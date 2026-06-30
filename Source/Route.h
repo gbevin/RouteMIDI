@@ -40,6 +40,7 @@ struct RouteInput
 
     mpe::Allocator mpeAlloc;              // voice allocation state for MPE expansion
     mpe::Collapser mpeCollapse;           // note tracking state for MPE collapse
+    mpe::Relocator mpeRelocate;           // collision tracking for MPE relocate
 };
 
 // A single MIDI output destination of a route.

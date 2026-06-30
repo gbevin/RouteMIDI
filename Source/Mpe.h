@@ -178,6 +178,26 @@ namespace mpe
         int noteOrder[17];          // trigger order per member channel (higher = more recent)
     };
 
+    // Per-input state used when relocating an MPE zone onto a smaller one, where
+    // several source member channels fold onto one destination channel. It tracks
+    // which source member channels currently hold a note (and their trigger order)
+    // so the channel-wide expression of an oversubscribed destination channel can
+    // follow the most recently triggered note.
+    struct Relocator
+    {
+        Relocator() { reset(); }
+
+        void reset()
+        {
+            counter = 0;
+            for (int i = 0; i < 17; ++i) { active[i] = false; order[i] = 0; }
+        }
+
+        int counter { 0 };   // monotonically increasing note-trigger counter
+        bool active[17];     // whether a note is held on each source member channel
+        int order[17];       // trigger order per source channel (higher = more recent)
+    };
+
     // Per-route state used to fan an MPE zone out across a route's output ports,
     // treating each output as one monophonic voice. It maps each active member
     // channel to an output port so a note (and its per-note expression) reaches

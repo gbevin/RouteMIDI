@@ -1511,21 +1511,81 @@ void ApplicationState::applyMpeOp(const ApplicationCommand& cmd, RouteInput& inp
             mpe::Zone src, dst;
             mpe::parseZone(cmd.opts_[0], src);
             mpe::parseZone(cmd.opts_[1], dst);
+            auto& rel = input.mpeRelocate;
 
-            MidiMessage out = msg;
+            // the master channel is zone-wide; just move it across
             if (ch == src.masterChannel())
             {
+                MidiMessage out = msg;
                 out.setChannel(dst.masterChannel());
+                output.add(out);
+                break;
             }
-            else
+
+            const int idx = src.memberIndexOf(ch);
+            if (idx < 0)
             {
-                const int idx = src.memberIndexOf(ch);
-                if (idx >= 0)
+                // not part of the source zone; pass through untouched
+                output.add(msg);
+                break;
+            }
+
+            // when the destination has fewer members, several source channels
+            // fold onto one destination channel by wrapping the member index
+            const int dstChannel = dst.memberChannel(idx % dst.members);
+
+            if (msg.isNoteOn() && msg.getVelocity() > 0)
+            {
+                rel.active[ch] = true;
+                rel.order[ch] = ++rel.counter;
+                MidiMessage out = msg;
+                out.setChannel(dstChannel);
+                output.add(out);
+                break;
+            }
+            if (msg.isNoteOff() || (msg.isNoteOn() && msg.getVelocity() == 0))
+            {
+                MidiMessage out = msg;
+                out.setChannel(dstChannel);
+                output.add(out);
+                rel.active[ch] = false;
+                break;
+            }
+
+            // pitch bend, channel pressure and timbre (CC 74) are channel-wide,
+            // so they collide when several notes share a destination channel
+            const bool isExpression = msg.isPitchWheel() || msg.isChannelPressure() ||
+                (msg.isController() && msg.getControllerNumber() == 74);
+            if (isExpression)
+            {
+                // find the most recently triggered note among the source channels
+                // that fold onto this same destination channel
+                int activeChannel = 0, bestOrder = 0;
+                for (int i = 0; i < src.members; ++i)
                 {
-                    // wrap with the destination size when it has fewer members
-                    out.setChannel(dst.memberChannel(idx % dst.members));
+                    if ((i % dst.members) != (idx % dst.members))
+                    {
+                        continue;
+                    }
+                    const int sourceChannel = src.memberChannel(i);
+                    if (rel.active[sourceChannel] && rel.order[sourceChannel] > bestOrder)
+                    {
+                        bestOrder = rel.order[sourceChannel];
+                        activeChannel = sourceChannel;
+                    }
+                }
+
+                // with at most one note on the destination channel the expression
+                // is genuinely per-note and passes through; once notes collide,
+                // only the most recently triggered note's expression is kept
+                if (activeChannel != 0 && ch != activeChannel)
+                {
+                    break;  // suppressed: another note owns this destination channel
                 }
             }
+
+            MidiMessage out = msg;
+            out.setChannel(dstChannel);
             output.add(out);
             break;
         }

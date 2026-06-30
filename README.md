@@ -286,7 +286,9 @@ RouteMIDI is *zone-aware*: it knows which channels belong to a zone, so it can r
 
 ### Routing MPE between zones
 
-`mpe <from> <to>` relocates a whole MPE stream from one zone to another, remapping the master channel and each member channel by position (member *i* of the source becomes member *i* of the destination). This is the safe way to, for instance, feed a Lower-Zone controller into a synth configured for the Upper Zone, or to place two controllers on two different zones of one multitimbral synth. If the destination has fewer member channels than the source uses, the extra members wrap around onto the available ones.
+`mpe <from> <to>` relocates a whole MPE stream from one zone to another, remapping the master channel and each member channel by position (member *i* of the source becomes member *i* of the destination). This is the safe way to, for instance, feed a Lower-Zone controller into a synth configured for the Upper Zone, or to place two controllers on two different zones of one multitimbral synth.
+
+If the destination has fewer member channels than the source uses, the extra members wrap around onto the available ones, so two notes can end up sharing a destination channel. While a destination channel holds a single note its pitch bend, channel pressure and CC 74 pass through as genuine per-note expression; once notes collide on it, those channel-wide dimensions follow a **last-note-wins** rule (only the most recently triggered note's expression is kept, falling back to the remaining note when it is released). Note-ons, note-offs and polyphonic aftertouch (which carries its own note number) always pass through unchanged.
 
 ```
 routemidi in "Seaboard" mpe lower upper out "Synth"      # Lower Zone -> Upper Zone

@@ -146,6 +146,72 @@ public:
             expectEquals(out[0].getChannel(), 10);
         }
 
+        beginTest("relocate keeps per-note expression when destinations don't collide");
+        {
+            // lower:2 -> lower:2: members map one-to-one, so both notes keep their
+            // own pitch bend
+            Array<MidiMessage> in;
+            in.add(MidiMessage::noteOn(2, 60, (uint8)100));
+            in.add(MidiMessage::noteOn(3, 64, (uint8)100));
+            in.add(MidiMessage::pitchWheel(2, 9000));
+            in.add(MidiMessage::pitchWheel(3, 5000));
+            auto out = runMpe(state, MPE_RELOCATE, {"lower:2", "lower:2"}, in);
+
+            int bendCount = 0, bend2 = -1, bend3 = -1;
+            for (const auto& m : out)
+                if (m.isPitchWheel())
+                {
+                    ++bendCount;
+                    if (m.getChannel() == 2) bend2 = m.getPitchWheelValue();
+                    if (m.getChannel() == 3) bend3 = m.getPitchWheelValue();
+                }
+            expectEquals(bendCount, 2);     // both per-note bends pass through
+            expectEquals(bend2, 9000);
+            expectEquals(bend3, 5000);
+        }
+
+        beginTest("relocate folds colliding notes' expression to last-note-wins");
+        {
+            // lower:4 (members 2-5) -> lower:2 (members 2-3): source channels 2 and
+            // 4 both fold onto destination channel 2
+            Array<MidiMessage> in;
+            in.add(MidiMessage::noteOn(2, 60, (uint8)100));            // older note
+            in.add(MidiMessage::noteOn(4, 64, (uint8)100));            // newest -> owns ch 2
+            in.add(MidiMessage::pitchWheel(2, 9000));                  // older: suppressed
+            in.add(MidiMessage::pitchWheel(4, 5000));                  // active: passes
+            in.add(MidiMessage::channelPressureChange(2, 50));        // older: suppressed
+            in.add(MidiMessage::channelPressureChange(4, 70));        // active: passes (as channel pressure)
+            auto out = runMpe(state, MPE_RELOCATE, {"lower:4", "lower:2"}, in);
+
+            int bend = -1, bendCount = 0, cp = -1, cpCount = 0;
+            for (const auto& m : out)
+            {
+                if (m.isPitchWheel())       { bend = m.getPitchWheelValue(); ++bendCount; expectEquals(m.getChannel(), 2); }
+                if (m.isChannelPressure())  { cp = m.getChannelPressureValue(); ++cpCount; expectEquals(m.getChannel(), 2); }
+            }
+            expectEquals(bendCount, 1);
+            expectEquals(bend, 5000);       // the active note's bend
+            expectEquals(cpCount, 1);
+            expectEquals(cp, 70);           // pressure stays channel pressure, last note wins
+        }
+
+        beginTest("relocate falls back to the remaining note after a collision releases");
+        {
+            Array<MidiMessage> in;
+            in.add(MidiMessage::noteOn(2, 60, (uint8)100));            // older note (ch 2)
+            in.add(MidiMessage::noteOn(4, 64, (uint8)100));            // newest -> owns dst ch 2
+            in.add(MidiMessage::noteOff(4, 64, (uint8)0));            // it releases
+            in.add(MidiMessage::pitchWheel(2, 7000));                 // ch 2 owns dst ch 2 again
+            in.add(MidiMessage::pitchWheel(4, 3000));                 // ch 4 no longer held: suppressed
+            auto out = runMpe(state, MPE_RELOCATE, {"lower:4", "lower:2"}, in);
+
+            int bend = -1, bendCount = 0;
+            for (const auto& m : out)
+                if (m.isPitchWheel()) { bend = m.getPitchWheelValue(); ++bendCount; }
+            expectEquals(bendCount, 1);
+            expectEquals(bend, 7000);
+        }
+
         beginTest("collapse folds every zone channel onto one channel");
         {
             Array<MidiMessage> in;
