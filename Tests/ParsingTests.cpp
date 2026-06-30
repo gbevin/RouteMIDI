@@ -167,6 +167,128 @@ public:
             expectEquals(route->filters.size(), 0);
         }
 
+        beginTest("Long command names land in the correct route buckets");
+        {
+            ApplicationState state;
+            parse(state, "input A control-change pitch-bend transpose 12 channel-set 2 "
+                         "nrpn-add 1000 50 mpe-mono lower 1 output B");
+            expectEquals(state.getRoutes().size(), 1);
+            auto* route = state.getRoutes()[0];
+
+            expectEquals(route->inputs.size(), 1);
+            expect(route->inputs[0]->inName == "A");
+            expectEquals(route->outputs.size(), 1);
+            expect(route->outputs[0]->name == "B");
+
+            // filters, in order
+            expectEquals(route->filters.size(), 2);
+            expect(route->filters[0].command_ == CONTROL_CHANGE);
+            expect(route->filters[1].command_ == PITCH_BEND);
+
+            // transforms keep their order and arguments
+            expectEquals(route->transforms.size(), 2);
+            expect(route->transforms[0].command_ == TRANSPOSE);
+            expect(route->transforms[0].opts_[0] == "12");
+            expect(route->transforms[1].command_ == CHANNEL_SET);
+            expect(route->transforms[1].opts_[0] == "2");
+
+            // RPN/NRPN value transforms live in the converter bucket
+            expectEquals(route->converters.size(), 1);
+            expect(route->converters[0].command_ == NRPN_ADD);
+            expect(route->converters[0].opts_[0] == "1000");
+            expect(route->converters[0].opts_[1] == "50");
+
+            // MPE operations land in their own bucket
+            expectEquals(route->mpeOps.size(), 1);
+            expect(route->mpeOps[0].command_ == MPE_COLLAPSE);
+            expect(route->mpeOps[0].opts_[0] == "lower");
+            expect(route->mpeOps[0].opts_[1] == "1");
+        }
+
+        beginTest("MPE zone filter and split parse into the right buckets (long names)");
+        {
+            ApplicationState state;
+            parse(state, "input A mpe-member lower:7 mpe-split lower:15 5 output B output C");
+            auto* route = state.getRoutes()[0];
+
+            expectEquals(route->filters.size(), 1);
+            expect(route->filters[0].command_ == MPE_MEMBER);
+            expect(route->filters[0].opts_[0] == "lower:7");
+
+            expectEquals(route->outputSplit.size(), 1);
+            expect(route->outputSplit[0].command_ == MPE_SPLIT);
+            expect(route->outputSplit[0].opts_[0] == "lower:15");
+            expect(route->outputSplit[0].opts_[1] == "5");
+
+            expectEquals(route->outputs.size(), 2);
+        }
+
+        beginTest("Variable-argument commands collect an optional value without swallowing the next command");
+        {
+            // cc with no number: the following "out" is not consumed as its argument
+            {
+                ApplicationState state;
+                parse(state, "in A cc out B");
+                auto* route = state.getRoutes()[0];
+                expectEquals(route->filters.size(), 1);
+                expect(route->filters[0].command_ == CONTROL_CHANGE);
+                expect(route->filters[0].opts_.isEmpty());
+                expectEquals(route->outputs.size(), 1);
+                expect(route->outputs[0]->name == "B");
+            }
+            // cc with a number captures it
+            {
+                ApplicationState state;
+                parse(state, "in A cc 7 out B");
+                auto* route = state.getRoutes()[0];
+                expectEquals(route->filters.size(), 1);
+                expect(route->filters[0].opts_[0] == "7");
+                expectEquals(route->outputs.size(), 1);
+            }
+            // cc14 (optional, omitted) followed by pc (optional, given)
+            {
+                ApplicationState state;
+                parse(state, "in A cc14 pc 5 out B");
+                auto* route = state.getRoutes()[0];
+                expectEquals(route->filters.size(), 2);
+                expect(route->filters[0].command_ == CONTROL_CHANGE_14BIT);
+                expect(route->filters[0].opts_.isEmpty());
+                expect(route->filters[1].command_ == PROGRAM_CHANGE);
+                expect(route->filters[1].opts_[0] == "5");
+            }
+        }
+
+        beginTest("Stdin and stdout ports are recognized from '-'");
+        {
+            ApplicationState state;
+            parse(state, "in - out -");
+            auto* route = state.getRoutes()[0];
+            expectEquals(route->inputs.size(), 1);
+            expect(route->inputs[0]->isStdin);
+            expect(route->inputs[0]->inName == "stdin");
+            expectEquals(route->outputs.size(), 1);
+            expect(route->outputs[0]->isStdout);
+        }
+
+        beginTest("Range selectors are captured as option tokens");
+        {
+            ApplicationState state;
+            parse(state, "in A cc 1..10 ch 1..4 out B");
+            auto* route = state.getRoutes()[0];
+            expectEquals(route->filters.size(), 2);
+            expect(route->filters[0].command_ == CONTROL_CHANGE);
+            expect(route->filters[0].opts_[0] == "1..10");
+            expect(route->filters[1].command_ == CHANNEL);
+            expect(route->filters[1].opts_[0] == "1..4");
+        }
+
+        beginTest("Commands before an input start no route");
+        {
+            ApplicationState state;
+            parse(state, "transp 12 out B cc");
+            expectEquals(state.getRoutes().size(), 0);
+        }
+
         beginTest("Decimal and hexadecimal number parsing");
         {
             ApplicationState dec;
