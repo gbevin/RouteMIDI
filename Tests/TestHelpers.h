@@ -1,0 +1,32 @@
+/*
+ * This file is part of RouteMIDI.
+ * Copyright (command) 2017-2026 Uwyn LLC.  https://www.uwyn.com
+ *
+ * RouteMIDI is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * RouteMIDI is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+#pragma once
+
+#include "JuceHeader.h"
+
+#include "../Source/ApplicationCommand.h"
+
+// builds a command with the given index and string options, as the parser would
+inline ApplicationCommand makeCommand(CommandIndex command, StringArray options = {})
+{
+    ApplicationCommand cmd = ApplicationCommand::Dummy();
+    cmd.command_ = command;
+    cmd.opts_ = options;
+    return cmd;
+}
