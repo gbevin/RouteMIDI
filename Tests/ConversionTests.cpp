@@ -298,6 +298,28 @@ public:
             expectEquals(countController(out, 100, 127), 1);
         }
 
+        beginTest("RPN interception mirrors NRPN: selects and closing null consumed");
+        {
+            // the RPN controller set (100/101) is intercepted exactly like the NRPN
+            // set (98/99): a convert rpn rule consumes the selects and the null that
+            // closes its parameter (param 4128 has LSB 32 > 31, so this stays a pure
+            // framing test independent of the RPN zero-extension scaling)
+            Array<MidiMessage> in;
+            in.add(MidiMessage::controllerEvent(1, 101, 32));   // RPN 4128 select
+            in.add(MidiMessage::controllerEvent(1, 100, 32));
+            in.add(MidiMessage::controllerEvent(1, 6, 3));      // data -> converted to CC 2
+            in.add(MidiMessage::controllerEvent(1, 38, 37));
+            in.add(MidiMessage::controllerEvent(1, 101, 127));  // RPN null closing 4128
+            in.add(MidiMessage::controllerEvent(1, 100, 127));
+            auto out = runConvert(state, {"rpn", "4128", "cc", "2"}, in);
+
+            expect(lastCC(out, 2) >= 0);                        // the RPN was converted
+            expectEquals(countController(out, 101, 127), 0);    // closing null consumed
+            expectEquals(countController(out, 100, 127), 0);
+            expectEquals(countController(out, 101, 32), 0);     // 4128 selects consumed
+            expectEquals(countController(out, 100, 32), 0);
+        }
+
         beginTest("LinnStrument-style frame: 4129+null pass through, 4128 converts cleanly");
         {
             // the device streams NRPN 4129 then NRPN 4128, each followed by an RPN
