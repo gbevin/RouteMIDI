@@ -1,6 +1,6 @@
 name: Release
 
-# Runs when a version tag (e.g. v0.9.0) is pushed. It builds and packages the
+# Runs when a version tag (e.g. 0.9.0) is pushed. It builds and packages the
 # Windows binary the way the release is distributed -- a zip holding a versioned
 # folder with the executable, the readme and the license, plus a SHA-256 checksum
 # -- and, together with the signed macOS package, drafts a GitHub release.
@@ -15,7 +15,7 @@ name: Release
 
 on:
   push:
-    tags: [ 'v*' ]
+    tags: [ '[0-9]+.[0-9]+.[0-9]+' ]
 
 permissions:
   contents: write
@@ -32,7 +32,7 @@ jobs:
       - name: Package
         shell: pwsh
         run: |
-          $version = "${{ github.ref_name }}".TrimStart('v')
+          $version = "${{ github.ref_name }}"
           $pkg = "routemidi-windows-$version"
           New-Item -ItemType Directory -Path $pkg | Out-Null
           Copy-Item -Path "Builds/VisualStudio2017/x64/Release/ConsoleApp/routemidi.exe", "README.md", "COPYING.md" -Destination $pkg
@@ -87,7 +87,7 @@ jobs:
           rm "$RUNNER_TEMP/notary.p8"
 
       - name: Build, sign, notarize and package
-        run: bash -e ./Scripts/build-macos.sh "${GITHUB_REF_NAME#v}"
+        run: bash -e ./Scripts/build-macos.sh "$GITHUB_REF_NAME"
 
       - name: Checksum
         run: |
