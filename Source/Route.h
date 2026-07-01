@@ -84,6 +84,20 @@ struct RouteInput
     int ccMsb[16][32] {};                 // last 14-bit CC MSB, per channel and controller
     bool ccMsbValid[16][32] {};           // whether an MSB has been seen yet
 
+    // pending RPN/NRPN parameter-select bytes, per channel, buffered until the
+    // MSB+LSB pair is complete so the converter can decide whether the selected
+    // parameter is intercepted (drop its constituents) or passes through (forward
+    // the raw selects verbatim)
+    int rpnSelMSB[16];                    // pending select MSB byte, -1 = none yet
+    int rpnSelLSB[16];                    // pending select LSB byte, -1 = none yet
+    MidiMessage rpnSelBuf[16][4];         // raw select CCs awaiting classification
+    int rpnSelBufLen[16] {};              // number buffered per channel
+    bool rpnSelIntercepted[16] {};        // the currently-selected parameter is a
+                                          // converter target, so its closing null
+                                          // (in either RPN or NRPN form) is consumed too
+
+    RouteInput() { for (int c = 0; c < 16; ++c) { rpnSelMSB[c] = -1; rpnSelLSB[c] = -1; } }
+
     // per-zone state (indexed [0] = Lower, [1] = Upper) so a Lower-zone and an
     // Upper-zone operation can run on the same input without sharing state
     mpe::Allocator mpeAlloc[2];           // voice allocation state for MPE expansion

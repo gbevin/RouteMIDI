@@ -330,6 +330,70 @@ ApplicationState::ApplicationState()
     currentCommand_ = ApplicationCommand::Dummy();
 }
 
+ApplicationState::~ApplicationState()
+{
+    stopOutputSender();
+}
+
+void ApplicationState::startOutputSender()
+{
+    if (senderThread_.joinable())
+    {
+        return;
+    }
+    senderShouldExit_ = false;
+    senderThread_ = std::thread([this]
+    {
+        for (;;)
+        {
+            std::deque<OutgoingMidi> batch;
+            {
+                std::unique_lock<std::mutex> lock(sendQueueMutex_);
+                sendQueueCv_.wait(lock, [this] { return senderShouldExit_.load() || !sendQueue_.empty(); });
+                if (senderShouldExit_.load() && sendQueue_.empty())
+                {
+                    return;
+                }
+                batch.swap(sendQueue_);   // drain everything pending in one go, in order
+            }
+            for (auto& item : batch)
+            {
+                if (item.out != nullptr)
+                {
+                    item.out->sendMessageNow(item.msg);
+                }
+            }
+        }
+    });
+}
+
+void ApplicationState::stopOutputSender()
+{
+    if (!senderThread_.joinable())
+    {
+        return;
+    }
+    {
+        std::lock_guard<std::mutex> lock(sendQueueMutex_);
+        senderShouldExit_ = true;
+    }
+    sendQueueCv_.notify_one();
+    senderThread_.join();   // drains any messages still queued before returning
+}
+
+void ApplicationState::enqueueSend(MidiOutput* out, const MidiMessage& msg)
+{
+    if (out == nullptr)
+    {
+        return;
+    }
+    {
+        std::lock_guard<std::mutex> lock(sendQueueMutex_);
+        sendQueue_.push_back({ out, msg });
+    }
+    sendQueueCv_.notify_one();
+}
+
 void ApplicationState::initialise(JUCEApplicationBase& app)
 {
     StringArray cmdLineParams(app.getCommandLineParameterArray());
@@ -379,18 +443,24 @@ void ApplicationState::initialise(JUCEApplicationBase& app)
     {
         // a "in -" source reads text MIDI from standard input until it closes,
         // then there is nothing left to route, so quit
+        startOutputSender();
         startTimer(200);
         readStdinMidi();
         app.systemRequestedQuit();
     }
     else
     {
+        startOutputSender();
         startTimer(200);
     }
 }
 
 void ApplicationState::shutdown()
 {
+    // stop the reconnect timer first so it cannot enqueue more sends, then flush
+    // any panic/notes-off through the sender before it is torn down
+    stopTimer();
+
     for (auto* route : routes_)
     {
         if (route->panic)
@@ -405,6 +475,8 @@ void ApplicationState::shutdown()
             }
         }
     }
+
+    stopOutputSender();   // drains the queue (including any panic) before returning
 }
 
 bool ApplicationState::hasStdinInput() const
@@ -473,20 +545,20 @@ Route* ApplicationState::routeForNewInput()
     return route;
 }
 
-bool ApplicationState::isMidiInDeviceAvailable(const String& name)
-{
-    for (auto&& device : MidiInput::getAvailableDevices())
-    {
-        if (device.name == name)
-        {
-            return true;
-        }
-    }
-    return false;
-}
-
 void ApplicationState::timerCallback()
 {
+    // Enumerate CoreMIDI devices WITHOUT holding midiCallbackLock_. These queries
+    // can take milliseconds, and doing them under the lock stalls the real-time
+    // MIDI input callback (which needs the same lock), risking dropped packets.
+    // Snapshot first, then take the lock only to reconcile connection state.
+    auto availableIns  = MidiInput::getAvailableDevices();
+    auto availableOuts = MidiOutput::getAvailableDevices();
+    StringArray inNames;
+    for (auto&& d : availableIns)
+    {
+        inNames.add(d.name);
+    }
+
     const ScopedLock sl(midiCallbackLock_);
 
     for (auto* route : routes_)
@@ -498,7 +570,7 @@ void ApplicationState::timerCallback()
                 continue;
             }
 
-            if (input->fullInName.isNotEmpty() && !isMidiInDeviceAvailable(input->fullInName))
+            if (input->fullInName.isNotEmpty() && !inNames.contains(input->fullInName))
             {
                 std::cerr << "MIDI input port \"" << input->fullInName << "\" got disconnected, waiting" << std::endl;
                 input->fullInName = String();
@@ -522,7 +594,7 @@ void ApplicationState::timerCallback()
         {
             if (!dest->isVirtual && !dest->isStdout && dest->out == nullptr && dest->name.isNotEmpty())
             {
-                for (auto&& device : MidiOutput::getAvailableDevices())
+                for (auto&& device : availableOuts)
                 {
                     if (device.name.containsIgnoreCase(dest->name))
                     {
@@ -1149,8 +1221,8 @@ void ApplicationState::sendPanic(Route& route)
         }
         for (int channel = 1; channel <= 16; ++channel)
         {
-            dest->out->sendMessageNow(MidiMessage::controllerEvent(channel, 64, 0));   // sustain off
-            dest->out->sendMessageNow(MidiMessage::controllerEvent(channel, 123, 0));  // all notes off
+            enqueueSend(dest->out.get(), MidiMessage::controllerEvent(channel, 64, 0));   // sustain off
+            enqueueSend(dest->out.get(), MidiMessage::controllerEvent(channel, 123, 0));  // all notes off
         }
     }
 
@@ -1175,8 +1247,8 @@ void ApplicationState::sendZoneReset(Route& route)
         }
         for (int channel = 1; channel <= 16; ++channel)
         {
-            dest->out->sendMessageNow(MidiMessage::controllerEvent(channel, 123, 0));  // all notes off
-            dest->out->sendMessageNow(MidiMessage::controllerEvent(channel, 121, 0));  // reset all controllers
+            enqueueSend(dest->out.get(), MidiMessage::controllerEvent(channel, 123, 0));  // all notes off
+            enqueueSend(dest->out.get(), MidiMessage::controllerEvent(channel, 121, 0));  // reset all controllers
         }
     }
 
@@ -1292,7 +1364,7 @@ void ApplicationState::sendToDest(OutputDest* dest, const MidiMessage& msg)
     }
     else if (dest->out)
     {
-        dest->out->sendMessageNow(msg);
+        enqueueSend(dest->out.get(), msg);
     }
 }
 
@@ -2213,13 +2285,82 @@ void ApplicationState::processConverters(Route& route, RouteInput& input, const 
         }
     }
 
-    // When the route converts any RPN/NRPN, the converter takes over the whole
-    // RPN controller set (6, 38, 98-101) and reassembles every (N)RPN. Targeted
-    // parameters are converted; all others are regenerated and passed through.
+    // When the route converts or transforms any RPN/NRPN, the converter takes
+    // over the whole RPN controller set (6, 38, 98-101) and reassembles every
+    // (N)RPN. A parameter targeted by a rule is intercepted - its constituent
+    // CCs are consumed and replaced by the converted or transformed result -
+    // while every other parameter, and the RPN/NRPN null that deselects it,
+    // passes through verbatim.
     const bool isRpnCC = (cc == 6 || cc == 38 || cc == 98 || cc == 99 || cc == 100 || cc == 101);
     if (haveRpnRule && isRpnCC)
     {
+        // whether any convert or transform rule targets this parameter as a source
+        auto paramIntercepted = [&](int param, bool isNRPN) -> bool
+        {
+            for (auto& cmd : route.converters)
+            {
+                ConvType st, dt;
+                if (parseConvType(cmd.opts_[0], st) && parseConvType(cmd.opts_[2], dt)
+                    && ((st == CONV_RPN && !isNRPN) || (st == CONV_NRPN && isNRPN))
+                    && asDecOrHexIntValue(cmd.opts_[1]) == param)
+                {
+                    return true;
+                }
+                if (isRpnTransform(cmd.command_))
+                {
+                    const bool nrpnT = (cmd.command_ == NRPN_ADD || cmd.command_ == NRPN_SCALE || cmd.command_ == NRPN_CURVE);
+                    if (nrpnT == isNRPN && asDecOrHexIntValue(cmd.opts_[0]) == param)
+                        return true;
+                }
+            }
+            return false;
+        };
+        auto flushSelects = [&]()
+        {
+            for (int i = 0; i < input.rpnSelBufLen[ch - 1]; ++i)
+                output.add(input.rpnSelBuf[ch - 1][i]);
+            input.rpnSelBufLen[ch - 1] = 0;
+        };
+
+        // keep the detector's per-channel state current for the data entry below
         auto parsed = input.rpnDetector.tryParse(ch, cc, val);
+
+        // parameter select (98/99 = NRPN, 100/101 = RPN) or null: buffer the CC
+        // and, once the MSB+LSB pair is complete, either drop it (its parameter is
+        // intercepted, so the constituents disappear into the conversion) or
+        // forward the buffered CCs verbatim (an untargeted parameter). The null
+        // (MSB+LSB both 127) that closes a parameter is dropped along with it when
+        // that parameter was intercepted, even if the device closes with the
+        // universal RPN null (100/101) after selecting with NRPN (98/99), as the
+        // LinnStrument does.
+        if (cc != 6 && cc != 38)
+        {
+            const bool nrpnSel = (cc == 98 || cc == 99);
+            if (input.rpnSelBufLen[ch - 1] >= 4)   // shouldn't happen; drain as a safety valve
+                flushSelects();
+            input.rpnSelBuf[ch - 1][input.rpnSelBufLen[ch - 1]++] = msg;
+            if (cc == 99 || cc == 101) input.rpnSelMSB[ch - 1] = val;
+            else                       input.rpnSelLSB[ch - 1] = val;
+
+            if (input.rpnSelMSB[ch - 1] >= 0 && input.rpnSelLSB[ch - 1] >= 0)
+            {
+                const int param = (input.rpnSelMSB[ch - 1] << 7) | input.rpnSelLSB[ch - 1];
+                const bool isNull = (param == 0x3fff);
+                const bool drop = isNull ? input.rpnSelIntercepted[ch - 1]
+                                         : paramIntercepted(param, nrpnSel);
+                if (drop)
+                    input.rpnSelBufLen[ch - 1] = 0;   // replaced by the conversion output
+                else
+                    flushSelects();                   // pass through unchanged
+                // a real select updates which parameter is active; a null deselects
+                input.rpnSelIntercepted[ch - 1] = isNull ? false : drop;
+                input.rpnSelMSB[ch - 1] = -1;
+                input.rpnSelLSB[ch - 1] = -1;
+            }
+            return;
+        }
+
+        // data entry (6/38): the detector has assembled a value for the parameter
         if (parsed.has_value())
         {
             const auto& rpn = *parsed;
@@ -2237,14 +2378,16 @@ void ApplicationState::processConverters(Route& route, RouteInput& input, const 
                     srcNum == rpn.parameterNumber)
                 {
                     const int dstNum = dstNumber(dt, cmd.opts_[3]);
+                    input.rpnSelBufLen[ch - 1] = 0;   // drop any dangling selects
                     emitConversion(output, ch, rpn.value, srcBits, dt, dstNum,
                                    scaleMethodFor(st, srcNum, dt, dstNum), ts);
                     return;
                 }
             }
 
-            // no convert rule claimed it; apply any matching value transforms
-            // (add/scale/curve) and regenerate the (N)RPN, unchanged if none match
+            // value transform (add/scale/curve) on this parameter: apply and
+            // regenerate the (N)RPN with the modified value
+            bool transformed = false;
             int newValue = rpn.value;
             const int maxValue = rpn.is14BitValue ? 16383 : 127;
             for (auto& cmd : route.converters)
@@ -2262,6 +2405,7 @@ void ApplicationState::processConverters(Route& route, RouteInput& input, const 
                 {
                     continue;
                 }
+                transformed = true;
                 switch (cmd.command_)
                 {
                     case NRPN_ADD:
@@ -2281,16 +2425,24 @@ void ApplicationState::processConverters(Route& route, RouteInput& input, const 
                 }
             }
 
-            MidiBuffer buffer = MidiRPNGenerator::generate(rpn.channel, rpn.parameterNumber, newValue,
-                                                           rpn.isNRPN, rpn.is14BitValue);
-            for (const auto meta : buffer)
+            if (transformed)
             {
-                auto m = meta.getMessage();
-                m.setTimeStamp(ts);
-                output.add(m);
+                input.rpnSelBufLen[ch - 1] = 0;   // regeneration re-emits the selects
+                MidiBuffer buffer = MidiRPNGenerator::generate(rpn.channel, rpn.parameterNumber, newValue,
+                                                               rpn.isNRPN, rpn.is14BitValue);
+                for (const auto meta : buffer)
+                {
+                    auto m = meta.getMessage();
+                    m.setTimeStamp(ts);
+                    output.add(m);
+                }
+                return;
             }
         }
-        // the constituent CC is consumed in all cases
+
+        // untargeted: forward any buffered selects and this data entry verbatim
+        flushSelects();
+        output.add(msg);
         return;
     }
 

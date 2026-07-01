@@ -113,6 +113,22 @@ namespace
         return out;
     }
 
+    // counts how many times a specific controller-value pair appears in the output
+    int countController(const Array<MidiMessage>& out, int ccNum, int value)
+    {
+        int n = 0;
+        for (const auto& m : out)
+            if (m.isController() && m.getControllerNumber() == ccNum && m.getControllerValue() == value)
+                ++n;
+        return n;
+    }
+
+    bool isController(const MidiMessage& m, int ch, int ccNum, int value)
+    {
+        return m.isController() && m.getChannel() == ch
+            && m.getControllerNumber() == ccNum && m.getControllerValue() == value;
+    }
+
     bool parseLastRpn(const Array<MidiMessage>& out, MidiRPNMessage& result)
     {
         MidiRPNDetector detector;
@@ -223,6 +239,84 @@ public:
             expect(rpn.isNRPN);
             expectEquals(rpn.parameterNumber, 99);
             expectEquals(rpn.value, 5000);
+        }
+
+        beginTest("Untargeted NRPN passes through verbatim (no regeneration or doubling)");
+        {
+            // with a convert rule for NRPN 4128, an unrelated NRPN 4129 must pass
+            // through byte-for-byte - not be reassembled and re-emitted (which used
+            // to duplicate the parameter select and add an intermediate 7-bit value)
+            Array<MidiMessage> in;
+            in.add(MidiMessage::controllerEvent(1, 99, 32));   // param MSB (4129 >> 7)
+            in.add(MidiMessage::controllerEvent(1, 98, 33));   // param LSB (4129 & 127)
+            in.add(MidiMessage::controllerEvent(1, 6, 9));     // data MSB
+            in.add(MidiMessage::controllerEvent(1, 38, 44));   // data LSB
+            auto out = runConvert(state, {"nrpn", "4128", "cc", "2"}, in);
+            expectEquals(out.size(), 4);
+            expect(isController(out[0], 1, 99, 32));
+            expect(isController(out[1], 1, 98, 33));
+            expect(isController(out[2], 1, 6, 9));
+            expect(isController(out[3], 1, 38, 44));
+        }
+
+        beginTest("An intercepted parameter's closing null is consumed with it");
+        {
+            // the null (CC 101/100 = 127, or CC 99/98 = 127) that deselects an
+            // intercepted parameter is part of its framing: the selects were consumed
+            // and replaced by the CC, so the matching deselect is dropped too - even
+            // when the device closes with the universal RPN null after an NRPN select
+            Array<MidiMessage> in;
+            in.add(MidiMessage::controllerEvent(1, 99, 32));    // NRPN 4128 select
+            in.add(MidiMessage::controllerEvent(1, 98, 32));
+            in.add(MidiMessage::controllerEvent(1, 6, 3));      // data -> converted to CC 2
+            in.add(MidiMessage::controllerEvent(1, 38, 37));
+            in.add(MidiMessage::controllerEvent(1, 101, 127));  // RPN null closing 4128
+            in.add(MidiMessage::controllerEvent(1, 100, 127));
+            auto out = runConvert(state, {"nrpn", "4128", "cc", "2"}, in);
+
+            expect(lastCC(out, 2) >= 0);                        // the NRPN was converted
+            expectEquals(countController(out, 101, 127), 0);    // closing null consumed
+            expectEquals(countController(out, 100, 127), 0);
+            expectEquals(countController(out, 99, 32), 0);      // 4128 selects consumed
+            expectEquals(countController(out, 98, 32), 0);
+        }
+
+        beginTest("An untargeted parameter's null still passes through");
+        {
+            // a null that deselects a parameter the converter never intercepted must
+            // reach the destination unchanged
+            Array<MidiMessage> in;
+            in.add(MidiMessage::controllerEvent(1, 99, 32));    // NRPN 4129 select (untargeted)
+            in.add(MidiMessage::controllerEvent(1, 98, 33));
+            in.add(MidiMessage::controllerEvent(1, 6, 3));
+            in.add(MidiMessage::controllerEvent(1, 38, 37));
+            in.add(MidiMessage::controllerEvent(1, 101, 127));  // RPN null closing 4129
+            in.add(MidiMessage::controllerEvent(1, 100, 127));
+            auto out = runConvert(state, {"nrpn", "4128", "cc", "2"}, in);
+
+            expectEquals(countController(out, 101, 127), 1);    // null survives
+            expectEquals(countController(out, 100, 127), 1);
+        }
+
+        beginTest("LinnStrument-style frame: 4129+null pass through, 4128 converts cleanly");
+        {
+            // the device streams NRPN 4129 then NRPN 4128, each followed by an RPN
+            // null. Only 4128 is targeted: it becomes CC 2 and its whole frame - the
+            // selects and the closing null - disappears, while the untargeted 4129 and
+            // its null are forwarded untouched
+            auto cc = [](int n, int v) { return MidiMessage::controllerEvent(1, n, v); };
+            Array<MidiMessage> in;
+            in.add(cc(99, 32)); in.add(cc(98, 33)); in.add(cc(6, 9)); in.add(cc(38, 44));   // NRPN 4129
+            in.add(cc(101, 127)); in.add(cc(100, 127));                                     // 4129 null
+            in.add(cc(99, 32)); in.add(cc(98, 32)); in.add(cc(6, 3)); in.add(cc(38, 37));   // NRPN 4128
+            in.add(cc(101, 127)); in.add(cc(100, 127));                                     // 4128 null
+            auto out = runConvert(state, {"nrpn", "4128", "cc", "2"}, in);
+
+            expectEquals(countController(out, 2, 3), 2);        // 4128 -> CC 2 (7-bit + 14-bit)
+            expectEquals(countController(out, 100, 127), 1);    // only 4129's null survives
+            expectEquals(countController(out, 101, 127), 1);
+            expectEquals(countController(out, 98, 33), 1);      // 4129 select forwarded once
+            expectEquals(countController(out, 98, 32), 0);      // 4128 select consumed
         }
 
         beginTest("Non Control Change messages pass through a converter route");

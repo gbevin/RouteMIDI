@@ -24,10 +24,17 @@
 #include "Route.h"
 #include "ScriptMidiMessageClass.h"
 
+#include <atomic>
+#include <condition_variable>
+#include <deque>
+#include <mutex>
+#include <thread>
+
 class ApplicationState : public MidiInputCallback, public Timer
 {
 public:
     ApplicationState();
+    ~ApplicationState() override;
     void initialise(JUCEApplicationBase& app);
     void shutdown();
 
@@ -80,11 +87,27 @@ private:
     void createVirtualInput(RouteInput& input, const String& name);
     OutputDest* openOutput(const String& name);
     OutputDest* createVirtualOutput(const String& name);
-    static bool isMidiInDeviceAvailable(const String& name);
 
     void routeMessage(Route& route, RouteInput& input, const MidiMessage& msg);
     void applyMpeOp(const ApplicationCommand& cmd, RouteInput& input, const MidiMessage& msg, Array<MidiMessage>& output);
     void sendToDest(OutputDest* dest, const MidiMessage& msg);
+
+    // Outgoing hardware sends are handed to a dedicated thread so the real-time
+    // MIDI input callback never blocks on MIDI output I/O. Under a heavy stream
+    // (e.g. a full-hand MPE controller flooding NRPN) doing sendMessageNow inline
+    // on the callback made the callback slow enough that CoreMIDI dropped incoming
+    // packets - a lost note-off is a stuck note. The callback now only routes and
+    // enqueues; this thread drains the queue.
+    void startOutputSender();
+    void stopOutputSender();
+    void enqueueSend(MidiOutput* out, const MidiMessage& msg);
+
+    struct OutgoingMidi { MidiOutput* out; MidiMessage msg; };
+    std::deque<OutgoingMidi> sendQueue_;
+    std::mutex sendQueueMutex_;
+    std::condition_variable sendQueueCv_;
+    std::thread senderThread_;
+    std::atomic<bool> senderShouldExit_ { false };
     void sendZoneReset(Route& route);
     void sendPanic(Route& route);
     bool hasStdinInput() const;
