@@ -75,6 +75,7 @@ enum CommandIndex
     TUNE_REQUEST,
     NOTE_RANGE,
     VELOCITY_RANGE,
+    CONTROL_CHANGE_RANGE,
     IN_SCALE,
     MPE_MASTER,
     MPE_MEMBER,

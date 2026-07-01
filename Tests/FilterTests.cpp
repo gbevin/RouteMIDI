@@ -151,6 +151,18 @@ public:
             expect(! state.passesFilters(route, MidiMessage::controllerEvent(1, 7, 100)));
         }
 
+        beginTest("ccrange passes a controller only within a value range");
+        {
+            Route route;
+            route.filters.add(makeCommand(CONTROL_CHANGE_RANGE, {"1", "64", "127"}));
+            expect(  state.passesFilters(route, MidiMessage::controllerEvent(1, 1, 100)));  // in range
+            expect(  state.passesFilters(route, MidiMessage::controllerEvent(1, 1, 64)));   // lower bound
+            expect(  state.passesFilters(route, MidiMessage::controllerEvent(1, 1, 127)));  // upper bound
+            expect(! state.passesFilters(route, MidiMessage::controllerEvent(1, 1, 63)));   // below range
+            expect(! state.passesFilters(route, MidiMessage::controllerEvent(1, 7, 100)));  // a different CC
+            expect(! state.passesFilters(route, MidiMessage::noteOn(1, 60, (uint8)100)));   // a non-CC
+        }
+
         beginTest("inscale passes only notes that belong to the key");
         {
             Route route;

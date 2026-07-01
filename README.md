@@ -83,6 +83,8 @@ Filters:
   tun                  Pass Tune Request
   noterange low high   Pass notes within a note range (key split)
   velrange  low high   Pass note-ons within a velocity range (vel split)
+  ccrange   number low Pass a Control Change only when its value is in a range
+            high
   inscale   root scale Pass notes that belong to a scale (root and name)
   mpemaster zone[:n]   Pass the master channel of an MPE zone (e.g. lower)
   mpemember zone[:n]   Pass the member channels of an MPE zone (e.g. upper:7)
@@ -173,14 +175,14 @@ Alternatively, you can use the following long versions of the commands:
   poly-pressure control-change control-change-14 program-change
   channel-pressure pitch-bend system-realtime continue active-sensing reset
   system-common system-exclusive system-exclusive-file time-code song-position
-  song-select tune-request note-range velocity-range in-scale mpe-master
-  mpe-member mpe-zone channel-map channel-set channel-add transpose
-  diatonic-transpose note-map note-to-control-change control-change-to-note
-  note-to-program-change velocity-scale velocity-set velocity-add
-  velocity-curve velocity-clip velocity-compress control-change-map
-  control-change-add control-change-scale control-change-curve
-  program-change-map program-change-add pitch-bend-add pitch-bend-scale
-  pitch-bend-set channel-pressure-add channel-pressure-scale
+  song-select tune-request note-range velocity-range control-change-range
+  in-scale mpe-master mpe-member mpe-zone channel-map channel-set channel-add
+  transpose diatonic-transpose note-map note-to-control-change
+  control-change-to-note note-to-program-change velocity-scale velocity-set
+  velocity-add velocity-curve velocity-clip velocity-compress
+  control-change-map control-change-add control-change-scale
+  control-change-curve program-change-map program-change-add pitch-bend-add
+  pitch-bend-scale pitch-bend-set channel-pressure-add channel-pressure-scale
   channel-pressure-set channel-pressure-curve nrpn-add nrpn-scale nrpn-curve
   rpn-add rpn-scale rpn-curve javascript javascript-file mpe-mono mpe-expand
   mpe-split mpe-bend mpe-sensitivity
@@ -224,6 +226,8 @@ routemidi in "Keyboard" ch 1..4 out "Synth"         # only channels 1-4
 
 The `noterange` and `velrange` filters pass notes within a note or velocity range, which (combined with the multi-route model) makes keyboard and velocity splits easy. Unlike `on lo..hi` (which matches only note-ons), `noterange` matches note-ons, note-offs and poly pressure together, and `velrange` always passes note-offs so a velocity split can't leave notes stuck.
 
+The `ccrange` filter is the same idea for a controller: it passes a Control Change only when its value falls within a `low high` window, so `ccrange 1 64 127` lets the modulation wheel through only in its upper half. As always, `not ccrange 1 64 127` inverts it (blocking that window and passing everything else).
+
 The `cc14`, `nrpn` and `rpn` filters match the constituent Control Change messages of a 14-bit CC, an NRPN or an RPN. `cc14` without a number passes every 14-bit-capable controller (MSB 0-31 together with its LSB 32-63), or with a number just that MSB controller and its LSB. `nrpn` passes the NRPN traffic (CC 98, 99 plus the data-entry CC 6, 38) and `rpn` the RPN traffic (CC 100, 101 plus CC 6, 38).
 
 The `inscale` filter passes only the notes that belong to a key, taking a root and a scale name from the [same list as the `scale` transform](#transforms). It's the filtering counterpart of `scale`: where `scale` bends stray notes onto the nearest scale note, `inscale` simply drops them (and `not inscale` keeps only the out-of-key notes). It matches note-ons, note-offs and poly pressure together, so a note that passes is always released.
@@ -234,6 +238,7 @@ routemidi in "Keyboard" not clock out "Synth"       # everything except clock
 routemidi in "Keyboard" ch 1 cc 1 out "Synth"       # only CC 1 on channel 1
 routemidi in "Knobs" rpn out "Synth"                # only RPN traffic
 routemidi in "Keyboard" inscale C major out "Synth" # only notes in C major
+routemidi in "Wheel" ccrange 1 64 127 out "Synth"   # mod wheel only in its top half
 # key split: bottom half to a bass, top half to a lead
 routemidi in "Keyboard" noterange C-2 B2 out "Bass" \
           in "Keyboard" noterange C3 G8 out "Lead"

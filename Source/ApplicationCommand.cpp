@@ -230,6 +230,7 @@ bool ApplicationCommand::isFilter() const
         case TUNE_REQUEST:
         case NOTE_RANGE:
         case VELOCITY_RANGE:
+        case CONTROL_CHANGE_RANGE:
         case IN_SCALE:
         case MPE_MASTER:
         case MPE_MEMBER:
@@ -398,6 +399,11 @@ bool ApplicationCommand::matches(ApplicationState& state, const MidiMessage& msg
             return msg.isNoteOn() &&
                 msg.getVelocity() >= state.asDecOrHex7BitValue(opts_[0]) &&
                 msg.getVelocity() <= state.asDecOrHex7BitValue(opts_[1]);
+        case CONTROL_CHANGE_RANGE:
+            return checkChannel(msg, channelLow, channelHigh) && msg.isController() &&
+                msg.getControllerNumber() == state.asDecOrHex7BitValue(opts_[0]) &&
+                msg.getControllerValue() >= state.asDecOrHex7BitValue(opts_[1]) &&
+                msg.getControllerValue() <= state.asDecOrHex7BitValue(opts_[2]);
         case IN_SCALE:
         {
             // pass note messages whose note belongs to the given key and scale

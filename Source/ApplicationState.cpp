@@ -264,6 +264,7 @@ ApplicationState::ApplicationState()
     commands_.add({"tun",       "tune-request",           TUNE_REQUEST,            0, {""},                       {"Pass Tune Request"}});
     commands_.add({"noterange", "note-range",             NOTE_RANGE,              2, {"low", "high"},            {"Pass notes within a note range (key split)"}});
     commands_.add({"velrange",  "velocity-range",         VELOCITY_RANGE,          2, {"low", "high"},            {"Pass note-ons within a velocity range (vel split)"}});
+    commands_.add({"ccrange",   "control-change-range",   CONTROL_CHANGE_RANGE,    3, {"number", "low", "high"},  {"Pass a Control Change only when its value is in a range"}});
     commands_.add({"inscale",   "in-scale",               IN_SCALE,                2, {"root", "scale"},          {"Pass notes that belong to a scale (root and name)"}});
     commands_.add({"mpemaster", "mpe-master",             MPE_MASTER,              1, {"zone[:n]"},               {"Pass the master channel of an MPE zone (e.g. lower)"}});
     commands_.add({"mpemember", "mpe-member",             MPE_MEMBER,              1, {"zone[:n]"},               {"Pass the member channels of an MPE zone (e.g. upper:7)"}});
