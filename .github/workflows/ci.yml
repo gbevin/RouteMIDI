@@ -1,0 +1,76 @@
+name: CI
+
+# Builds RouteMIDI and its unit-test suite on macOS, Linux and Windows, then runs
+# the tests. JUCE is vendored under JuceLibraryCode/modules, so no framework needs
+# to be fetched -- the committed Projucer build files are used as-is.
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: macos-latest,   name: macOS }
+          - { os: ubuntu-latest,  name: Linux }
+          - { os: windows-latest, name: Windows }
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ---------------------------------------------------------------- macOS
+      - name: Build (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          xcodebuild -project Builds/MacOSX/routemidi.xcodeproj \
+            -target "routemidi - ConsoleApp" -configuration Release SYMROOT=build build
+          xcodebuild -project Tests/Builds/MacOSX/RouteMIDITests.xcodeproj \
+            -target "RouteMIDITests - ConsoleApp" -configuration Release SYMROOT=build build
+
+      - name: Run tests (macOS)
+        if: runner.os == 'macOS'
+        run: ./Tests/Builds/MacOSX/build/Release/RouteMIDITests
+
+      # ---------------------------------------------------------------- Linux
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev
+
+      - name: Build (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          make -C Builds/LinuxMakefile CONFIG=Release -j"$(nproc)"
+          make -C Tests/Builds/LinuxMakefile CONFIG=Release -j"$(nproc)"
+
+      - name: Run tests (Linux)
+        if: runner.os == 'Linux'
+        run: ./Tests/Builds/LinuxMakefile/build/RouteMIDITests
+
+      # -------------------------------------------------------------- Windows
+      - name: Add MSBuild to PATH
+        if: runner.os == 'Windows'
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
+        # the committed projects target the v141 toolset (VS2017); build with the
+        # runner's current toolset so no legacy build tools need installing
+        run: |
+          msbuild Builds/VisualStudio2017/routemidi.sln /m /p:Configuration=Release /p:Platform=x64 /p:PlatformToolset=v143
+          msbuild Tests/Builds/VisualStudio2017/RouteMIDITests.sln /m /p:Configuration=Release /p:Platform=x64 /p:PlatformToolset=v143
+
+      - name: Run tests (Windows)
+        if: runner.os == 'Windows'
+        run: .\Tests\Builds\VisualStudio2017\x64\Release\ConsoleApp\RouteMIDITests.exe
