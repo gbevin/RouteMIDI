@@ -174,21 +174,21 @@ static void emitConversion(Array<MidiMessage>& out, int channel, int srcValue, i
 
 ApplicationState::ApplicationState()
 {
-    commands_.add({"in",        "input",                  INPUT,                   1, {"name"},             {"Add a MIDI input (- for stdin text); a new route starts after outputs"}});
+    commands_.add({"in",        "input",                  INPUT,                   1, {"name"},             {"Add a MIDI input (- for stdin text); a new route starts after outputs"}, "Routing and ports"});
     commands_.add({"out",       "output",                 OUTPUT,                  1, {"name"},             {"Add a MIDI output to the route (- for stdout text)"}});
     commands_.add({"vin",       "virtual-in",             VIRTUAL_IN,             -1, {"(name)"},           {"Add a virtual MIDI input to the route (Linux/macOS)"}});
     commands_.add({"vout",      "virtual-out",            VIRTUAL_OUT,            -1, {"(name)"},           {"Add a virtual MIDI output to the route (Linux/macOS)"}});
     commands_.add({"list",      "",                       LIST,                    0, {""},                 {"List the available MIDI input and output ports"}});
     commands_.add({"panic",     "",                       PANIC,                   0, {""},                 {"Send all-notes-off on disconnect, exit and zone change"}});
-    commands_.add({"file",      "",                       TXTFILE,                 1, {"path"},             {"Load commands from the specified program file"}});
+    commands_.add({"file",      "",                       TXTFILE,                 1, {"path"},             {"Load commands from the specified program file"}, "Configuration"});
     commands_.add({"dec",       "decimal",                DECIMAL,                 0, {""},                 {"Interpret the next numbers as decimals by default"}});
     commands_.add({"hex",       "hexadecimal",            HEXADECIMAL,             0, {""},                 {"Interpret the next numbers as hexadecimals by default"}});
     commands_.add({"omc",       "octave-middle-c",        OCTAVE_MIDDLE_C,         1, {"number"},           {"Set octave for middle C, defaults to 3"}});
-    commands_.add({"nn",        "note-numbers",           NOTE_NUMBERS,            0, {""},                 {"Monitor notes as numbers instead of names"}});
+    commands_.add({"nn",        "note-numbers",           NOTE_NUMBERS,            0, {""},                 {"Monitor notes as numbers instead of names"}, "Monitoring"});
     commands_.add({"ts",        "timestamp",              TIMESTAMP,               0, {""},                 {"Prefix monitored messages with a timestamp"}});
     commands_.add({"mon",       "verbose",                MONITOR,                 0, {""},                 {"Print each routed message (quiet by default)"}});
     commands_.add({"src",       "monitor-source",         MONITOR_SOURCE,          0, {""},                 {"Prefix monitored messages with the input port name"}});
-    commands_.add({"not",       "",                       NOT,                     0, {""},                 {"Negate the next filter, blocking matching messages"}});
+    commands_.add({"not",       "",                       NOT,                     0, {""},                 {"Negate the next filter, blocking matching messages"}, "Filters"});
     commands_.add({"ch",        "channel",                CHANNEL,                 1, {"number"},           {"Restrict the route to a MIDI channel (1-16)"}});
     commands_.add({"voice",     "",                       VOICE,                   0, {""},                 {"Pass all Channel Voice messages"}});
     commands_.add({"note",      "",                       NOTE,                    0, {""},                 {"Pass all Note messages"}});
@@ -221,17 +221,17 @@ ApplicationState::ApplicationState()
     commands_.add({"mpemaster", "mpe-master",             MPE_MASTER,              1, {"zone[:n]"},         {"Pass the master channel of an MPE zone (e.g. lower)"}});
     commands_.add({"mpemember", "mpe-member",             MPE_MEMBER,              1, {"zone[:n]"},         {"Pass the member channels of an MPE zone (e.g. upper:7)"}});
     commands_.add({"mpezone",   "mpe-zone",               MPE_ZONE,                1, {"zone[:n]"},         {"Pass a whole MPE zone (its master and member channels)"}});
-    commands_.add({"chmap",     "channel-map",            CHANNEL_MAP,             2, {"from", "to"},       {"Remap channel-voice messages from one channel to another"}});
+    commands_.add({"chmap",     "channel-map",            CHANNEL_MAP,             2, {"from", "to"},       {"Remap channel-voice messages from one channel to another"}, "Transforms"});
     commands_.add({"chset",     "channel-set",            CHANNEL_SET,             1, {"number"},           {"Force all channel-voice messages onto a channel"}});
     commands_.add({"chadd",     "channel-add",            CHANNEL_ADD,             1, {"number"},           {"Add N to the channel, wrapping 1-16 (may be negative)"}});
     commands_.add({"transp",    "transpose",              TRANSPOSE,               1, {"semitones"},        {"Transpose notes by N semitones (out-of-range dropped)"}});
     commands_.add({"notemap",   "note-map",               NOTE_MAP,                2, {"from", "to"},       {"Remap a specific note number to another"}});
-    commands_.add({"notecc",    "note-to-control-change", NOTE_TO_CC,              2, {"note", "cc"},       {"Turn a note into a Control Change (velocity as value)"}});
-    commands_.add({"ccnote",    "control-change-to-note", CC_TO_NOTE,              2, {"cc", "note"},       {"Turn a Control Change into a note (64+ on, else off)"}});
-    commands_.add({"notepc",    "note-to-program-change", NOTE_TO_PROGRAM,         2, {"note", "program"},  {"Turn a note-on into a Program Change (note-off dropped)"}});
     commands_.add({"scale",     "",                       SCALE,                   2, {"root", "scale"},    {"Snap notes to the nearest note of a scale (root, name)"}});
     commands_.add({"chord",     "",                       CHORD,                  -1, {"intervals"},        {"Stack notes at the given semitone intervals (a chord)"}});
     commands_.add({"latch",     "",                       LATCH,                  -1, {"(mode)"},           {"Keep notes on after release; toggle (default) or hold"}});
+    commands_.add({"notecc",    "note-to-control-change", NOTE_TO_CC,              2, {"note", "cc"},       {"Turn a note into a Control Change (velocity as value)"}});
+    commands_.add({"ccnote",    "control-change-to-note", CC_TO_NOTE,              2, {"cc", "note"},       {"Turn a Control Change into a note (64+ on, else off)"}});
+    commands_.add({"notepc",    "note-to-program-change", NOTE_TO_PROGRAM,         2, {"note", "program"},  {"Turn a note-on into a Program Change (note-off dropped)"}});
     commands_.add({"velscale",  "velocity-scale",         VELOCITY_SCALE,          1, {"factor"},           {"Scale note-on velocity by a factor (clamped 1-127)"}});
     commands_.add({"velset",    "velocity-set",           VELOCITY_SET,            1, {"number"},           {"Set a fixed note-on velocity (1-127)"}});
     commands_.add({"veladd",    "velocity-add",           VELOCITY_ADD,            1, {"number"},           {"Add an offset to note-on velocity (clamped 1-127)"}});
@@ -258,9 +258,9 @@ ApplicationState::ApplicationState()
     commands_.add({"js",        "javascript",             JAVASCRIPT,              1, {"code"},             {"Transform each message with this script"}});
     commands_.add({"jsf",       "javascript-file",        JAVASCRIPT_FILE,         1, {"path"},             {"Transform each message with the script in this file"}});
     commands_.add({"convert",   "",                       CONVERT,                 4, {"srctype", "[number]", "dsttype", "[number]"},
-                                                                                                            {"Convert a value between cc, cc14, rpn, nrpn, pb, cp & pc. Types cc, cc14, rpn and nrpn take a number selecting the controller or parameter, pb, cp and pc do not, and the value is rescaled to the destination resolution"}});
+                                                                                                            {"Convert a value between cc, cc14, rpn, nrpn, pb, cp & pc. Types cc, cc14, rpn and nrpn take a number selecting the controller or parameter, pb, cp and pc do not, and the value is rescaled to the destination resolution"}, "Conversion"});
     commands_.add({"mpe",       "",                       MPE_RELOCATE,            2, {"zone[:n]", "zone[:n]"},
-                                                                                                            {"Relocate an MPE stream between zones (e.g. lower upper), remapping channels"}});
+                                                                                                            {"Relocate an MPE stream between zones (e.g. lower upper), remapping channels"}, "MPE routing"});
     commands_.add({"mpemono",   "mpe-mono",               MPE_COLLAPSE,            2, {"zone[:n]", "channel"},
                                                                                                             {"Collapse an MPE zone onto a single channel for non-MPE gear (e.g. upper 1)"}});
     commands_.add({"mpexp",     "mpe-expand",             MPE_EXPAND,              2, {"channel", "zone[:n]"},
@@ -2598,11 +2598,23 @@ void ApplicationState::printUsage()
     printVersion();
     std::cout << std::endl;
     std::cout << "Usage: " << ProjectInfo::projectName << " [ commands ] [ programfile ] [ -- ]" << std::endl << std::endl
-              << "Commands:" << std::endl;
+              << "Commands:" << std::endl << std::endl;
     const int optionColumn = 12;       // where the option names start
     const int descriptionColumn = 23;  // where the description starts
+    bool firstSection = true;
     for (auto&& cmd : commands_)
     {
+        // print a flush-left section header before the command that starts a group
+        if (cmd.section_.isNotEmpty())
+        {
+            if (!firstSection)
+            {
+                std::cout << std::endl;
+            }
+            std::cout << cmd.section_ << ":" << std::endl;
+            firstSection = false;
+        }
+
         // the options share the option column, wrapping onto extra lines only
         // when they don't all fit within it (reserving one space so they never
         // butt up against the description column)
@@ -2649,6 +2661,7 @@ void ApplicationState::printUsage()
             std::cout << line.trimEnd() << std::endl;
         }
     }
+    std::cout << std::endl;
     std::cout << "  -h  or  --help       Print Help (this message) and exit" << std::endl;
     std::cout << "  --version            Print version information and exit" << std::endl;
     std::cout << "  --                   Read commands from standard input until it's closed" << std::endl;

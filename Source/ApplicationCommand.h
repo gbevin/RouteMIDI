@@ -85,12 +85,12 @@ enum CommandIndex
     CHANNEL_ADD,
     TRANSPOSE,
     NOTE_MAP,
-    NOTE_TO_CC,
-    CC_TO_NOTE,
-    NOTE_TO_PROGRAM,
     SCALE,
     CHORD,
     LATCH,
+    NOTE_TO_CC,
+    CC_TO_NOTE,
+    NOTE_TO_PROGRAM,
     VELOCITY_SCALE,
     VELOCITY_SET,
     VELOCITY_ADD,
@@ -166,6 +166,7 @@ struct ApplicationCommand
     int expectedOptions_;
     StringArray optionsDescriptions_;
     StringArray commandDescriptions_;
+    String section_;                    // when set, a help header printed before this command
     StringArray opts_;
     bool negate_ { false };
 };

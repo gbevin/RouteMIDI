@@ -31,6 +31,7 @@ To use it, simply type "routemidi" or "routemidi.exe" on the command line and fo
 
 These are all the supported commands:
 ```
+Routing and ports:
   in        name       Add a MIDI input (- for stdin text); a new route starts
                        after outputs
   out       name       Add a MIDI output to the route (- for stdout text)
@@ -38,14 +39,20 @@ These are all the supported commands:
   vout      (name)     Add a virtual MIDI output to the route (Linux/macOS)
   list                 List the available MIDI input and output ports
   panic                Send all-notes-off on disconnect, exit and zone change
+
+Configuration:
   file      path       Load commands from the specified program file
   dec                  Interpret the next numbers as decimals by default
   hex                  Interpret the next numbers as hexadecimals by default
   omc       number     Set octave for middle C, defaults to 3
+
+Monitoring:
   nn                   Monitor notes as numbers instead of names
   ts                   Prefix monitored messages with a timestamp
   mon                  Print each routed message (quiet by default)
   src                  Prefix monitored messages with the input port name
+
+Filters:
   not                  Negate the next filter, blocking matching messages
   ch        number     Restrict the route to a MIDI channel (1-16)
   voice                Pass all Channel Voice messages
@@ -79,18 +86,20 @@ These are all the supported commands:
   mpemaster zone[:n]   Pass the master channel of an MPE zone (e.g. lower)
   mpemember zone[:n]   Pass the member channels of an MPE zone (e.g. upper:7)
   mpezone   zone[:n]   Pass a whole MPE zone (its master and member channels)
+
+Transforms:
   chmap     from to    Remap channel-voice messages from one channel to another
   chset     number     Force all channel-voice messages onto a channel
   chadd     number     Add N to the channel, wrapping 1-16 (may be negative)
   transp    semitones  Transpose notes by N semitones (out-of-range dropped)
   notemap   from to    Remap a specific note number to another
+  scale     root scale Snap notes to the nearest note of a scale (root, name)
+  chord     intervals  Stack notes at the given semitone intervals (a chord)
+  latch     (mode)     Keep notes on after release; toggle (default) or hold
   notecc    note cc    Turn a note into a Control Change (velocity as value)
   ccnote    cc note    Turn a Control Change into a note (64+ on, else off)
   notepc    note       Turn a note-on into a Program Change (note-off dropped)
             program
-  scale     root scale Snap notes to the nearest note of a scale (root, name)
-  chord     intervals  Stack notes at the given semitone intervals (a chord)
-  latch     (mode)     Keep notes on after release; toggle (default) or hold
   velscale  factor     Scale note-on velocity by a factor (clamped 1-127)
   velset    number     Set a fixed note-on velocity (1-127)
   veladd    number     Add an offset to note-on velocity (clamped 1-127)
@@ -125,10 +134,14 @@ These are all the supported commands:
             gamma
   js        code       Transform each message with this script
   jsf       path       Transform each message with the script in this file
+
+Conversion:
   convert   srctype    Convert a value between cc, cc14, rpn, nrpn, pb, cp & pc.
             [number]   Types cc, cc14, rpn and nrpn take a number selecting the
             dsttype    controller or parameter, pb, cp and pc do not, and the
             [number]   value is rescaled to the destination resolution
+
+MPE routing:
   mpe       zone[:n]   Relocate an MPE stream between zones (e.g. lower upper),
             zone[:n]   remapping channels
   mpemono   zone[:n]   Collapse an MPE zone onto a single channel for non-MPE
@@ -141,6 +154,7 @@ These are all the supported commands:
             from to    to another
   mpesens   zone[:n]   Declare a member-channel pitch bend range (RPN 0) for
             semitones  synths that honor it
+
   -h  or  --help       Print Help (this message) and exit
   --version            Print version information and exit
   --                   Read commands from standard input until it's closed
