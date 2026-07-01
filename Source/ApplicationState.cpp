@@ -229,6 +229,8 @@ ApplicationState::ApplicationState()
     commands_.add({"notecc",    "note-to-control-change", NOTE_TO_CC,              2, {"note", "cc"},       {"Turn a note into a Control Change (velocity as value)"}});
     commands_.add({"ccnote",    "control-change-to-note", CC_TO_NOTE,              2, {"cc", "note"},       {"Turn a Control Change into a note (64+ on, else off)"}});
     commands_.add({"notepc",    "note-to-program-change", NOTE_TO_PROGRAM,         2, {"note", "program"},  {"Turn a note-on into a Program Change (note-off dropped)"}});
+    commands_.add({"scale",     "",                       SCALE,                   2, {"root", "scale"},    {"Snap notes to the nearest note of a scale (root, name)"}});
+    commands_.add({"chord",     "",                       CHORD,                  -1, {"intervals"},        {"Stack notes at the given semitone intervals (a chord)"}});
     commands_.add({"velscale",  "velocity-scale",         VELOCITY_SCALE,          1, {"factor"},           {"Scale note-on velocity by a factor (clamped 1-127)"}});
     commands_.add({"velset",    "velocity-set",           VELOCITY_SET,            1, {"number"},           {"Set a fixed note-on velocity (1-127)"}});
     commands_.add({"veladd",    "velocity-add",           VELOCITY_ADD,            1, {"number"},           {"Add an offset to note-on velocity (clamped 1-127)"}});
@@ -1566,6 +1568,29 @@ Array<MidiMessage> ApplicationState::applyTransforms(Route& route, const MidiMes
                     next.add(scriptMidiMessage_->getMidiMessage());
                 }
                 next.addArray(scriptMidiMessage_->getEmitted());
+            }
+            else if (cmd.command_ == CHORD)
+            {
+                // the played note passes through and, for note-ons and
+                // note-offs, gets extra notes stacked at the given intervals
+                next.add(m);
+                if (m.isNoteOnOrOff())
+                {
+                    const int base = m.getNoteNumber();
+                    const int channel = m.getChannel();
+                    const int velocity = m.getVelocity();
+                    const bool on = m.isNoteOn();
+                    const double ts = m.getTimeStamp();
+                    for (const auto& interval : cmd.opts_)
+                    {
+                        const int n = base + asDecOrHexIntValue(interval);
+                        if (n < 0 || n > 127) continue;   // out-of-range notes are dropped
+                        MidiMessage chordNote = on ? MidiMessage::noteOn(channel, n, (uint8)velocity)
+                                                   : MidiMessage::noteOff(channel, n, (uint8)velocity);
+                        chordNote.setTimeStamp(ts);
+                        next.add(chordNote);
+                    }
+                }
             }
             else
             {

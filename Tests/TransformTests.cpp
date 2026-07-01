@@ -124,6 +124,116 @@ public:
             expect(! makeCommand(NOTE_TO_PROGRAM, {"48", "5"}).transform(state, m));  // dropped
         }
 
+        beginTest("Scale quantize (snap notes to a key)");
+        {
+            // C major: chromatic notes fall to the nearest scale note, ties down
+            MidiMessage m = MidiMessage::noteOn(1, 61, (uint8)100);   // C#4
+            expect(makeCommand(SCALE, {"C", "major"}).transform(state, m));
+            expectEquals(m.getNoteNumber(), 60);                      // -> C4
+
+            m = MidiMessage::noteOn(1, 66, (uint8)100);               // F#4
+            expect(makeCommand(SCALE, {"C", "major"}).transform(state, m));
+            expectEquals(m.getNoteNumber(), 65);                      // -> F4
+
+            // a note already in the scale is left alone
+            m = MidiMessage::noteOn(1, 60, (uint8)100);
+            expect(makeCommand(SCALE, {"C", "major"}).transform(state, m));
+            expectEquals(m.getNoteNumber(), 60);
+
+            // note-offs snap too, so on/off pairs stay matched
+            m = MidiMessage::noteOff(1, 61, (uint8)0);
+            expect(makeCommand(SCALE, {"C", "major"}).transform(state, m));
+            expectEquals(m.getNoteNumber(), 60);
+
+            // the root and scale matter: F#4 belongs to G major and is kept
+            m = MidiMessage::noteOn(1, 66, (uint8)100);
+            expect(makeCommand(SCALE, {"G", "major"}).transform(state, m));
+            expectEquals(m.getNoteNumber(), 66);
+
+            // pentatonic scales skip more notes
+            m = MidiMessage::noteOn(1, 65, (uint8)100);               // F4
+            expect(makeCommand(SCALE, {"C", "majpent"}).transform(state, m));
+            expectEquals(m.getNoteNumber(), 64);                      // -> E4
+
+            // a custom comma-separated scale (semitone degrees from the root)
+            m = MidiMessage::noteOn(1, 64, (uint8)100);               // E4
+            expect(makeCommand(SCALE, {"C", "0,3,7"}).transform(state, m));
+            expectEquals(m.getNoteNumber(), 63);                      // -> Eb4
+
+            // additional scales snap as expected
+            m = MidiMessage::noteOn(1, 64, (uint8)100);               // E4
+            expect(makeCommand(SCALE, {"C", "diminished"}).transform(state, m));
+            expectEquals(m.getNoteNumber(), 63);                      // -> Eb4
+
+            m = MidiMessage::noteOn(1, 64, (uint8)100);               // E4
+            expect(makeCommand(SCALE, {"C", "fifth"}).transform(state, m));
+            expectEquals(m.getNoteNumber(), 67);                      // -> G4 (root/fifth)
+
+            // major blues keeps the natural third, minor blues snaps it away
+            m = MidiMessage::noteOn(1, 64, (uint8)100);
+            expect(makeCommand(SCALE, {"C", "majblues"}).transform(state, m));
+            expectEquals(m.getNoteNumber(), 64);
+            m = MidiMessage::noteOn(1, 64, (uint8)100);
+            expect(makeCommand(SCALE, {"C", "minblues"}).transform(state, m));
+            expectEquals(m.getNoteNumber(), 63);
+
+            // names are case-insensitive and ignore spaces, dashes and underscores
+            m = MidiMessage::noteOn(1, 64, (uint8)100);
+            expect(makeCommand(SCALE, {"C", "Harmonic-Minor"}).transform(state, m));
+            expectEquals(m.getNoteNumber(), 63);                      // harmonic minor has Eb
+
+            // an unknown scale name leaves the note untouched
+            m = MidiMessage::noteOn(1, 61, (uint8)100);
+            expect(makeCommand(SCALE, {"C", "bogus"}).transform(state, m));
+            expectEquals(m.getNoteNumber(), 61);
+        }
+
+        beginTest("Chord stacking and diatonic composition");
+        {
+            // chord adds notes at fixed semitone intervals above each played note
+            Route route;
+            route.transforms.add(makeCommand(CHORD, {"4", "7"}));     // major triad
+            auto out = state.applyTransforms(route, MidiMessage::noteOn(1, 60, (uint8)100));
+            expectEquals(out.size(), 3);
+            expectEquals(out[0].getNoteNumber(), 60);
+            expectEquals(out[1].getNoteNumber(), 64);
+            expectEquals(out[2].getNoteNumber(), 67);
+            for (auto& n : out)
+            {
+                expect(n.isNoteOn());
+                expectEquals(n.getChannel(), 1);
+                expectEquals((int)n.getVelocity(), 100);
+            }
+
+            // note-offs expand the same way, so the whole chord is released
+            out = state.applyTransforms(route, MidiMessage::noteOff(1, 60, (uint8)0));
+            expectEquals(out.size(), 3);
+            for (auto& n : out) expect(n.isNoteOff());
+
+            // chord notes out of range are dropped, the played note still passes
+            Route high;
+            high.transforms.add(makeCommand(CHORD, {"7"}));
+            out = state.applyTransforms(high, MidiMessage::noteOn(1, 125, (uint8)100));
+            expectEquals(out.size(), 1);
+            expectEquals(out[0].getNoteNumber(), 125);
+
+            // non-note messages pass through a chord untouched
+            out = state.applyTransforms(route, MidiMessage::controllerEvent(1, 7, 100));
+            expectEquals(out.size(), 1);
+            expect(out[0].isController());
+
+            // chord then scale yields diatonic chords: a triad on E in C major
+            // becomes E-G-B (the raw G# is snapped down to G)
+            Route diatonic;
+            diatonic.transforms.add(makeCommand(CHORD, {"4", "7"}));
+            diatonic.transforms.add(makeCommand(SCALE, {"C", "major"}));
+            out = state.applyTransforms(diatonic, MidiMessage::noteOn(1, 64, (uint8)100));
+            expectEquals(out.size(), 3);
+            expectEquals(out[0].getNoteNumber(), 64);   // E
+            expectEquals(out[1].getNoteNumber(), 67);   // G# -> G
+            expectEquals(out[2].getNoteNumber(), 71);   // B
+        }
+
         beginTest("Velocity transforms (note-on only)");
         {
             MidiMessage m = MidiMessage::noteOn(1, 60, (uint8)100);

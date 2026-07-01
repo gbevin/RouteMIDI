@@ -88,6 +88,8 @@ These are all the supported commands:
   ccnote    cc note    Turn a Control Change into a note (64+ on, else off)
   notepc    note       Turn a note-on into a Program Change (note-off dropped)
             program
+  scale     root scale Snap notes to the nearest note of a scale (root, name)
+  chord     intervals  Stack notes at the given semitone intervals (a chord)
   velscale  factor     Scale note-on velocity by a factor (clamped 1-127)
   velset    number     Set a fixed note-on velocity (1-127)
   veladd    number     Add an offset to note-on velocity (clamped 1-127)
@@ -239,6 +241,49 @@ A few transforms change a message from one type to another. `notecc` turns a spe
 routemidi in "Pad" notecc 60 64 out "Synth"             # a pad key holds the sustain CC
 routemidi in "Foot" ccnote 64 C1 out "Drums"            # a sustain pedal plays a kick
 routemidi in "Pads" notepc 36 0 notepc 37 1 out "Synth" # two pads select two patches
+```
+
+The `scale` transform snaps every note to the nearest note of a musical key, so a performance always stays in tune. It takes a root (a note name such as `C`, `F#` or `Bb`, or a number) and a scale name. Notes that are already in the scale pass through unchanged, and a note exactly between two scale notes snaps to the lower one; note-offs snap the same way as note-ons so held notes are always released. Scale names are case-insensitive and any spaces, dashes and underscores are ignored, so `harmonicminor`, `harmonic-minor` and `Harmonic Minor` are all the same.
+
+These scale names are supported (aliases in parentheses):
+
+| Scale name | Semitones from the root |
+| --- | --- |
+| `chromatic` | 0 1 2 3 4 5 6 7 8 9 10 11 |
+| `major` (`ionian`) | 0 2 4 5 7 9 11 |
+| `minor` (`aeolian`, `naturalminor`) | 0 2 3 5 7 8 10 |
+| `dorian` | 0 2 3 5 7 9 10 |
+| `phrygian` | 0 1 3 5 7 8 10 |
+| `lydian` | 0 2 4 6 7 9 11 |
+| `mixolydian` | 0 2 4 5 7 9 10 |
+| `locrian` | 0 1 3 5 6 8 10 |
+| `harmonicminor` | 0 2 3 5 7 8 11 |
+| `melodicminor` | 0 2 3 5 7 9 11 |
+| `majorpentatonic` (`majpent`, `pentatonic`) | 0 2 4 7 9 |
+| `minorpentatonic` (`minpent`) | 0 3 5 7 10 |
+| `majorblues` (`majblues`) | 0 2 3 4 7 9 |
+| `minorblues` (`minblues`, `blues`) | 0 3 5 6 7 10 |
+| `diminished` (`dim`) | 0 2 3 5 6 8 9 11 |
+| `wholetone` | 0 2 4 6 8 10 |
+| `spanish` (`phrygiandominant`) | 0 1 4 5 7 8 10 |
+| `romani` (`gypsy`, `hungarianminor`) | 0 2 3 6 7 8 11 |
+| `arabian` | 0 2 4 5 6 8 10 |
+| `egyptian` | 0 2 5 7 10 |
+| `ryukyu` | 0 4 5 7 11 |
+| `augmented` (`maj3rd`) | 0 4 8 |
+| `diminished7` (`dim7`, `min3rd`) | 0 3 6 9 |
+| `fifth` (`power`, `5th`) | 0 7 |
+
+You can also give a custom scale as a comma-separated list of semitone degrees from the root, for instance `scale D 0,2,3,5,7,9,10` for a D minor scale.
+
+The `chord` transform turns each note into a chord by stacking extra notes at fixed semitone intervals above (or below) the one that was played. `chord 4 7` adds a major third and a fifth, `chord 3 7` a minor third and a fifth, and negative intervals stack notes underneath (`chord -12` doubles an octave down). Each note-on emits the whole chord and each note-off releases it, and chord notes that fall outside 0-127 are dropped.
+
+Because transforms run in order, `chord` and `scale` combine into a diatonic harmonizer: stack a plain chromatic chord and then snap the result into a key. For example `chord 4 7 scale C major` plays a triad on every note that always belongs to C major, so an E becomes E-G-B and an F becomes F-A-C.
+
+```
+routemidi in "Keyboard" scale C minor out "Synth"       # keep a solo in C minor
+routemidi in "Keyboard" chord 4 7 out "Synth"           # play major triads
+routemidi in "Keyboard" chord 4 7 scale C major out "Synth"  # diatonic triads in C major
 ```
 
 For ultimate flexibility, the `js` and `jsf` commands run JavaScript on each message and can inspect it, rewrite it, drop it, or emit additional messages (so one note can become a chord, for instance). See the [JAVASCRIPT.md](JAVASCRIPT.md) documentation file for details.

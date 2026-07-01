@@ -48,6 +48,7 @@ public:
     // the filter stage and the converter stage without real MIDI hardware
     void parseParameters(StringArray& parameters);
     bool passesFilters(Route& route, const MidiMessage& msg);
+    Array<MidiMessage> applyTransforms(Route& route, const MidiMessage& msg);
     void processMpe(Route& route, RouteInput& input, const MidiMessage& msg, Array<MidiMessage>& output);
     void processConverters(Route& route, RouteInput& input, const MidiMessage& msg, Array<MidiMessage>& output);
     // distributes a message across a route's output ports as MPE voices; fills
@@ -89,7 +90,6 @@ private:
     bool hasStdinInput() const;
     void readStdinMidi();
 
-    Array<MidiMessage> applyTransforms(Route& route, const MidiMessage& msg);
     void printMonitor(const String& inName, const MidiMessage& msg);
 
     String output7BitAsHex(int v) const;

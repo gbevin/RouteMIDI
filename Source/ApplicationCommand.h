@@ -88,6 +88,8 @@ enum CommandIndex
     NOTE_TO_CC,
     CC_TO_NOTE,
     NOTE_TO_PROGRAM,
+    SCALE,
+    CHORD,
     VELOCITY_SCALE,
     VELOCITY_SET,
     VELOCITY_ADD,

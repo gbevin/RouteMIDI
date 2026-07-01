@@ -32,6 +32,124 @@ static int applyGammaCurve(int value, int maxValue, double gamma)
     return jlimit(0, maxValue, roundToInt(std::pow(normalized, gamma) * maxValue));
 }
 
+// parses a pitch class (0-11) from a note name (C, C#, Db, ... with an optional
+// octave that is ignored) or a plain number (interpreted modulo 12)
+static int parsePitchClass(ApplicationState& state, const String& value)
+{
+    const String v = value.toUpperCase();
+    if (v.isNotEmpty() && String("CDEFGABH").containsChar(v[0]))
+    {
+        int pc = 0;
+        switch (v[0])
+        {
+            case 'C': pc = 0;  break;
+            case 'D': pc = 2;  break;
+            case 'E': pc = 4;  break;
+            case 'F': pc = 5;  break;
+            case 'G': pc = 7;  break;
+            case 'A': pc = 9;  break;
+            case 'B':
+            case 'H': pc = 11; break;
+        }
+        if (v.length() >= 2)
+        {
+            if      (v[1] == 'B') pc -= 1;
+            else if (v[1] == '#') pc += 1;
+        }
+        return ((pc % 12) + 12) % 12;
+    }
+    return ((state.asDecOrHexIntValue(value) % 12) + 12) % 12;
+}
+
+// builds a 12-bit mask of the pitch classes (relative to the root) that make up
+// a named scale, or a custom comma-separated list of semitone degrees; returns
+// 0 for an unrecognised name
+static uint16 scaleMask(const String& name)
+{
+    // each scale lists the semitone degrees it contains, counting from the root;
+    // the first spelling is canonical and the rest are accepted aliases
+    static const struct { StringArray names; Array<int> degrees; } scales[] =
+    {
+        { {"chromatic"}, {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11} },
+        { {"major", "ionian"}, {0, 2, 4, 5, 7, 9, 11} },
+        { {"minor", "aeolian", "naturalminor"}, {0, 2, 3, 5, 7, 8, 10} },
+        { {"dorian"}, {0, 2, 3, 5, 7, 9, 10} },
+        { {"phrygian"}, {0, 1, 3, 5, 7, 8, 10} },
+        { {"lydian"}, {0, 2, 4, 6, 7, 9, 11} },
+        { {"mixolydian"}, {0, 2, 4, 5, 7, 9, 10} },
+        { {"locrian"}, {0, 1, 3, 5, 6, 8, 10} },
+        { {"harmonicminor"}, {0, 2, 3, 5, 7, 8, 11} },
+        { {"melodicminor"}, {0, 2, 3, 5, 7, 9, 11} },
+        { {"majorpentatonic", "majpent", "pentatonic"}, {0, 2, 4, 7, 9} },
+        { {"minorpentatonic", "minpent"}, {0, 3, 5, 7, 10} },
+        { {"majorblues", "majblues"}, {0, 2, 3, 4, 7, 9} },
+        { {"minorblues", "minblues", "blues"}, {0, 3, 5, 6, 7, 10} },
+        { {"diminished", "dim"}, {0, 2, 3, 5, 6, 8, 9, 11} },
+        { {"wholetone"}, {0, 2, 4, 6, 8, 10} },
+        { {"spanish", "phrygiandominant"}, {0, 1, 4, 5, 7, 8, 10} },
+        { {"romani", "gypsy", "hungarianminor"}, {0, 2, 3, 6, 7, 8, 11} },
+        { {"arabian"}, {0, 2, 4, 5, 6, 8, 10} },
+        { {"egyptian"}, {0, 2, 5, 7, 10} },
+        { {"ryukyu"}, {0, 4, 5, 7, 11} },
+        { {"augmented", "maj3rd"}, {0, 4, 8} },
+        { {"diminished7", "dim7", "min3rd"}, {0, 3, 6, 9} },
+        { {"fifth", "power", "5th"}, {0, 7} },
+    };
+
+    const String n = name.toLowerCase().removeCharacters("-_ ");
+
+    for (const auto& scale : scales)
+    {
+        if (scale.names.contains(n))
+        {
+            uint16 m = 0;
+            for (int d : scale.degrees) m |= (uint16)(1 << d);
+            return m;
+        }
+    }
+
+    // custom scale: a comma-separated list of semitone degrees (e.g. 0,2,4,7,9)
+    if (name.containsChar(','))
+    {
+        uint16 m = 0;
+        StringArray parts;
+        parts.addTokens(name, ",", "");
+        for (const auto& p : parts)
+        {
+            const String t = p.trim();
+            if (t.isNotEmpty())
+            {
+                m |= (uint16)(1 << (((t.getIntValue() % 12) + 12) % 12));
+            }
+        }
+        return m;
+    }
+
+    return 0;
+}
+
+// snaps a note to the nearest note belonging to the scale, preferring the lower
+// note on a tie and staying within 0-127; returns -1 when no scale note fits in
+// range (which never happens for a non-empty scale)
+static int snapToScale(int note, int root, uint16 mask)
+{
+    auto inScale = [root, mask](int n)
+    {
+        return (mask >> ((((n - root) % 12) + 12) % 12)) & 1;
+    };
+
+    if (inScale(note)) return note;
+
+    for (int d = 1; d <= 12; ++d)
+    {
+        const int down = note - d;
+        if (down >= 0 && inScale(down)) return down;   // ties resolve downward
+        const int up = note + d;
+        if (up <= 127 && inScale(up)) return up;
+    }
+    return -1;
+}
+
 ApplicationCommand ApplicationCommand::Dummy()
 {
     return {"", "", NONE, 0, {""}, {""}};
@@ -101,6 +219,8 @@ bool ApplicationCommand::isTransform() const
         case NOTE_TO_CC:
         case CC_TO_NOTE:
         case NOTE_TO_PROGRAM:
+        case SCALE:
+        case CHORD:
         case VELOCITY_SCALE:
         case VELOCITY_SET:
         case VELOCITY_ADD:
@@ -343,6 +463,23 @@ bool ApplicationCommand::transform(ApplicationState& state, MidiMessage& msg) co
                 }
                 msg = MidiMessage::programChange(msg.getChannel(), state.asDecOrHex7BitValue(opts_[1]));
                 msg.setTimeStamp(timestamp);
+            }
+            break;
+        case SCALE:
+            // snap the note to the nearest note of the given key and scale
+            if (msg.isNoteOnOrOff() || msg.isAftertouch())
+            {
+                const uint16 mask = scaleMask(opts_[1]);
+                if (mask == 0)
+                {
+                    break;   // unrecognised scale, leave the note untouched
+                }
+                const int snapped = snapToScale(msg.getNoteNumber(), parsePitchClass(state, opts_[0]), mask);
+                if (snapped < 0)
+                {
+                    return false;
+                }
+                msg.setNoteNumber(snapped);
             }
             break;
         case VELOCITY_SCALE:
