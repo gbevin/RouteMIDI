@@ -17,6 +17,7 @@
             file="Source/ApplicationState.h"/>
       <FILE id="bbj9mA" name="BitScaling.h" compile="0" resource="0" file="Source/BitScaling.h"/>
       <FILE id="cbk001" name="ChannelBucket.h" compile="0" resource="0" file="Source/ChannelBucket.h"/>
+      <FILE id="cnv001" name="Conversion.h" compile="0" resource="0" file="Source/Conversion.h"/>
       <FILE id="ltc001" name="Latch.h" compile="0" resource="0" file="Source/Latch.h"/>
       <FILE id="mno001" name="Mono.h" compile="0" resource="0" file="Source/Mono.h"/>
       <FILE id="hGRRus" name="Main.cpp" compile="1" resource="0" file="Source/Main.cpp"/>

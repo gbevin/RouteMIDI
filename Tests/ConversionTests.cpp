@@ -505,6 +505,24 @@ public:
             expect(! rpn.isNRPN);
             expectEquals(rpn.value, 8000);   // unchanged
         }
+
+        beginTest("a value transform frames the regenerated parameter with a closing null");
+        {
+            // a transform regenerates the whole (N)RPN and deselects it, exactly as
+            // a convert to (n)rpn does; a 7-bit source keeps this to one regeneration
+            auto nrpn = runConverterCommand(state, NRPN_ADD, {"1000", "5"}, rpnInput(1, 1000, 100, true, false));
+            expect(parseLastRpn(nrpn, rpn));
+            expectEquals(rpn.value, 105);
+            expectEquals(countController(nrpn, 99, 127), 1);   // NRPN null (CC 99/98 = 127)
+            expectEquals(countController(nrpn, 98, 127), 1);
+
+            // an RPN transform closes with the universal RPN null (CC 101/100 = 127)
+            auto rpnOut = runConverterCommand(state, RPN_ADD, {"5", "10"}, rpnInput(1, 5, 100, false, false));
+            expect(parseLastRpn(rpnOut, rpn));
+            expectEquals(rpn.value, 110);
+            expectEquals(countController(rpnOut, 101, 127), 1);
+            expectEquals(countController(rpnOut, 100, 127), 1);
+        }
     }
 };
 

@@ -21,6 +21,7 @@
 #include "JuceHeader.h"
 
 #include "ApplicationCommand.h"
+#include "Conversion.h"
 #include "Latch.h"
 #include "Mono.h"
 #include "Mpe.h"
@@ -135,6 +136,7 @@ struct Route
     Array<ApplicationCommand> transforms; // applied in order to passing messages
     Array<ApplicationCommand> mpeOps;     // MPE zone relocate/collapse/expand rules
     Array<ApplicationCommand> converters; // CC/CC14/RPN/NRPN inter-conversion rules
+    Array<conversion::Rule> convertRules; // converters compiled to numbers, rebuilt on demand
     Array<ApplicationCommand> outputSplit; // 0 or 1: distribute MPE voices across the outputs
 
     mpe::Splitter mpeSplit;               // per-route voice-to-output allocation state

@@ -19,204 +19,13 @@
 #include "ApplicationState.h"
 
 #include "BitScaling.h"
+#include "Conversion.h"
 #include "ScriptOscClass.h"
 #include "ScriptUtilClass.h"
 
 static const int DEFAULT_OCTAVE_MIDDLE_C = 3;
 static const String DEFAULT_VIRTUAL_IN_NAME = "RouteMIDI In";
 static const String DEFAULT_VIRTUAL_OUT_NAME = "RouteMIDI Out";
-
-//==============================================================================
-// Inter-conversion between controller value types. cc, cc14, rpn and nrpn take a
-// number selecting which controller or parameter; pp takes a note number (which
-// is optional on the source side, where it means "any note"); pb, cp and pc have
-// a single value per channel and take no number.
-
-enum ConvType { CONV_CC7, CONV_CC14, CONV_RPN, CONV_NRPN, CONV_PB, CONV_CP, CONV_PC, CONV_PP };
-
-static bool parseConvType(const String& s, ConvType& out)
-{
-    if (s.equalsIgnoreCase("cc"))   { out = CONV_CC7;  return true; }
-    if (s.equalsIgnoreCase("cc14")) { out = CONV_CC14; return true; }
-    if (s.equalsIgnoreCase("rpn"))  { out = CONV_RPN;  return true; }
-    if (s.equalsIgnoreCase("nrpn")) { out = CONV_NRPN; return true; }
-    if (s.equalsIgnoreCase("pb"))   { out = CONV_PB;   return true; }
-    if (s.equalsIgnoreCase("cp"))   { out = CONV_CP;   return true; }
-    if (s.equalsIgnoreCase("pc"))   { out = CONV_PC;   return true; }
-    if (s.equalsIgnoreCase("pp"))   { out = CONV_PP;   return true; }
-    return false;
-}
-
-// whether a type always takes a number argument (the controller/parameter types)
-static bool typeNeedsNumber(ConvType type)
-{
-    return type == CONV_CC7 || type == CONV_CC14 || type == CONV_RPN || type == CONV_NRPN;
-}
-
-// whether a type requires a number when it is the destination: the controller and
-// parameter types, plus pp (poly pressure must know which note to land on)
-static bool dstTypeNeedsNumber(ConvType type)
-{
-    return typeNeedsNumber(type) || type == CONV_PP;
-}
-
-// Walks a convert spec ("srctype [num] dsttype [num]") and fills the normalized
-// [srctype, srcnum, dsttype, dstnum] fields. A source pp may omit its note (stored
-// as "-1", meaning any note); a destination pp requires one. Returns the number of
-// tokens consumed, or -1 if the spec is still incomplete or invalid.
-static int parseConvertSpec(const StringArray& opts, String& srcType, String& srcNum,
-                            String& dstType, String& dstNum)
-{
-    srcNum = "0";
-    dstNum = "0";
-    ConvType st, dt, tmp;
-    int i = 0;
-
-    if (i >= opts.size() || ! parseConvType(opts[i], st)) return -1;
-    srcType = opts[i++];
-    if (typeNeedsNumber(st))
-    {
-        if (i >= opts.size()) return -1;
-        srcNum = opts[i++];
-    }
-    else if (st == CONV_PP)
-    {
-        if (i >= opts.size()) return -1;                        // still need the dsttype
-        if (parseConvType(opts[i], tmp)) srcNum = "-1";         // a type follows: any note
-        else                             srcNum = opts[i++];    // otherwise it's the note
-    }
-
-    if (i >= opts.size() || ! parseConvType(opts[i], dt)) return -1;
-    dstType = opts[i++];
-    if (dstTypeNeedsNumber(dt))
-    {
-        if (i >= opts.size()) return -1;
-        dstNum = opts[i++];
-    }
-    return i;
-}
-
-// given the options collected so far for a convert command, returns true once all
-// required tokens are present
-static bool convertSpecComplete(const StringArray& opts)
-{
-    String a, b, c, d;
-    return parseConvertSpec(opts, a, b, c, d) >= 0;
-}
-
-// the bit resolution of a type's value (pitch bend and the 14-bit parameter
-// types are 14-bit, everything else is 7-bit)
-static int valueBitsFor(ConvType type)
-{
-    return (type == CONV_CC14 || type == CONV_RPN || type == CONV_NRPN || type == CONV_PB) ? 14 : 7;
-}
-
-// returns the scaling method for a conversion: Zero-Extension when either side
-// is an RPN whose parameter LSB is 0-31 (an absolute MIDI 1.0 RPN), else
-// Min-Center-Max
-static bitscaling::ScaleMethod scaleMethodFor(ConvType srcType, int srcNum, ConvType dstType, int dstNum)
-{
-    auto isLegacyRpn = [](ConvType t, int num) { return t == CONV_RPN && (num & 0x7f) <= 31; };
-    return (isLegacyRpn(srcType, srcNum) || isLegacyRpn(dstType, dstNum))
-        ? bitscaling::ZeroExtension : bitscaling::MinCenterMax;
-}
-
-// applies a gamma curve to a value in [0, maxValue]: gamma < 1 boosts low values
-// (concave), gamma > 1 attenuates them (convex), gamma 1 is linear
-static int gammaCurve(int value, int maxValue, double gamma)
-{
-    if (gamma <= 0.0 || maxValue <= 0)
-    {
-        return value;
-    }
-    const double normalized = jlimit(0.0, 1.0, (double) value / (double) maxValue);
-    return jlimit(0, maxValue, roundToInt(std::pow(normalized, gamma) * maxValue));
-}
-
-// true for the six RPN/NRPN value-transform commands handled in the converter stage
-static bool isRpnTransform(CommandIndex c)
-{
-    return c == NRPN_ADD || c == NRPN_SCALE || c == NRPN_CURVE ||
-           c == RPN_ADD  || c == RPN_SCALE  || c == RPN_CURVE;
-}
-
-// emit the destination representation of a parameter value, scaling the bit
-// width as needed; appends an RPN/NRPN null for (N)RPN destinations
-static void emitConversion(Array<MidiMessage>& out, int channel, int srcValue, int srcBits,
-                           ConvType dstType, int dstNum, bitscaling::ScaleMethod method, double timestamp)
-{
-    const int v = bitscaling::scaleValue(srcValue, srcBits, valueBitsFor(dstType), method);
-
-    switch (dstType)
-    {
-        case CONV_CC7:
-        {
-            auto m = MidiMessage::controllerEvent(channel, dstNum & 0x7f, v & 0x7f);
-            m.setTimeStamp(timestamp);
-            out.add(m);
-            break;
-        }
-        case CONV_CC14:
-        {
-            const int n = dstNum & 0x1f;
-            auto msb = MidiMessage::controllerEvent(channel, n, (v >> 7) & 0x7f);
-            msb.setTimeStamp(timestamp);
-            out.add(msb);
-            auto lsb = MidiMessage::controllerEvent(channel, n + 32, v & 0x7f);
-            lsb.setTimeStamp(timestamp);
-            out.add(lsb);
-            break;
-        }
-        case CONV_RPN:
-        case CONV_NRPN:
-        {
-            const bool isNRPN = (dstType == CONV_NRPN);
-            MidiBuffer buffer = MidiRPNGenerator::generate(channel, dstNum & 0x3fff, v & 0x3fff, isNRPN, true);
-            for (const auto meta : buffer)
-            {
-                auto m = meta.getMessage();
-                m.setTimeStamp(timestamp);
-                out.add(m);
-            }
-            // RPN/NRPN null to deselect the parameter (MA07 / MIDI 1.0 best practice)
-            auto a = MidiMessage::controllerEvent(channel, isNRPN ? 99 : 101, 127);
-            a.setTimeStamp(timestamp);
-            out.add(a);
-            auto b = MidiMessage::controllerEvent(channel, isNRPN ? 98 : 100, 127);
-            b.setTimeStamp(timestamp);
-            out.add(b);
-            break;
-        }
-        case CONV_PB:
-        {
-            auto m = MidiMessage::pitchWheel(channel, jlimit(0, 16383, v));
-            m.setTimeStamp(timestamp);
-            out.add(m);
-            break;
-        }
-        case CONV_CP:
-        {
-            auto m = MidiMessage::channelPressureChange(channel, jlimit(0, 127, v));
-            m.setTimeStamp(timestamp);
-            out.add(m);
-            break;
-        }
-        case CONV_PC:
-        {
-            auto m = MidiMessage::programChange(channel, jlimit(0, 127, v));
-            m.setTimeStamp(timestamp);
-            out.add(m);
-            break;
-        }
-        case CONV_PP:
-        {
-            auto m = MidiMessage::aftertouchChange(channel, dstNum & 0x7f, jlimit(0, 127, v));
-            m.setTimeStamp(timestamp);
-            out.add(m);
-            break;
-        }
-    }
-}
 
 ApplicationState::ApplicationState()
 {
@@ -666,7 +475,7 @@ void ApplicationState::parseParameters(StringArray& parameters)
             // convert has a dynamic number of arguments ("srctype [num] dsttype
             // [num]"), so collect tokens until the specification is complete
             currentCommand_.opts_.add(param);
-            if (convertSpecComplete(currentCommand_.opts_))
+            if (conversion::specComplete(currentCommand_.opts_))
             {
                 currentCommand_.expectedOptions_ = 0;
             }
@@ -936,7 +745,7 @@ void ApplicationState::executeCommand(ApplicationCommand& cmd)
             // [num]"); normalize them to a fixed [srctype, srcnum, dsttype, dstnum]
             // form (with "0" where a type takes no number) for the converter
             String srcType, srcNum, dstType, dstNum;
-            const bool ok = parseConvertSpec(cmd.opts_, srcType, srcNum, dstType, dstNum) >= 0;
+            const bool ok = conversion::parseSpec(cmd.opts_, srcType, srcNum, dstType, dstNum) >= 0;
 
             if (!ok)
             {
@@ -2154,346 +1963,322 @@ void ApplicationState::applyMpeOp(const ApplicationCommand& cmd, RouteInput& inp
     }
 }
 
-void ApplicationState::processConverters(Route& route, RouteInput& input, const MidiMessage& msg, Array<MidiMessage>& output)
+//==============================================================================
+// The converter stage, driven by conversion::Rule values compiled once from the
+// route's string rules (see rebuildConvertRules). Split into the three source
+// families it handles: single-message types, the RPN/NRPN controller set, and
+// plain 7/14-bit CC.
+
+// whether the route converts or transforms any RPN/NRPN parameter
+static bool hasRpnRule(const Array<conversion::Rule>& rules)
 {
+    for (const auto& r : rules)
+        if (r.isTransform || r.src == conversion::Rpn || r.src == conversion::Nrpn)
+            return true;
+    return false;
+}
+
+// pb, cp, pc and pp sources, each carrying one value per message. Poly pressure
+// with an "any note" source (srcNum -1) is collapsed to the maximum held pressure
+// (matching how MPE combines channel pressure) before conversion.
+static void convertNonController(const Array<conversion::Rule>& rules, RouteInput& input,
+                                 const MidiMessage& msg, Array<MidiMessage>& output)
+{
+    using namespace conversion;
     const int ch = msg.getChannel();
     const double ts = msg.getTimeStamp();
 
-    // a destination pp interprets its number as a note (so note names work too),
-    // every other type as a plain controller/parameter number
-    auto dstNumber = [this](ConvType t, const String& tok)
+    if (msg.isNoteOnOrOff() || msg.isAftertouch())
     {
-        return (t == CONV_PP) ? (int) asNoteNumber(tok) : asDecOrHexIntValue(tok);
-    };
+        bool anyNotePP = false;
+        for (const auto& r : rules)
+            if (! r.isTransform && r.src == Pp && r.srcNum == -1) { anyNotePP = true; break; }
 
-    // single-message source types: poly pressure, pitch bend, channel pressure
-    // and program change
-    if (! msg.isController())
-    {
-        // "any note" poly-pressure collapse: watch note-ons/offs to know which
-        // notes are held and reduce their pressure with the maximum (matching how
-        // MPE combines channel pressure), re-emitting when a release lowers it
-        if (msg.isNoteOnOrOff() || msg.isAftertouch())
+        if (anyNotePP)
         {
-            bool anyNotePP = false;
-            for (auto& cmd : route.converters)
+            const int note = msg.getNoteNumber();
+            if      (msg.isNoteOn())  input.pressureCollapse.noteOn(ch, note);
+            else if (msg.isNoteOff()) input.pressureCollapse.noteOff(ch, note);
+            else                      input.pressureCollapse.set(ch, note, msg.getAfterTouchValue());
+
+            // a note-on only adds a note at zero pressure, which never raises the
+            // maximum, so only poly pressure and note-offs need to re-emit
+            if (! msg.isNoteOn())
             {
-                ConvType st;
-                if (parseConvType(cmd.opts_[0], st) && st == CONV_PP && cmd.opts_[1] == "-1")
-                {
-                    anyNotePP = true;
-                    break;
-                }
+                const int maxP = input.pressureCollapse.maxPressure(ch);
+                if (input.pressureCollapse.changed(ch, maxP))
+                    for (const auto& r : rules)
+                        if (! r.isTransform && r.src == Pp && r.srcNum == -1)
+                            emit(output, ch, maxP, 7, r.dst, r.dstNum, r.method, ts);
             }
 
-            if (anyNotePP)
-            {
-                const int note = msg.getNoteNumber();
-                if      (msg.isNoteOn())  input.pressureCollapse.noteOn(ch, note);
-                else if (msg.isNoteOff()) input.pressureCollapse.noteOff(ch, note);
-                else                      input.pressureCollapse.set(ch, note, msg.getAfterTouchValue());
-
-                // a note-on only adds a note at zero pressure, which never raises
-                // the maximum, so only poly pressure and note-offs need to re-emit
-                if (! msg.isNoteOn())
-                {
-                    const int maxP = input.pressureCollapse.maxPressure(ch);
-                    if (input.pressureCollapse.changed(ch, maxP))
-                    {
-                        for (auto& cmd : route.converters)
-                        {
-                            ConvType st, dt;
-                            if (! parseConvType(cmd.opts_[0], st) || st != CONV_PP || cmd.opts_[1] != "-1")
-                                continue;
-                            if (! parseConvType(cmd.opts_[2], dt))
-                                continue;
-                            const int dstNum = dstNumber(dt, cmd.opts_[3]);
-                            emitConversion(output, ch, maxP, 7, dt, dstNum, scaleMethodFor(st, -1, dt, dstNum), ts);
-                        }
-                    }
-                }
-
-                if (msg.isAftertouch())
-                {
-                    return;   // the poly pressure is consumed by the collapse
-                }
-                // note-ons and note-offs fall through to pass the note message onward
-            }
+            if (msg.isAftertouch())
+                return;   // the poly pressure is consumed by the collapse
+            // note-ons and note-offs fall through to pass the note message onward
         }
-
-        for (auto& cmd : route.converters)
-        {
-            ConvType st, dt;
-            if (! parseConvType(cmd.opts_[0], st) || ! parseConvType(cmd.opts_[2], dt))
-            {
-                continue;
-            }
-
-            const int srcNum = asDecOrHexIntValue(cmd.opts_[1]);
-            int srcValue = -1;
-            int srcBits = 7;
-
-            if (st == CONV_PB && msg.isPitchWheel())
-            {
-                srcValue = msg.getPitchWheelValue();
-                srcBits = 14;
-            }
-            else if (st == CONV_CP && msg.isChannelPressure())
-            {
-                srcValue = msg.getChannelPressureValue();
-            }
-            else if (st == CONV_PC && msg.isProgramChange())
-            {
-                srcValue = msg.getProgramChangeNumber();
-            }
-            else if (st == CONV_PP && msg.isAftertouch() && cmd.opts_[1] != "-1"
-                     && msg.getNoteNumber() == (int) asNoteNumber(cmd.opts_[1]))
-            {
-                // a specific source note (the any-note collapse is handled above)
-                srcValue = msg.getAfterTouchValue();
-            }
-
-            if (srcValue >= 0)
-            {
-                const int dstNum = dstNumber(dt, cmd.opts_[3]);
-                emitConversion(output, ch, srcValue, srcBits, dt, dstNum,
-                               scaleMethodFor(st, srcNum, dt, dstNum), ts);
-                return;
-            }
-        }
-
-        output.add(msg);
-        return;
     }
 
+    for (const auto& r : rules)
+    {
+        if (r.isTransform) continue;
+
+        int srcValue = -1;
+        if      (r.src == Pb && msg.isPitchWheel())        srcValue = msg.getPitchWheelValue();
+        else if (r.src == Cp && msg.isChannelPressure())   srcValue = msg.getChannelPressureValue();
+        else if (r.src == Pc && msg.isProgramChange())     srcValue = msg.getProgramChangeNumber();
+        else if (r.src == Pp && msg.isAftertouch() && r.srcNum != -1
+                 && msg.getNoteNumber() == r.srcNum)       srcValue = msg.getAfterTouchValue();
+
+        if (srcValue >= 0)
+        {
+            emit(output, ch, srcValue, r.srcBits, r.dst, r.dstNum, r.method, ts);
+            return;
+        }
+    }
+
+    output.add(msg);
+}
+
+// the RPN/NRPN controller set (6, 38, 98-101). A parameter targeted by a rule is
+// intercepted - its constituent CCs, and the null that closes it, are consumed and
+// replaced by the converted or transformed result - while every other parameter
+// passes through verbatim.
+static void convertRpnSet(const Array<conversion::Rule>& rules, RouteInput& input,
+                          const MidiMessage& msg, Array<MidiMessage>& output)
+{
+    using namespace conversion;
+    const int ch = msg.getChannel();
+    const double ts = msg.getTimeStamp();
     const int cc = msg.getControllerNumber();
     const int val = msg.getControllerValue();
 
-    bool haveRpnRule = false;
-    for (auto& cmd : route.converters)
+    // whether any convert or transform rule targets this parameter as a source
+    auto paramIntercepted = [&](int param, bool isNRPN) -> bool
     {
-        ConvType st;
-        if (parseConvType(cmd.opts_[0], st) && (st == CONV_RPN || st == CONV_NRPN))
+        for (const auto& r : rules)
         {
-            haveRpnRule = true;
-            break;
+            if (! r.isTransform && ((r.src == Rpn && ! isNRPN) || (r.src == Nrpn && isNRPN))
+                && r.srcNum == param)
+                return true;
+            if (r.isTransform && r.nrpn == isNRPN && r.param == param)
+                return true;
         }
-        if (isRpnTransform(cmd.command_))
+        return false;
+    };
+    auto flushSelects = [&]()
+    {
+        for (int i = 0; i < input.rpnSelBufLen[ch - 1]; ++i)
+            output.add(input.rpnSelBuf[ch - 1][i]);
+        input.rpnSelBufLen[ch - 1] = 0;
+    };
+
+    // keep the detector's per-channel state current for the data entry below
+    auto parsed = input.rpnDetector.tryParse(ch, cc, val);
+
+    // parameter select (98/99 = NRPN, 100/101 = RPN) or null: buffer the CC and,
+    // once the MSB+LSB pair is complete, either drop it (its parameter is
+    // intercepted, so the constituents disappear into the conversion) or forward
+    // the buffered CCs verbatim (an untargeted parameter). The null (MSB+LSB both
+    // 127) that closes a parameter is dropped along with it when that parameter was
+    // intercepted, even if the device closes with the universal RPN null (100/101)
+    // after selecting with NRPN (98/99), as the LinnStrument does.
+    if (cc != 6 && cc != 38)
+    {
+        const bool nrpnSel = (cc == 98 || cc == 99);
+        if (input.rpnSelBufLen[ch - 1] >= 4)   // shouldn't happen; drain as a safety valve
+            flushSelects();
+        input.rpnSelBuf[ch - 1][input.rpnSelBufLen[ch - 1]++] = msg;
+        if (cc == 99 || cc == 101) input.rpnSelMSB[ch - 1] = val;
+        else                       input.rpnSelLSB[ch - 1] = val;
+
+        if (input.rpnSelMSB[ch - 1] >= 0 && input.rpnSelLSB[ch - 1] >= 0)
         {
-            haveRpnRule = true;
-            break;
+            const int param = (input.rpnSelMSB[ch - 1] << 7) | input.rpnSelLSB[ch - 1];
+            const bool isNull = (param == 0x3fff);
+            const bool drop = isNull ? input.rpnSelIntercepted[ch - 1]
+                                     : paramIntercepted(param, nrpnSel);
+            if (drop)
+                input.rpnSelBufLen[ch - 1] = 0;   // replaced by the conversion output
+            else
+                flushSelects();                   // pass through unchanged
+            // a real select updates which parameter is active; a null deselects
+            input.rpnSelIntercepted[ch - 1] = isNull ? false : drop;
+            input.rpnSelMSB[ch - 1] = -1;
+            input.rpnSelLSB[ch - 1] = -1;
         }
+        return;
     }
 
-    // When the route converts or transforms any RPN/NRPN, the converter takes
-    // over the whole RPN controller set (6, 38, 98-101) and reassembles every
-    // (N)RPN. A parameter targeted by a rule is intercepted - its constituent
-    // CCs are consumed and replaced by the converted or transformed result -
-    // while every other parameter, and the RPN/NRPN null that deselects it,
-    // passes through verbatim.
-    const bool isRpnCC = (cc == 6 || cc == 38 || cc == 98 || cc == 99 || cc == 100 || cc == 101);
-    if (haveRpnRule && isRpnCC)
+    // data entry (6/38): the detector has assembled a value for the parameter
+    if (parsed.has_value())
     {
-        // whether any convert or transform rule targets this parameter as a source
-        auto paramIntercepted = [&](int param, bool isNRPN) -> bool
+        const auto& rpn = *parsed;
+        const int srcBits = rpn.is14BitValue ? 14 : 7;
+
+        for (const auto& r : rules)
         {
-            for (auto& cmd : route.converters)
+            if (r.isTransform) continue;
+            if (((r.src == Rpn && ! rpn.isNRPN) || (r.src == Nrpn && rpn.isNRPN))
+                && r.srcNum == rpn.parameterNumber)
             {
-                ConvType st, dt;
-                if (parseConvType(cmd.opts_[0], st) && parseConvType(cmd.opts_[2], dt)
-                    && ((st == CONV_RPN && !isNRPN) || (st == CONV_NRPN && isNRPN))
-                    && asDecOrHexIntValue(cmd.opts_[1]) == param)
-                {
-                    return true;
-                }
-                if (isRpnTransform(cmd.command_))
-                {
-                    const bool nrpnT = (cmd.command_ == NRPN_ADD || cmd.command_ == NRPN_SCALE || cmd.command_ == NRPN_CURVE);
-                    if (nrpnT == isNRPN && asDecOrHexIntValue(cmd.opts_[0]) == param)
-                        return true;
-                }
-            }
-            return false;
-        };
-        auto flushSelects = [&]()
-        {
-            for (int i = 0; i < input.rpnSelBufLen[ch - 1]; ++i)
-                output.add(input.rpnSelBuf[ch - 1][i]);
-            input.rpnSelBufLen[ch - 1] = 0;
-        };
-
-        // keep the detector's per-channel state current for the data entry below
-        auto parsed = input.rpnDetector.tryParse(ch, cc, val);
-
-        // parameter select (98/99 = NRPN, 100/101 = RPN) or null: buffer the CC
-        // and, once the MSB+LSB pair is complete, either drop it (its parameter is
-        // intercepted, so the constituents disappear into the conversion) or
-        // forward the buffered CCs verbatim (an untargeted parameter). The null
-        // (MSB+LSB both 127) that closes a parameter is dropped along with it when
-        // that parameter was intercepted, even if the device closes with the
-        // universal RPN null (100/101) after selecting with NRPN (98/99), as the
-        // LinnStrument does.
-        if (cc != 6 && cc != 38)
-        {
-            const bool nrpnSel = (cc == 98 || cc == 99);
-            if (input.rpnSelBufLen[ch - 1] >= 4)   // shouldn't happen; drain as a safety valve
-                flushSelects();
-            input.rpnSelBuf[ch - 1][input.rpnSelBufLen[ch - 1]++] = msg;
-            if (cc == 99 || cc == 101) input.rpnSelMSB[ch - 1] = val;
-            else                       input.rpnSelLSB[ch - 1] = val;
-
-            if (input.rpnSelMSB[ch - 1] >= 0 && input.rpnSelLSB[ch - 1] >= 0)
-            {
-                const int param = (input.rpnSelMSB[ch - 1] << 7) | input.rpnSelLSB[ch - 1];
-                const bool isNull = (param == 0x3fff);
-                const bool drop = isNull ? input.rpnSelIntercepted[ch - 1]
-                                         : paramIntercepted(param, nrpnSel);
-                if (drop)
-                    input.rpnSelBufLen[ch - 1] = 0;   // replaced by the conversion output
-                else
-                    flushSelects();                   // pass through unchanged
-                // a real select updates which parameter is active; a null deselects
-                input.rpnSelIntercepted[ch - 1] = isNull ? false : drop;
-                input.rpnSelMSB[ch - 1] = -1;
-                input.rpnSelLSB[ch - 1] = -1;
-            }
-            return;
-        }
-
-        // data entry (6/38): the detector has assembled a value for the parameter
-        if (parsed.has_value())
-        {
-            const auto& rpn = *parsed;
-            const int srcBits = rpn.is14BitValue ? 14 : 7;
-
-            for (auto& cmd : route.converters)
-            {
-                ConvType st, dt;
-                if (!parseConvType(cmd.opts_[0], st) || !parseConvType(cmd.opts_[2], dt))
-                {
-                    continue;
-                }
-                const int srcNum = asDecOrHexIntValue(cmd.opts_[1]);
-                if (((st == CONV_RPN && !rpn.isNRPN) || (st == CONV_NRPN && rpn.isNRPN)) &&
-                    srcNum == rpn.parameterNumber)
-                {
-                    const int dstNum = dstNumber(dt, cmd.opts_[3]);
-                    input.rpnSelBufLen[ch - 1] = 0;   // drop any dangling selects
-                    emitConversion(output, ch, rpn.value, srcBits, dt, dstNum,
-                                   scaleMethodFor(st, srcNum, dt, dstNum), ts);
-                    return;
-                }
-            }
-
-            // value transform (add/scale/curve) on this parameter: apply and
-            // regenerate the (N)RPN with the modified value
-            bool transformed = false;
-            int newValue = rpn.value;
-            const int maxValue = rpn.is14BitValue ? 16383 : 127;
-            for (auto& cmd : route.converters)
-            {
-                if (!isRpnTransform(cmd.command_))
-                {
-                    continue;
-                }
-                const bool isNrpnTransform = (cmd.command_ == NRPN_ADD || cmd.command_ == NRPN_SCALE || cmd.command_ == NRPN_CURVE);
-                if (isNrpnTransform != rpn.isNRPN)
-                {
-                    continue;
-                }
-                if (asDecOrHexIntValue(cmd.opts_[0]) != rpn.parameterNumber)
-                {
-                    continue;
-                }
-                transformed = true;
-                switch (cmd.command_)
-                {
-                    case NRPN_ADD:
-                    case RPN_ADD:
-                        newValue = jlimit(0, maxValue, newValue + asDecOrHexIntValue(cmd.opts_[1]));
-                        break;
-                    case NRPN_SCALE:
-                    case RPN_SCALE:
-                        newValue = jlimit(0, maxValue, roundToInt(newValue * cmd.opts_[1].getFloatValue()));
-                        break;
-                    case NRPN_CURVE:
-                    case RPN_CURVE:
-                        newValue = gammaCurve(newValue, maxValue, cmd.opts_[1].getDoubleValue());
-                        break;
-                    default:
-                        break;
-                }
-            }
-
-            if (transformed)
-            {
-                input.rpnSelBufLen[ch - 1] = 0;   // regeneration re-emits the selects
-                MidiBuffer buffer = MidiRPNGenerator::generate(rpn.channel, rpn.parameterNumber, newValue,
-                                                               rpn.isNRPN, rpn.is14BitValue);
-                for (const auto meta : buffer)
-                {
-                    auto m = meta.getMessage();
-                    m.setTimeStamp(ts);
-                    output.add(m);
-                }
+                input.rpnSelBufLen[ch - 1] = 0;   // drop any dangling selects
+                emit(output, ch, rpn.value, srcBits, r.dst, r.dstNum, r.method, ts);
                 return;
             }
         }
 
-        // untargeted: forward any buffered selects and this data entry verbatim
-        flushSelects();
-        output.add(msg);
-        return;
+        // value transform (add/scale/curve) on this parameter: apply and regenerate
+        // the (N)RPN with the modified value
+        bool transformed = false;
+        int newValue = rpn.value;
+        const int maxValue = rpn.is14BitValue ? 16383 : 127;
+        for (const auto& r : rules)
+        {
+            if (! r.isTransform || r.nrpn != rpn.isNRPN || r.param != rpn.parameterNumber)
+                continue;
+            transformed = true;
+            switch (r.op)
+            {
+                case NRPN_ADD:
+                case RPN_ADD:
+                    newValue = jlimit(0, maxValue, newValue + r.addAmount);
+                    break;
+                case NRPN_SCALE:
+                case RPN_SCALE:
+                    newValue = jlimit(0, maxValue, roundToInt(newValue * (float) r.factor));
+                    break;
+                case NRPN_CURVE:
+                case RPN_CURVE:
+                    newValue = gammaCurve(newValue, maxValue, r.gamma);
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        if (transformed)
+        {
+            // regenerate the whole (N)RPN, selects and closing null included, so a
+            // transformed parameter is framed exactly like a converted one
+            input.rpnSelBufLen[ch - 1] = 0;
+            conversion::emitRpn(output, rpn.channel, rpn.parameterNumber, newValue,
+                                rpn.isNRPN, rpn.is14BitValue, ts);
+            return;
+        }
     }
 
-    // 14-bit CC source: MSB on controller N (0-31), LSB on controller N+32
-    for (auto& cmd : route.converters)
+    // untargeted: forward any buffered selects and this data entry verbatim
+    flushSelects();
+    output.add(msg);
+}
+
+// plain CC sources: 14-bit (MSB on controller N in 0-31, LSB on N+32) then 7-bit.
+// Returns whether a rule claimed the message.
+static bool convertCc(const Array<conversion::Rule>& rules, RouteInput& input,
+                      const MidiMessage& msg, Array<MidiMessage>& output)
+{
+    using namespace conversion;
+    const int ch = msg.getChannel();
+    const double ts = msg.getTimeStamp();
+    const int cc = msg.getControllerNumber();
+    const int val = msg.getControllerValue();
+
+    for (const auto& r : rules)
     {
-        ConvType st, dt;
-        if (!parseConvType(cmd.opts_[0], st) || st != CONV_CC14)
-        {
-            continue;
-        }
-        parseConvType(cmd.opts_[2], dt);
-        const int n = asDecOrHexIntValue(cmd.opts_[1]) & 0x1f;
-        const int dstNum = dstNumber(dt, cmd.opts_[3]);
-        const auto method = scaleMethodFor(CONV_CC14, n, dt, dstNum);
+        if (r.isTransform || r.src != Cc14) continue;
+        const int n = r.srcNum & 0x1f;
         if (cc == n)
         {
             input.ccMsb[ch - 1][n] = val;
             input.ccMsbValid[ch - 1][n] = true;
-            emitConversion(output, ch, val, 7, dt, dstNum, method, ts);
-            return;
+            emit(output, ch, val, 7, r.dst, r.dstNum, r.method, ts);
+            return true;
         }
         if (cc == n + 32)
         {
             const int msb = input.ccMsbValid[ch - 1][n] ? input.ccMsb[ch - 1][n] : 0;
-            emitConversion(output, ch, (msb << 7) | val, 14, dt, dstNum, method, ts);
-            return;
+            emit(output, ch, (msb << 7) | val, 14, r.dst, r.dstNum, r.method, ts);
+            return true;
         }
     }
 
-    // 7-bit CC source
-    for (auto& cmd : route.converters)
+    for (const auto& r : rules)
     {
-        ConvType st, dt;
-        if (!parseConvType(cmd.opts_[0], st) || st != CONV_CC7)
+        if (r.isTransform || r.src != Cc7) continue;
+        if (cc == r.srcNum)
         {
-            continue;
-        }
-        const int srcNum = asDecOrHexIntValue(cmd.opts_[1]);
-        if (cc == srcNum)
-        {
-            parseConvType(cmd.opts_[2], dt);
-            const int dstNum = dstNumber(dt, cmd.opts_[3]);
-            emitConversion(output, ch, val, 7, dt, dstNum,
-                           scaleMethodFor(CONV_CC7, srcNum, dt, dstNum), ts);
-            return;
+            emit(output, ch, val, 7, r.dst, r.dstNum, r.method, ts);
+            return true;
         }
     }
 
-    // not managed by any conversion rule: forward unchanged
-    output.add(msg);
+    return false;
+}
+
+// compile the route's string convert/transform commands to conversion::Rule
+// numbers, so the real-time path never parses option strings. Numbers are decoded
+// with the current hex/octave settings, matching the previous per-message behaviour.
+void ApplicationState::rebuildConvertRules(Route& route)
+{
+    route.convertRules.clearQuick();
+    for (const auto& cmd : route.converters)
+    {
+        conversion::Rule r;
+        if (conversion::isRpnTransform(cmd.command_))
+        {
+            r.isTransform = true;
+            r.op    = cmd.command_;
+            r.nrpn  = (cmd.command_ == NRPN_ADD || cmd.command_ == NRPN_SCALE || cmd.command_ == NRPN_CURVE);
+            r.param = asDecOrHexIntValue(cmd.opts_[0]);
+            r.addAmount = asDecOrHexIntValue(cmd.opts_[1]);
+            r.factor    = cmd.opts_[1].getFloatValue();
+            r.gamma     = cmd.opts_[1].getDoubleValue();
+        }
+        else
+        {
+            conversion::parseType(cmd.opts_[0], r.src);
+            conversion::parseType(cmd.opts_[2], r.dst);
+            // a source pp keeps -1 (any note) or resolves its note; other sources
+            // take a controller/parameter number
+            r.srcNum = (r.src == conversion::Pp)
+                         ? (cmd.opts_[1] == "-1" ? -1 : (int) asNoteNumber(cmd.opts_[1]))
+                         : asDecOrHexIntValue(cmd.opts_[1]);
+            r.dstNum = (r.dst == conversion::Pp) ? (int) asNoteNumber(cmd.opts_[3])
+                                                 : asDecOrHexIntValue(cmd.opts_[3]);
+            r.srcBits = conversion::valueBits(r.src);
+            r.method  = conversion::scaleMethodFor(r.src, r.srcNum, r.dst, r.dstNum);
+        }
+        route.convertRules.add(r);
+    }
+}
+
+void ApplicationState::processConverters(Route& route, RouteInput& input, const MidiMessage& msg, Array<MidiMessage>& output)
+{
+    // converters are only appended at setup, so a size mismatch means the compiled
+    // cache is stale; rebuild it once and then match rules without parsing strings
+    if (route.convertRules.size() != route.converters.size())
+        rebuildConvertRules(route);
+
+    const auto& rules = route.convertRules;
+
+    if (! msg.isController())
+    {
+        convertNonController(rules, input, msg, output);
+        return;
+    }
+
+    const int cc = msg.getControllerNumber();
+    const bool isRpnCC = (cc == 6 || cc == 38 || cc == 98 || cc == 99 || cc == 100 || cc == 101);
+    if (isRpnCC && hasRpnRule(rules))
+    {
+        convertRpnSet(rules, input, msg, output);
+        return;
+    }
+
+    if (convertCc(rules, input, msg, output))
+        return;
+
+    output.add(msg);   // not managed by any conversion rule: forward unchanged
 }
 
 String ApplicationState::messageToText(const MidiMessage& msg) const

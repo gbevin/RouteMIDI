@@ -58,6 +58,7 @@ public:
     Array<MidiMessage> applyTransforms(Route& route, RouteInput& input, const MidiMessage& msg);
     void processMpe(Route& route, RouteInput& input, const MidiMessage& msg, Array<MidiMessage>& output);
     void processConverters(Route& route, RouteInput& input, const MidiMessage& msg, Array<MidiMessage>& output);
+    void rebuildConvertRules(Route& route);   // compile route.converters to route.convertRules
     // distributes a message across a route's output ports as MPE voices; fills
     // parallel arrays where outPorts[i] is the destination index for outMsgs[i]
     // (-1 means broadcast to every output)
