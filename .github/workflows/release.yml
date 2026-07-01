@@ -26,7 +26,7 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: microsoft/setup-msbuild@v2
+      - uses: microsoft/setup-msbuild@v3
       - name: Build
         run: msbuild Builds/VisualStudio2017/routemidi.sln /m /p:Configuration=Release /p:Platform=x64 /p:PlatformToolset=v143
       - name: Package
@@ -39,7 +39,7 @@ jobs:
           Compress-Archive -Path $pkg -DestinationPath "$pkg.zip"
           $hash = (Get-FileHash -Algorithm SHA256 "$pkg.zip").Hash.ToLower()
           Set-Content -Path "$pkg.zip.sha256" -Value "$hash  $pkg.zip" -Encoding ascii
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: windows
           path: routemidi-windows-*.zip*
@@ -95,7 +95,7 @@ jobs:
           zip=$(ls routemidi-macOS-*.zip)
           shasum -a 256 "$zip" > "$zip.sha256"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: macos
           path: Installers/routemidi-macOS-*.zip*
@@ -105,12 +105,12 @@ jobs:
     needs: [ windows, macos ]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: dist
           merge-multiple: true
       - name: Draft GitHub release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           draft: true
           generate_release_notes: true
