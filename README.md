@@ -1,5 +1,9 @@
 # RouteMIDI
 
+[![CI](https://github.com/gbevin/RouteMIDI/actions/workflows/ci.yml/badge.svg)](https://github.com/gbevin/RouteMIDI/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/gbevin/RouteMIDI?sort=semver)](https://github.com/gbevin/RouteMIDI/releases/latest)
+[![License: GPL v3](https://img.shields.io/badge/license-GPLv3-blue.svg)](COPYING.md)
+
 RouteMIDI is a multi-platform command-line tool that makes it very easy to connect MIDI ports together, passing MIDI messages between them while filtering and transforming them along the way.
 
 All the heavy lifting is done by the wonderful JUCE library.
@@ -7,10 +11,6 @@ All the heavy lifting is done by the wonderful JUCE library.
 The project website is https://github.com/gbevin/RouteMIDI
 
 RouteMIDI is the third member of a family of command-line MIDI tools, alongside [SendMIDI](https://github.com/gbevin/SendMIDI) (send MIDI messages) and [ReceiveMIDI](https://github.com/gbevin/ReceiveMIDI) (receive and monitor MIDI messages). It deliberately shares their concise command vocabulary, number and note-name parsing, and JavaScript scripting, so if you know one of them, you already know most of RouteMIDI.
-
-## Community
-
-Join the Forums: https://forum.uwyn.com
 
 ## Purpose
 
