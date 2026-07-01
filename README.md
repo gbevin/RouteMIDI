@@ -1,8 +1,8 @@
 # RouteMIDI
 
-[![CI](https://github.com/gbevin/RouteMIDI/actions/workflows/ci.yml/badge.svg)](https://github.com/gbevin/RouteMIDI/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/gbevin/RouteMIDI?sort=semver)](https://github.com/gbevin/RouteMIDI/releases/latest)
 [![License: GPL v3](https://img.shields.io/badge/license-GPLv3-blue.svg)](COPYING.md)
+[![Release](https://img.shields.io/github/v/release/gbevin/RouteMIDI?sort=semver)](https://github.com/gbevin/RouteMIDI/releases/latest)
+[![CI](https://github.com/gbevin/RouteMIDI/actions/workflows/ci.yml/badge.svg)](https://github.com/gbevin/RouteMIDI/actions/workflows/ci.yml)
 
 RouteMIDI is a multi-platform command-line tool that makes it very easy to connect MIDI ports together, passing MIDI messages between them while filtering, transforming and converting them along the way.
 
