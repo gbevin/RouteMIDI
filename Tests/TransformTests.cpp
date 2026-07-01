@@ -325,6 +325,67 @@ public:
             expectEquals(noteOffs, 2);
         }
 
+        beginTest("Mono forces one note at a time by priority");
+        {
+            // a small helper: apply a mono transform over a sequence, returning
+            // the (on?,note) pairs it produces
+            auto runMono = [&state](const StringArray& opts, const Array<MidiMessage>& in)
+            {
+                Route route;
+                route.inputs.add(new RouteInput());
+                route.transforms.add(makeCommand(MONO, opts));
+                Array<MidiMessage> out;
+                for (const auto& m : in)
+                    out.addArray(state.applyTransforms(route, *route.inputs[0], m));
+                return out;
+            };
+
+            auto describe = [](const MidiMessage& m)
+            {
+                return (m.isNoteOn() ? "on " : m.isNoteOff() ? "off " : "?") + String(m.getNoteNumber());
+            };
+
+            // last-note priority: a new note steals, releasing it falls back to
+            // the previously held note (retriggered at its own velocity)
+            auto out = runMono({}, {
+                MidiMessage::noteOn(1, 60, (uint8)100),   // C sounds
+                MidiMessage::noteOn(1, 64, (uint8)90),    // E steals: off C, on E
+                MidiMessage::noteOff(1, 64, (uint8)0),    // E off, fall back: on C
+                MidiMessage::noteOff(1, 60, (uint8)0) });  // C off
+            StringArray got;
+            for (const auto& m : out) got.add(describe(m));
+            expect(got == StringArray({ "on 60", "off 60", "on 64", "off 64", "on 60", "off 60" }));
+            // the fallback note keeps its own velocity
+            for (const auto& m : out)
+                if (m.isNoteOn() && m.getNoteNumber() == 60)
+                    expectEquals((int)m.getVelocity(), 100);
+
+            // low-note priority: a higher note waits under a held lower one
+            out = runMono({"low"}, {
+                MidiMessage::noteOn(1, 60, (uint8)100),   // C sounds
+                MidiMessage::noteOn(1, 67, (uint8)90),    // G higher: waits, no output
+                MidiMessage::noteOff(1, 60, (uint8)0),    // C off, fall back to G
+                MidiMessage::noteOff(1, 67, (uint8)0) });
+            got.clear();
+            for (const auto& m : out) got.add(describe(m));
+            expect(got == StringArray({ "on 60", "off 60", "on 67", "off 67" }));
+
+            // high-note priority: a lower note waits under a held higher one
+            out = runMono({"high"}, {
+                MidiMessage::noteOn(1, 67, (uint8)100),   // G sounds
+                MidiMessage::noteOn(1, 60, (uint8)90),    // C lower: waits
+                MidiMessage::noteOff(1, 67, (uint8)0),    // G off, fall back to C
+                MidiMessage::noteOff(1, 60, (uint8)0) });
+            got.clear();
+            for (const auto& m : out) got.add(describe(m));
+            expect(got == StringArray({ "on 67", "off 67", "on 60", "off 60" }));
+
+            // non-note messages pass through untouched
+            out = runMono({}, { MidiMessage::controllerEvent(1, 7, 100) });
+            expectEquals(out.size(), 1);
+            expect(out[0].isController());
+        }
+
         beginTest("Velocity transforms (note-on only)");
         {
             MidiMessage m = MidiMessage::noteOn(1, 60, (uint8)100);

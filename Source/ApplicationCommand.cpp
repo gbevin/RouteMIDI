@@ -257,6 +257,7 @@ bool ApplicationCommand::isTransform() const
         case SCALE:
         case CHORD:
         case LATCH:
+        case MONO:
         case VELOCITY_SCALE:
         case VELOCITY_SET:
         case VELOCITY_ADD:

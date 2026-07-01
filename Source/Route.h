@@ -22,6 +22,7 @@
 
 #include "ApplicationCommand.h"
 #include "Latch.h"
+#include "Mono.h"
 #include "Mpe.h"
 
 // Per-input state for the "any note" poly-pressure collapse (convert pp -> a
@@ -92,6 +93,7 @@ struct RouteInput
     mpe::McmTracker mcm;                  // MPE zone reconfiguration detection (both zones)
 
     LatchState latch;                     // held-note tracking for the latch transform
+    MonoState mono;                       // held-note tracking for the mono transform
     PressureCollapse pressureCollapse;    // held-note pressure tracking for convert pp -> value
 };
 

@@ -60,6 +60,7 @@
 		7033D33CCF3316E84F4E96D0 /* include_juce_midi_ci.cpp */ /* include_juce_midi_ci.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = include_juce_midi_ci.cpp; path = ../../JuceLibraryCode/include_juce_midi_ci.cpp; sourceTree = SOURCE_ROOT; };
 		717D40CBAC30A1051D429FBD /* juce_audio_devices */ /* juce_audio_devices */ = {isa = PBXFileReference; lastKnownFileType = folder; name = juce_audio_devices; path = ../../../JuceLibraryCode/modules/juce_audio_devices; sourceTree = SOURCE_ROOT; };
 		718E470C47423A5734BBE6B4 /* include_juce_core.mm */ /* include_juce_core.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = include_juce_core.mm; path = ../../JuceLibraryCode/include_juce_core.mm; sourceTree = SOURCE_ROOT; };
+		72E9C82602A4CA1128EC1E47 /* Mono.h */ /* Mono.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Mono.h; path = ../../../Source/Mono.h; sourceTree = SOURCE_ROOT; };
 		749B35F51368829BDF045F25 /* Foundation.framework */ /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
 		74E83C7D42C715792B6537C9 /* MpeTests.cpp */ /* MpeTests.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = MpeTests.cpp; path = ../../MpeTests.cpp; sourceTree = SOURCE_ROOT; };
 		7599A4D720B561530820F5F1 /* Route.h */ /* Route.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Route.h; path = ../../../Source/Route.h; sourceTree = SOURCE_ROOT; };
@@ -161,6 +162,7 @@
 				26805B057A76A735FEA3254B,
 				62460F70AA75475EFD62FB30,
 				113BCE723884E45DD7A8FC4F,
+				72E9C82602A4CA1128EC1E47,
 				623DB344C4CFD3EB80F45955,
 				7599A4D720B561530820F5F1,
 				15000DBCB5EC2B5BA4195BCC,

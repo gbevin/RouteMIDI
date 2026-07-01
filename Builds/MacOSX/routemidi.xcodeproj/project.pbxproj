@@ -38,6 +38,7 @@
 		14D92B2040A282CCDC3A0918 /* BitScaling.h */ /* BitScaling.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = BitScaling.h; path = ../../Source/BitScaling.h; sourceTree = SOURCE_ROOT; };
 		1AEEB2610132487771E735B2 /* Route.h */ /* Route.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Route.h; path = ../../Source/Route.h; sourceTree = SOURCE_ROOT; };
 		21797EC5FAA9C2DC6DD2B3EF /* ScriptUtilClass.cpp */ /* ScriptUtilClass.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = ScriptUtilClass.cpp; path = ../../Source/ScriptUtilClass.cpp; sourceTree = SOURCE_ROOT; };
+		23E31207938832D19BD7AA17 /* Mono.h */ /* Mono.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Mono.h; path = ../../Source/Mono.h; sourceTree = SOURCE_ROOT; };
 		24749B444222A65B40FE5D2E /* JuceHeader.h */ /* JuceHeader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = JuceHeader.h; path = ../../JuceLibraryCode/JuceHeader.h; sourceTree = SOURCE_ROOT; };
 		27131189176A2D0C2E910C11 /* ChannelBucket.h */ /* ChannelBucket.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ChannelBucket.h; path = ../../Source/ChannelBucket.h; sourceTree = SOURCE_ROOT; };
 		28F1F23438CA15D2AF8C89C3 /* ApplicationState.cpp */ /* ApplicationState.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = ApplicationState.cpp; path = ../../Source/ApplicationState.cpp; sourceTree = SOURCE_ROOT; };
@@ -160,6 +161,7 @@
 				14D92B2040A282CCDC3A0918,
 				27131189176A2D0C2E910C11,
 				984B89DA298818FDB2DF5FC5,
+				23E31207938832D19BD7AA17,
 				B2451D1DBA700503A8FEDC18,
 				C824511B9526921A9B1CD762,
 				1AEEB2610132487771E735B2,

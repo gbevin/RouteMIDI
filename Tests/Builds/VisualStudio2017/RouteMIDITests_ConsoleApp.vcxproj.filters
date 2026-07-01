@@ -1224,6 +1224,9 @@
     <ClInclude Include="..\..\..\Source\Latch.h">
       <Filter>RouteMIDITests\Source</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\Source\Mono.h">
+      <Filter>RouteMIDITests\Source</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\Source\Mpe.h">
       <Filter>RouteMIDITests\Source</Filter>
     </ClInclude>

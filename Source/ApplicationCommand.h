@@ -91,6 +91,7 @@ enum CommandIndex
     SCALE,
     CHORD,
     LATCH,
+    MONO,
     NOTE_TO_CC,
     CC_TO_NOTE,
     NOTE_TO_PROGRAM,

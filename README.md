@@ -101,6 +101,7 @@ Transforms:
   scale     root scale Snap notes to the nearest note of a scale (root, name)
   chord     intervals  Stack notes at the given semitone intervals (a chord)
   latch     (mode)     Keep notes on after release; toggle (default) or hold
+  mono      (priority) Force monophony; priority last (default), low or high
   notecc    note cc    Turn a note into a Control Change (velocity as value)
   ccnote    cc note    Turn a Control Change into a note (64+ on, else off)
   notepc    note       Turn a note-on into a Program Change (note-off dropped)
@@ -336,6 +337,14 @@ The `latch` transform keeps notes sounding after their keys are released, so you
 routemidi in "Keyboard" latch out "Synth"               # tap notes to toggle a drone
 routemidi in "Keyboard" latch hold out "Synth"          # hold the last chord you played
 routemidi in "Keyboard" chord 4 7 latch hold out "Synth"  # hold whole triads hands-free
+```
+
+The `mono` transform forces monophony — only one note sounds at a time — which is handy for driving a mono synth from a polyphonic controller. When you hold several notes it picks the winner by an optional priority: `last` (the default) lets each new note take over, `low` keeps the lowest held note (classic bass-synth behaviour) and `high` the highest. Releasing the sounding note falls back to the next note still held, retriggered at its own velocity, and notes that lose priority simply wait silently until they win it. It works per channel, so to collapse a polyphonic MPE performance onto one mono synth, put a `chset` in front of it (or run it after an MPE collapse) to bring the notes onto a single channel first.
+
+```
+routemidi in "Keyboard" mono out "Synth"                # last-note mono
+routemidi in "Bass" mono low out "Synth"                # lowest note wins
+routemidi in "LinnStrument" chset 1 mono out "Mono"     # collapse MPE to a mono synth
 ```
 
 For ultimate flexibility, the `js` and `jsf` commands run JavaScript on each message and can inspect it, rewrite it, drop it, or emit additional messages (so one note can become a chord, for instance). See the [JAVASCRIPT.md](JAVASCRIPT.md) documentation file for details.

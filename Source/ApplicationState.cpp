@@ -278,6 +278,7 @@ ApplicationState::ApplicationState()
     commands_.add({"scale",     "",                       SCALE,                   2, {"root", "scale"},          {"Snap notes to the nearest note of a scale (root, name)"}});
     commands_.add({"chord",     "",                       CHORD,                  -1, {"intervals"},              {"Stack notes at the given semitone intervals (a chord)"}});
     commands_.add({"latch",     "",                       LATCH,                  -1, {"(mode)"},                 {"Keep notes on after release; toggle (default) or hold"}});
+    commands_.add({"mono",      "",                       MONO,                   -1, {"(priority)"},             {"Force monophony; priority last (default), low or high"}});
     commands_.add({"notecc",    "note-to-control-change", NOTE_TO_CC,              2, {"note", "cc"},             {"Turn a note into a Control Change (velocity as value)"}});
     commands_.add({"ccnote",    "control-change-to-note", CC_TO_NOTE,              2, {"cc", "note"},             {"Turn a Control Change into a note (64+ on, else off)"}});
     commands_.add({"notepc",    "note-to-program-change", NOTE_TO_PROGRAM,         2, {"note", "program"},        {"Turn a note-on into a Program Change (note-off dropped)"}});
@@ -1157,6 +1158,7 @@ void ApplicationState::sendPanic(Route& route)
     for (auto* input : route.inputs)
     {
         input->latch.clear();
+        input->mono.reset();
         input->pressureCollapse.reset();
     }
 }
@@ -1182,6 +1184,7 @@ void ApplicationState::sendZoneReset(Route& route)
     for (auto* input : route.inputs)
     {
         input->latch.clear();
+        input->mono.reset();
         input->pressureCollapse.reset();
     }
 }
@@ -1635,6 +1638,17 @@ Array<MidiMessage> ApplicationState::applyTransforms(Route& route, RouteInput& i
                 // press, hold replaces the held chord when a new gesture starts
                 const bool hold = cmd.opts_.size() > 0 && cmd.opts_[0].equalsIgnoreCase("hold");
                 input.latch.process(hold, m, next);
+            }
+            else if (cmd.command_ == MONO)
+            {
+                // forces one note at a time, choosing among held notes by priority
+                MonoState::Priority priority = MonoState::Last;
+                if (cmd.opts_.size() > 0)
+                {
+                    if      (cmd.opts_[0].equalsIgnoreCase("low"))  priority = MonoState::Low;
+                    else if (cmd.opts_[0].equalsIgnoreCase("high")) priority = MonoState::High;
+                }
+                input.mono.process(priority, m, next);
             }
             else
             {
