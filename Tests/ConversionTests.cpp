@@ -88,6 +88,15 @@ namespace
         return v;
     }
 
+    int lastPolyPressure(const Array<MidiMessage>& out, int note)
+    {
+        int v = -1;
+        for (const auto& m : out)
+            if (m.isAftertouch() && m.getNoteNumber() == note)
+                v = m.getAfterTouchValue();
+        return v;
+    }
+
     // runs an arbitrary converter-stage command (e.g. an RPN/NRPN value
     // transform) over a sequence of input messages
     Array<MidiMessage> runConverterCommand(ApplicationState& state, CommandIndex command,
@@ -253,6 +262,87 @@ public:
 
             auto back = runConvert(state, {"cc", "7", "pc", "0"}, { MidiMessage::controllerEvent(1, 7, 10) });
             expectEquals(lastProgramChange(back), 10);
+        }
+
+        beginTest("Poly Pressure conversions");
+        {
+            // a specific source note converts only that note; others pass through
+            auto out = runConvert(state, {"pp", "60", "cc", "1"},
+                { MidiMessage::aftertouchChange(1, 60, 100), MidiMessage::aftertouchChange(1, 62, 100) });
+            expectEquals(lastCC(out, 1), 100);
+            expectEquals(lastPolyPressure(out, 62), 100);   // note 62 untouched
+            expect(lastPolyPressure(out, 60) < 0);          // note 60 was converted away
+
+            // channel pressure sprays onto a target note as poly pressure
+            auto back = runConvert(state, {"cp", "0", "pp", "60"}, { MidiMessage::channelPressureChange(1, 90) });
+            expectEquals(lastPolyPressure(back, 60), 90);
+
+            // a CC lands on a note too
+            auto fromCC = runConvert(state, {"cc", "74", "pp", "72"}, { MidiMessage::controllerEvent(1, 74, 127) });
+            expectEquals(lastPolyPressure(fromCC, 72), 127);
+
+            // poly pressure can be remapped from one note to another
+            auto remap = runConvert(state, {"pp", "60", "pp", "72"}, { MidiMessage::aftertouchChange(1, 60, 55) });
+            expectEquals(lastPolyPressure(remap, 72), 55);
+        }
+
+        beginTest("Any-note poly pressure collapses with the maximum of held notes");
+        {
+            // two notes held; the channel pressure follows the loudest, matching
+            // how MPE combines pressure, and re-emits when a release lowers it
+            Array<MidiMessage> in;
+            in.add(MidiMessage::noteOn(1, 60, (uint8)100));
+            in.add(MidiMessage::noteOn(1, 64, (uint8)100));
+            in.add(MidiMessage::aftertouchChange(1, 60, 100));  // C loudest -> 100
+            in.add(MidiMessage::aftertouchChange(1, 64, 40));   // still 100 (suppressed)
+            in.add(MidiMessage::aftertouchChange(1, 60, 30));   // E now loudest -> 40
+            in.add(MidiMessage::noteOff(1, 64, (uint8)0));       // C now loudest -> 30
+            in.add(MidiMessage::noteOff(1, 60, (uint8)0));       // none held -> 0
+
+            auto out = runConvert(state, {"pp", "-1", "cp", "0"}, in);
+
+            Array<int> cps;
+            for (const auto& m : out)
+                if (m.isChannelPressure())
+                    cps.add(m.getChannelPressureValue());
+
+            expectEquals(cps.size(), 4);           // 100, 40, 30, 0 (the 40-update is suppressed)
+            expectEquals(cps[0], 100);
+            expectEquals(cps[1], 40);
+            expectEquals(cps[2], 30);
+            expectEquals(cps[3], 0);
+
+            // the note-ons and note-offs still pass through untouched
+            int noteOns = 0, noteOffs = 0;
+            for (const auto& m : out)
+            {
+                if (m.isNoteOn())  ++noteOns;
+                if (m.isNoteOff()) ++noteOffs;
+            }
+            expectEquals(noteOns, 2);
+            expectEquals(noteOffs, 2);
+        }
+
+        beginTest("convert parses an optional poly-pressure source note");
+        {
+            // "convert pp cp" -> any note (sentinel "-1"); "convert pp 60 cp" -> note 60
+            auto normalizedConvert = [](StringArray params)
+            {
+                ApplicationState s;
+                auto* prev = std::cerr.rdbuf(nullptr);
+                s.parseParameters(params);
+                std::cerr.rdbuf(prev);
+                return s.getRoutes().getFirst()->converters.getReference(0).opts_;
+            };
+
+            auto anyRule = normalizedConvert({ "in", "PortA", "convert", "pp", "cp", "out", "PortB" });
+            expectEquals(anyRule[0], String("pp"));
+            expectEquals(anyRule[1], String("-1"));   // no note given -> any note
+            expectEquals(anyRule[2], String("cp"));
+
+            auto noteRule = normalizedConvert({ "in", "PortA", "convert", "pp", "60", "cp", "out", "PortB" });
+            expectEquals(noteRule[1], String("60"));
+            expectEquals(noteRule[2], String("cp"));
         }
 
         beginTest("Pitch Bend -> NRPN keeps 14-bit resolution");

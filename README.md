@@ -141,10 +141,11 @@ Transforms:
   jsf       path       Transform each message with the script in this file
 
 Conversion:
-  convert   srctype    Convert a value between cc, cc14, rpn, nrpn, pb, cp & pc.
-            [number]   Types cc, cc14, rpn and nrpn take a number selecting the
-            dsttype    controller or parameter, pb, cp and pc do not, and the
-            [number]   value is rescaled to the destination resolution
+  convert   srctype    Convert a value between cc, cc14, rpn, nrpn, pb, cp, pc &
+            [number]   pp. Types cc, cc14, rpn and nrpn take a controller or
+            dsttype    parameter number and pp a note (optional on a source,
+            [number]   meaning any note), while pb, cp and pc take none; the
+                       value is rescaled to the destination resolution
 
 MPE routing:
   mpe       zone[:n]   Relocate an MPE stream between zones (e.g. lower upper),
@@ -353,8 +354,13 @@ where each type is one of:
 | `pb`   | Pitch Bend                           | none                      | 14-bit           |
 | `cp`   | Channel Pressure                     | none                      | 7-bit            |
 | `pc`   | Program Change                       | none                      | 7-bit            |
+| `pp`   | Poly Pressure                        | note (optional as source) | 7-bit            |
 
 The `cc`, `cc14`, `rpn` and `nrpn` types are followed by a number selecting which controller or parameter. The `pb`, `cp` and `pc` types have a single value per channel, so they take no number.
+
+`pp` is the only per-*note* type, so its number is a note (a name like `C3` or a number). Because poly pressure carries a note that the other types don't, the note behaves differently on each side: as a **destination** it is required (poly pressure has to land on a specific note), while as a **source** it is optional — give one to convert just that note, or omit it to fold *every* note's poly pressure into the destination. That "any note" collapse (`convert pp cp`) is the usual way to feed a synth that has no poly aftertouch.
+
+When several notes are held, the any-note collapse combines them with the **maximum** — the destination follows the hardest-pressed key, and drops back when it is released. This matches how MPE itself combines channel pressure (and what RouteMIDI's own `mpemono` does), so the loudest finger drives the value rather than whichever note happened to move last.
 
 ```
 routemidi in "Knobs"  convert nrpn 245 cc14 1   out "Synth"
@@ -362,6 +368,9 @@ routemidi in "Fader"  convert cc14 1  nrpn 245  out "Module"
 routemidi in "Wheel"  convert pb      nrpn 1000 out "Synth"
 routemidi in "After"  convert cp      cc 11     out "Synth"
 routemidi in "Knob"   convert cc 7    pb        out "Synth"
+routemidi in "MPE"    convert pp      cp        out "Mono Synth"  # any note -> channel pressure
+routemidi in "Pad"    convert cp      pp C3     out "Sampler"     # channel pressure -> note C3
+routemidi in "Grid"   convert pp 60   cc 74     out "Synth"       # one pad's pressure -> CC 74
 ```
 
 Several conversions can be configured on one route; only the matching messages are converted, everything else passes through untouched.

@@ -28,10 +28,11 @@ static const String DEFAULT_VIRTUAL_OUT_NAME = "RouteMIDI Out";
 
 //==============================================================================
 // Inter-conversion between controller value types. cc, cc14, rpn and nrpn take a
-// number argument selecting which controller or parameter; pb, cp and pc have a
-// single value per channel and take no number.
+// number selecting which controller or parameter; pp takes a note number (which
+// is optional on the source side, where it means "any note"); pb, cp and pc have
+// a single value per channel and take no number.
 
-enum ConvType { CONV_CC7, CONV_CC14, CONV_RPN, CONV_NRPN, CONV_PB, CONV_CP, CONV_PC };
+enum ConvType { CONV_CC7, CONV_CC14, CONV_RPN, CONV_NRPN, CONV_PB, CONV_CP, CONV_PC, CONV_PP };
 
 static bool parseConvType(const String& s, ConvType& out)
 {
@@ -42,27 +43,65 @@ static bool parseConvType(const String& s, ConvType& out)
     if (s.equalsIgnoreCase("pb"))   { out = CONV_PB;   return true; }
     if (s.equalsIgnoreCase("cp"))   { out = CONV_CP;   return true; }
     if (s.equalsIgnoreCase("pc"))   { out = CONV_PC;   return true; }
+    if (s.equalsIgnoreCase("pp"))   { out = CONV_PP;   return true; }
     return false;
 }
 
-// whether a type takes a number argument
+// whether a type always takes a number argument (the controller/parameter types)
 static bool typeNeedsNumber(ConvType type)
 {
     return type == CONV_CC7 || type == CONV_CC14 || type == CONV_RPN || type == CONV_NRPN;
 }
 
-// given the options collected so far for a convert command (the grammar is
-// "srctype [num] dsttype [num]"), returns true once all required tokens are present
+// whether a type requires a number when it is the destination: the controller and
+// parameter types, plus pp (poly pressure must know which note to land on)
+static bool dstTypeNeedsNumber(ConvType type)
+{
+    return typeNeedsNumber(type) || type == CONV_PP;
+}
+
+// Walks a convert spec ("srctype [num] dsttype [num]") and fills the normalized
+// [srctype, srcnum, dsttype, dstnum] fields. A source pp may omit its note (stored
+// as "-1", meaning any note); a destination pp requires one. Returns the number of
+// tokens consumed, or -1 if the spec is still incomplete or invalid.
+static int parseConvertSpec(const StringArray& opts, String& srcType, String& srcNum,
+                            String& dstType, String& dstNum)
+{
+    srcNum = "0";
+    dstNum = "0";
+    ConvType st, dt, tmp;
+    int i = 0;
+
+    if (i >= opts.size() || ! parseConvType(opts[i], st)) return -1;
+    srcType = opts[i++];
+    if (typeNeedsNumber(st))
+    {
+        if (i >= opts.size()) return -1;
+        srcNum = opts[i++];
+    }
+    else if (st == CONV_PP)
+    {
+        if (i >= opts.size()) return -1;                        // still need the dsttype
+        if (parseConvType(opts[i], tmp)) srcNum = "-1";         // a type follows: any note
+        else                             srcNum = opts[i++];    // otherwise it's the note
+    }
+
+    if (i >= opts.size() || ! parseConvType(opts[i], dt)) return -1;
+    dstType = opts[i++];
+    if (dstTypeNeedsNumber(dt))
+    {
+        if (i >= opts.size()) return -1;
+        dstNum = opts[i++];
+    }
+    return i;
+}
+
+// given the options collected so far for a convert command, returns true once all
+// required tokens are present
 static bool convertSpecComplete(const StringArray& opts)
 {
-    if (opts.size() < 1) return false;
-    ConvType t;
-    const bool srcNeedsNum = parseConvType(opts[0], t) && typeNeedsNumber(t);
-    const int dstTypeIndex = srcNeedsNum ? 2 : 1;
-    if (opts.size() <= dstTypeIndex) return false;
-    const bool dstNeedsNum = parseConvType(opts[dstTypeIndex], t) && typeNeedsNumber(t);
-    const int required = dstTypeIndex + 1 + (dstNeedsNum ? 1 : 0);
-    return opts.size() >= required;
+    String a, b, c, d;
+    return parseConvertSpec(opts, a, b, c, d) >= 0;
 }
 
 // the bit resolution of a type's value (pitch bend and the 14-bit parameter
@@ -169,6 +208,13 @@ static void emitConversion(Array<MidiMessage>& out, int channel, int srcValue, i
             out.add(m);
             break;
         }
+        case CONV_PP:
+        {
+            auto m = MidiMessage::aftertouchChange(channel, dstNum & 0x7f, jlimit(0, 127, v));
+            m.setTimeStamp(timestamp);
+            out.add(m);
+            break;
+        }
     }
 }
 
@@ -262,7 +308,7 @@ ApplicationState::ApplicationState()
     commands_.add({"js",        "javascript",             JAVASCRIPT,              1, {"code"},                   {"Transform each message with this script"}});
     commands_.add({"jsf",       "javascript-file",        JAVASCRIPT_FILE,         1, {"path"},                   {"Transform each message with the script in this file"}});
     commands_.add({"convert",   "",                       CONVERT,                 4, {"srctype", "[number]", "dsttype", "[number]"},
-                                                                                                                  {"Convert a value between cc, cc14, rpn, nrpn, pb, cp & pc. Types cc, cc14, rpn and nrpn take a number selecting the controller or parameter, pb, cp and pc do not, and the value is rescaled to the destination resolution"}, "Conversion"});
+                                                                                                                  {"Convert a value between cc, cc14, rpn, nrpn, pb, cp, pc & pp. Types cc, cc14, rpn and nrpn take a controller or parameter number and pp a note (optional on a source, meaning any note), while pb, cp and pc take none; the value is rescaled to the destination resolution"}, "Conversion"});
     commands_.add({"mpe",       "",                       MPE_RELOCATE,            2, {"zone[:n]", "zone[:n]"},   {"Relocate an MPE stream between zones (e.g. lower upper), remapping channels"}, "MPE routing"});
     commands_.add({"mpemono",   "mpe-mono",               MPE_COLLAPSE,            2, {"zone[:n]", "channel"},    {"Collapse an MPE zone onto a single channel for non-MPE gear (e.g. upper 1)"}});
     commands_.add({"mpexp",     "mpe-expand",             MPE_EXPAND,              2, {"channel", "zone[:n]"},    {"Spread a channel's notes across an MPE zone's member channels (e.g. 1 lower)"}});
@@ -815,36 +861,13 @@ void ApplicationState::executeCommand(ApplicationCommand& cmd)
             // the collected options have a dynamic shape ("srctype [num] dsttype
             // [num]"); normalize them to a fixed [srctype, srcnum, dsttype, dstnum]
             // form (with "0" where a type takes no number) for the converter
-            const StringArray in = cmd.opts_;
-            ConvType st, dt;
-            String srcType, srcNum = "0", dstType, dstNum = "0";
-            int idx = 0;
-            bool ok = idx < in.size() && parseConvType(in[idx], st);
-            if (ok)
-            {
-                srcType = in[idx++];
-                if (typeNeedsNumber(st))
-                {
-                    if (idx < in.size()) srcNum = in[idx++]; else ok = false;
-                }
-            }
-            if (ok)
-            {
-                ok = idx < in.size() && parseConvType(in[idx], dt);
-                if (ok)
-                {
-                    dstType = in[idx++];
-                    if (typeNeedsNumber(dt))
-                    {
-                        if (idx < in.size()) dstNum = in[idx++]; else ok = false;
-                    }
-                }
-            }
+            String srcType, srcNum, dstType, dstNum;
+            const bool ok = parseConvertSpec(cmd.opts_, srcType, srcNum, dstType, dstNum) >= 0;
 
             if (!ok)
             {
                 std::cerr << "Invalid convert specification, expected \"<srctype> [number] <dsttype> [number]\""
-                          << " with types cc, cc14, rpn, nrpn, pb, cp or pc" << std::endl;
+                          << " with types cc, cc14, rpn, nrpn, pb, cp, pc or pp" << std::endl;
                 JUCEApplicationBase::getInstance()->setApplicationReturnValue(EXIT_FAILURE);
             }
             else if (auto* route = currentRoute())
@@ -1133,6 +1156,7 @@ void ApplicationState::sendPanic(Route& route)
     for (auto* input : route.inputs)
     {
         input->latch.clear();
+        input->pressureCollapse.reset();
     }
 }
 
@@ -1157,6 +1181,7 @@ void ApplicationState::sendZoneReset(Route& route)
     for (auto* input : route.inputs)
     {
         input->latch.clear();
+        input->pressureCollapse.reset();
     }
 }
 
@@ -2047,9 +2072,68 @@ void ApplicationState::processConverters(Route& route, RouteInput& input, const 
     const int ch = msg.getChannel();
     const double ts = msg.getTimeStamp();
 
-    // single-message source types: pitch bend, channel pressure and program change
+    // a destination pp interprets its number as a note (so note names work too),
+    // every other type as a plain controller/parameter number
+    auto dstNumber = [this](ConvType t, const String& tok)
+    {
+        return (t == CONV_PP) ? (int) asNoteNumber(tok) : asDecOrHexIntValue(tok);
+    };
+
+    // single-message source types: poly pressure, pitch bend, channel pressure
+    // and program change
     if (! msg.isController())
     {
+        // "any note" poly-pressure collapse: watch note-ons/offs to know which
+        // notes are held and reduce their pressure with the maximum (matching how
+        // MPE combines channel pressure), re-emitting when a release lowers it
+        if (msg.isNoteOnOrOff() || msg.isAftertouch())
+        {
+            bool anyNotePP = false;
+            for (auto& cmd : route.converters)
+            {
+                ConvType st;
+                if (parseConvType(cmd.opts_[0], st) && st == CONV_PP && cmd.opts_[1] == "-1")
+                {
+                    anyNotePP = true;
+                    break;
+                }
+            }
+
+            if (anyNotePP)
+            {
+                const int note = msg.getNoteNumber();
+                if      (msg.isNoteOn())  input.pressureCollapse.noteOn(ch, note);
+                else if (msg.isNoteOff()) input.pressureCollapse.noteOff(ch, note);
+                else                      input.pressureCollapse.set(ch, note, msg.getAfterTouchValue());
+
+                // a note-on only adds a note at zero pressure, which never raises
+                // the maximum, so only poly pressure and note-offs need to re-emit
+                if (! msg.isNoteOn())
+                {
+                    const int maxP = input.pressureCollapse.maxPressure(ch);
+                    if (input.pressureCollapse.changed(ch, maxP))
+                    {
+                        for (auto& cmd : route.converters)
+                        {
+                            ConvType st, dt;
+                            if (! parseConvType(cmd.opts_[0], st) || st != CONV_PP || cmd.opts_[1] != "-1")
+                                continue;
+                            if (! parseConvType(cmd.opts_[2], dt))
+                                continue;
+                            const int dstNum = dstNumber(dt, cmd.opts_[3]);
+                            emitConversion(output, ch, maxP, 7, dt, dstNum, scaleMethodFor(st, -1, dt, dstNum), ts);
+                        }
+                    }
+                }
+
+                if (msg.isAftertouch())
+                {
+                    return;   // the poly pressure is consumed by the collapse
+                }
+                // note-ons and note-offs fall through to pass the note message onward
+            }
+        }
+
         for (auto& cmd : route.converters)
         {
             ConvType st, dt;
@@ -2075,10 +2159,16 @@ void ApplicationState::processConverters(Route& route, RouteInput& input, const 
             {
                 srcValue = msg.getProgramChangeNumber();
             }
+            else if (st == CONV_PP && msg.isAftertouch() && cmd.opts_[1] != "-1"
+                     && msg.getNoteNumber() == (int) asNoteNumber(cmd.opts_[1]))
+            {
+                // a specific source note (the any-note collapse is handled above)
+                srcValue = msg.getAfterTouchValue();
+            }
 
             if (srcValue >= 0)
             {
-                const int dstNum = asDecOrHexIntValue(cmd.opts_[3]);
+                const int dstNum = dstNumber(dt, cmd.opts_[3]);
                 emitConversion(output, ch, srcValue, srcBits, dt, dstNum,
                                scaleMethodFor(st, srcNum, dt, dstNum), ts);
                 return;
@@ -2131,7 +2221,7 @@ void ApplicationState::processConverters(Route& route, RouteInput& input, const 
                 if (((st == CONV_RPN && !rpn.isNRPN) || (st == CONV_NRPN && rpn.isNRPN)) &&
                     srcNum == rpn.parameterNumber)
                 {
-                    const int dstNum = asDecOrHexIntValue(cmd.opts_[3]);
+                    const int dstNum = dstNumber(dt, cmd.opts_[3]);
                     emitConversion(output, ch, rpn.value, srcBits, dt, dstNum,
                                    scaleMethodFor(st, srcNum, dt, dstNum), ts);
                     return;
@@ -2199,7 +2289,7 @@ void ApplicationState::processConverters(Route& route, RouteInput& input, const 
         }
         parseConvType(cmd.opts_[2], dt);
         const int n = asDecOrHexIntValue(cmd.opts_[1]) & 0x1f;
-        const int dstNum = asDecOrHexIntValue(cmd.opts_[3]);
+        const int dstNum = dstNumber(dt, cmd.opts_[3]);
         const auto method = scaleMethodFor(CONV_CC14, n, dt, dstNum);
         if (cc == n)
         {
@@ -2228,7 +2318,7 @@ void ApplicationState::processConverters(Route& route, RouteInput& input, const 
         if (cc == srcNum)
         {
             parseConvType(cmd.opts_[2], dt);
-            const int dstNum = asDecOrHexIntValue(cmd.opts_[3]);
+            const int dstNum = dstNumber(dt, cmd.opts_[3]);
             emitConversion(output, ch, val, 7, dt, dstNum,
                            scaleMethodFor(CONV_CC7, srcNum, dt, dstNum), ts);
             return;

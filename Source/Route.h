@@ -24,6 +24,50 @@
 #include "Latch.h"
 #include "Mpe.h"
 
+// Per-input state for the "any note" poly-pressure collapse (convert pp -> a
+// per-channel value without a source note). It tracks the pressure of every held
+// note per channel so the combined value can be reduced with the maximum, the
+// same way MPE combines channel pressure (see Mpe.h). A cache of the last value
+// emitted per channel avoids redundant sends.
+struct PressureCollapse
+{
+    PressureCollapse() { reset(); }
+
+    void reset()
+    {
+        for (int c = 0; c < 16; ++c)
+        {
+            lastMax[c] = -1;
+            for (int n = 0; n < 128; ++n) pressure[c][n] = -1;
+        }
+    }
+
+    void noteOn(int channel, int note)         { int& p = pressure[channel - 1][note]; if (p < 0) p = 0; }
+    void noteOff(int channel, int note)        { pressure[channel - 1][note] = -1; }
+    void set(int channel, int note, int value) { pressure[channel - 1][note] = value; }
+
+    // the highest pressure among the notes currently held on the channel, or 0
+    // when none are held
+    int maxPressure(int channel) const
+    {
+        int m = -1;
+        for (int n = 0; n < 128; ++n) m = jmax(m, pressure[channel - 1][n]);
+        return jmax(0, m);
+    }
+
+    // returns true (updating the cache) when the channel's combined value differs
+    // from the last one emitted, so unchanged values aren't resent
+    bool changed(int channel, int value)
+    {
+        if (lastMax[channel - 1] == value) return false;
+        lastMax[channel - 1] = value;
+        return true;
+    }
+
+    int pressure[16][128];  // held-note pressures per channel, -1 = note not held
+    int lastMax[16];        // last combined value emitted per channel, -1 = none yet
+};
+
 // A single MIDI input port of a route.
 struct RouteInput
 {
@@ -48,6 +92,7 @@ struct RouteInput
     mpe::McmTracker mcm;                  // MPE zone reconfiguration detection (both zones)
 
     LatchState latch;                     // held-note tracking for the latch transform
+    PressureCollapse pressureCollapse;    // held-note pressure tracking for convert pp -> value
 };
 
 // A single MIDI output destination of a route.
