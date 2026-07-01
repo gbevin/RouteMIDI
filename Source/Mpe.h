@@ -381,7 +381,13 @@ namespace mpe
             outSense = 0;
             lastBend = 8192;
             lastCC74 = 0;
-            for (int i = 0; i < 17; ++i) { channelNote[i] = -1; noteOrder[i] = 0; }
+            for (int i = 0; i < 17; ++i)
+            {
+                channelNote[i] = -1;
+                noteOrder[i] = 0;
+                for (int c = 0; c < 128; ++c) channelCC[i][c] = -1;
+            }
+            for (int c = 0; c < 128; ++c) targetCC[c] = -1;
         }
 
         // the member channel of the most recently triggered note that is still
@@ -406,6 +412,8 @@ namespace mpe
         int outSense { 0 };         // Pitch Bend Sensitivity last declared on the target, 0 = none
         int lastBend { 8192 };      // last pitch bend value sent to the target (avoids redundant sends)
         int lastCC74 { 0 };         // last CC 74 value sent to the target
+        int channelCC[17][128];     // last value of each CC held on each member channel, -1 = none
+        int targetCC[128];          // last value of each CC sent to the target, -1 = none
         ExpressionState expr;       // Manager/Member expression cache for combining
     };
 
@@ -423,7 +431,16 @@ namespace mpe
             counter = 0;
             masterRpnMsb = -1;
             masterRpnLsb = -1;
-            for (int i = 0; i < 17; ++i) { active[i] = false; order[i] = 0; }
+            for (int i = 0; i < 17; ++i)
+            {
+                active[i] = false;
+                order[i] = 0;
+                srcBend[i] = -1;
+                srcPressure[i] = -1;
+                destBend[i] = 8192;
+                destPressure[i] = -1;
+                for (int c = 0; c < 128; ++c) { channelCC[i][c] = -1; destCC[i][c] = -1; }
+            }
         }
 
         int counter { 0 };   // monotonically increasing note-trigger counter
@@ -431,6 +448,12 @@ namespace mpe
         int order[17];       // trigger order per source channel (higher = more recent)
         int masterRpnMsb { -1 };  // RPN selection on the master channel, to spot the MCM (RPN 6)
         int masterRpnLsb { -1 };
+        int srcBend[17];         // last pitch bend held on each source member channel, -1 = none
+        int srcPressure[17];     // last channel pressure held on each source channel, -1 = none
+        int channelCC[17][128];  // last value of each CC held on each source channel, -1 = none
+        int destBend[17];        // last pitch bend sent to each destination channel
+        int destPressure[17];    // last channel pressure sent to each destination channel, -1 = none
+        int destCC[17][128];     // last value of each CC sent to each destination channel, -1 = none
     };
 
     // Per-route state used to fan an MPE zone out across a route's output ports,

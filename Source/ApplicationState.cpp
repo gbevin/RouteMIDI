@@ -1613,12 +1613,66 @@ void ApplicationState::applyMpeOp(const ApplicationCommand& cmd, RouteInput& inp
 
             // when the destination has fewer members, several source channels
             // fold onto one destination channel by wrapping the member index
-            const int dstChannel = dst.memberChannel(idx % dst.members);
+            const int bucket = idx % dst.members;
+            const int dstChannel = dst.memberChannel(bucket);
+
+            // the most recently triggered held source note among the channels that
+            // fold onto the same destination channel, or 0 if none is held
+            auto activeForBucket = [&](int b) -> int
+            {
+                int activeChannel = 0, bestOrder = 0;
+                for (int i = 0; i < src.members; ++i)
+                {
+                    if ((i % dst.members) != b) continue;
+                    const int sourceChannel = src.memberChannel(i);
+                    if (rel.active[sourceChannel] && rel.order[sourceChannel] > bestOrder)
+                    {
+                        bestOrder = rel.order[sourceChannel];
+                        activeChannel = sourceChannel;
+                    }
+                }
+                return activeChannel;
+            };
+
+            // re-send a source note's held per-note expression onto its destination
+            // channel, but only the values that differ from what the destination last
+            // received (ascending CC order keeps a 14-bit MSB ahead of its LSB)
+            auto reassert = [&](int sc, int dc)
+            {
+                if (sc < 1) return;
+                if (rel.srcBend[sc] >= 0 && rel.srcBend[sc] != rel.destBend[dc])
+                {
+                    MidiMessage m = MidiMessage::pitchWheel(dc, rel.srcBend[sc]);
+                    m.setTimeStamp(ts); output.add(m);
+                    rel.destBend[dc] = rel.srcBend[sc];
+                }
+                if (rel.srcPressure[sc] >= 0 && rel.srcPressure[sc] != rel.destPressure[dc])
+                {
+                    MidiMessage m = MidiMessage::channelPressureChange(dc, rel.srcPressure[sc]);
+                    m.setTimeStamp(ts); output.add(m);
+                    rel.destPressure[dc] = rel.srcPressure[sc];
+                }
+                for (int cc = 0; cc < 128; ++cc)
+                {
+                    const int v = rel.channelCC[sc][cc];
+                    if (v >= 0 && v != rel.destCC[dc][cc])
+                    {
+                        MidiMessage m = MidiMessage::controllerEvent(dc, cc, v);
+                        m.setTimeStamp(ts); output.add(m);
+                        rel.destCC[dc][cc] = v;
+                    }
+                }
+            };
 
             if (msg.isNoteOn() && msg.getVelocity() > 0)
             {
                 rel.active[ch] = true;
                 rel.order[ch] = ++rel.counter;
+                // a fresh note starts with no known per-note expression, so stale
+                // values from a previous note on this channel are forgotten
+                rel.srcBend[ch] = -1;
+                rel.srcPressure[ch] = -1;
+                for (int cc = 0; cc < 128; ++cc) rel.channelCC[ch][cc] = -1;
                 MidiMessage out = msg;
                 out.setChannel(dstChannel);
                 output.add(out);
@@ -1630,35 +1684,28 @@ void ApplicationState::applyMpeOp(const ApplicationCommand& cmd, RouteInput& inp
                 out.setChannel(dstChannel);
                 output.add(out);
                 rel.active[ch] = false;
+                // hand the destination channel to whichever folded note now owns it,
+                // re-asserting its held expression so it stops tracking the released
+                // note instead of waiting for the next update to arrive
+                reassert(activeForBucket(bucket), dstChannel);
                 break;
             }
 
-            // pitch bend, channel pressure and timbre (CC 74) are channel-wide,
-            // so they collide when several notes share a destination channel
-            const bool isExpression = msg.isPitchWheel() || msg.isChannelPressure() ||
-                (msg.isController() && msg.getControllerNumber() == 74);
-            if (isExpression)
-            {
-                // find the most recently triggered note among the source channels
-                // that fold onto this same destination channel
-                int activeChannel = 0, bestOrder = 0;
-                for (int i = 0; i < src.members; ++i)
-                {
-                    if ((i % dst.members) != (idx % dst.members))
-                    {
-                        continue;
-                    }
-                    const int sourceChannel = src.memberChannel(i);
-                    if (rel.active[sourceChannel] && rel.order[sourceChannel] > bestOrder)
-                    {
-                        bestOrder = rel.order[sourceChannel];
-                        activeChannel = sourceChannel;
-                    }
-                }
+            // pitch bend, channel pressure and every controller are channel-wide, so
+            // they collide when several notes share a destination channel; remember
+            // each note's latest value so a note that later regains the channel can
+            // re-assert it, and let only the owning note reach the destination
+            if (msg.isPitchWheel())           rel.srcBend[ch] = msg.getPitchWheelValue();
+            else if (msg.isChannelPressure()) rel.srcPressure[ch] = msg.getChannelPressureValue();
+            else if (msg.isController())      rel.channelCC[ch][msg.getControllerNumber()] = msg.getControllerValue();
 
-                // with at most one note on the destination channel the expression
-                // is genuinely per-note and passes through; once notes collide,
-                // only the most recently triggered note's expression is kept
+            const bool isPerNote = msg.isPitchWheel() || msg.isChannelPressure() || msg.isController();
+            if (isPerNote)
+            {
+                // with at most one note on the destination channel the expression is
+                // genuinely per-note and passes through; once notes collide, only the
+                // most recently triggered note's expression is kept
+                const int activeChannel = activeForBucket(bucket);
                 if (activeChannel != 0 && ch != activeChannel)
                 {
                     break;  // suppressed: another note owns this destination channel
@@ -1668,6 +1715,11 @@ void ApplicationState::applyMpeOp(const ApplicationCommand& cmd, RouteInput& inp
             MidiMessage out = msg;
             out.setChannel(dstChannel);
             output.add(out);
+            // remember what the destination channel now holds so a later re-assertion
+            // only re-sends genuine differences
+            if (msg.isPitchWheel())           rel.destBend[dstChannel] = msg.getPitchWheelValue();
+            else if (msg.isChannelPressure()) rel.destPressure[dstChannel] = msg.getChannelPressureValue();
+            else if (msg.isController())      rel.destCC[dstChannel][msg.getControllerNumber()] = msg.getControllerValue();
             break;
         }
         case MPE_COLLAPSE:
@@ -1722,6 +1774,25 @@ void ApplicationState::applyMpeOp(const ApplicationCommand& cmd, RouteInput& inp
                 output.add(cc);
                 col.lastCC74 = value;
             };
+            // when a note takes over the channel, re-send every per-note controller
+            // it still holds whose value differs from what the target last received,
+            // so a mono synth adopts the new note's expression instead of keeping the
+            // previous note's (ascending order keeps a 14-bit MSB before its LSB)
+            auto reassertCCs = [&](int memberCh)
+            {
+                if (memberCh < 1) return;
+                for (int cc = 0; cc < 128; ++cc)
+                {
+                    const int v = col.channelCC[memberCh][cc];
+                    if (v >= 0 && v != col.targetCC[cc])
+                    {
+                        MidiMessage m = MidiMessage::controllerEvent(target, cc, v);
+                        m.setTimeStamp(ts);
+                        output.add(m);
+                        col.targetCC[cc] = v;
+                    }
+                }
+            };
             // a member note's pressure rides on polyphonic aftertouch (so each
             // note keeps its own), combined with the Manager pressure via Max
             auto emitPressure = [&](int memberCh)
@@ -1765,6 +1836,9 @@ void ApplicationState::applyMpeOp(const ApplicationCommand& cmd, RouteInput& inp
             {
                 col.channelNote[ch] = msg.getNoteNumber();
                 col.noteOrder[ch] = ++col.order;
+                // a fresh note starts with no known per-note controller state, so
+                // stale values from a previous note on this channel are forgotten
+                for (int cc = 0; cc < 128; ++cc) col.channelCC[ch][cc] = -1;
                 // the new note owns the channel-wide dimensions; send its initial
                 // combined expression before the Note On (spec section 2.4)
                 emitBend(ch);
@@ -1784,13 +1858,33 @@ void ApplicationState::applyMpeOp(const ApplicationCommand& cmd, RouteInput& inp
                 output.add(out);
                 // hand the channel-wide dimensions to whichever note now owns them
                 const int a = col.activeChannel();
-                if (a >= 1) { emitBend(a); emitCC74(a); }
+                if (a >= 1) { emitBend(a); emitCC74(a); reassertCCs(a); }
                 break;
             }
             if (change == mpe::ExpressionState::Bend)     { if (ch == col.activeChannel()) emitBend(ch); break; }
             if (change == mpe::ExpressionState::CC74)     { if (ch == col.activeChannel()) emitCC74(ch); break; }
             if (change == mpe::ExpressionState::Pressure) { emitPressure(ch); break; }
             if (isSensitivityData()) break;
+
+            // any other member-channel controller (e.g. a high-resolution 14-bit
+            // CC like the LinnStrument's CC 6/38) is a per-note expression too:
+            // remember it for every held note, but only let the note that currently
+            // owns the channel reach the target so simultaneous touches never fight,
+            // and a note that later regains the channel can re-assert its own value
+            if (msg.isController())
+            {
+                const int cc = msg.getControllerNumber();
+                const int v  = msg.getControllerValue();
+                col.channelCC[ch][cc] = v;
+                if (ch == col.activeChannel() && col.targetCC[cc] != v)
+                {
+                    MidiMessage m = MidiMessage::controllerEvent(target, cc, v);
+                    m.setTimeStamp(ts);
+                    output.add(m);
+                    col.targetCC[cc] = v;
+                }
+                break;
+            }
 
             // any other member-channel message is forwarded rechanneled
             MidiMessage out = msg;

@@ -408,6 +408,61 @@ public:
             expectEquals(bend, 7000);
         }
 
+        beginTest("relocate folds a colliding per-note CC to last-note-wins");
+        {
+            // like the pitch-bend collision, a generic per-note CC (here CC 6/38)
+            // from two notes sharing a destination channel must not fight: only the
+            // active note's copy reaches the destination
+            Array<MidiMessage> in;
+            in.add(MidiMessage::noteOn(2, 60, (uint8)100));           // older note
+            in.add(MidiMessage::noteOn(4, 64, (uint8)100));           // newest -> owns dst ch 2
+            in.add(MidiMessage::controllerEvent(2, 6, 24));           // older MSB: suppressed
+            in.add(MidiMessage::controllerEvent(2, 38, 8));           // older LSB: suppressed
+            in.add(MidiMessage::controllerEvent(4, 6, 21));           // active MSB: passes
+            in.add(MidiMessage::controllerEvent(4, 38, 118));         // active LSB: passes
+            auto out = runMpe(state, MPE_RELOCATE, {"lower:4", "lower:2"}, in);
+
+            int msb = -1, lsb = -1, msbCount = 0, lsbCount = 0;
+            for (const auto& m : out)
+            {
+                if (m.isController() && m.getControllerNumber() == 6)  { msb = m.getControllerValue(); ++msbCount; expectEquals(m.getChannel(), 2); }
+                if (m.isController() && m.getControllerNumber() == 38) { lsb = m.getControllerValue(); ++lsbCount; expectEquals(m.getChannel(), 2); }
+            }
+            expectEquals(msbCount, 1);
+            expectEquals(lsbCount, 1);
+            expectEquals(msb, 21);
+            expectEquals(lsb, 118);
+        }
+
+        beginTest("relocate re-asserts a per-note CC when the previous note regains the channel");
+        {
+            // ch2 and ch4 fold onto dst ch2; ch4 (active) drives CC 6/38, while ch2
+            // silently holds its own values. when ch4 releases, ch2 owns the channel
+            // and its held CC 6/38 must be re-sent so the receiver stops holding ch4's
+            Array<MidiMessage> in;
+            in.add(MidiMessage::noteOn(2, 60, (uint8)100));           // older note
+            in.add(MidiMessage::noteOn(4, 64, (uint8)100));           // newest -> owns dst ch 2
+            in.add(MidiMessage::controllerEvent(2, 6, 24));           // ch2 holds MSB 24 (suppressed)
+            in.add(MidiMessage::controllerEvent(2, 38, 8));           // ch2 holds LSB 8
+            in.add(MidiMessage::controllerEvent(4, 6, 21));           // ch4 active: passes
+            in.add(MidiMessage::controllerEvent(4, 38, 118));         // ch4 active: passes
+            in.add(MidiMessage::noteOff(4, 64, (uint8)0));           // ch4 releases -> ch2 regains
+            auto out = runMpe(state, MPE_RELOCATE, {"lower:4", "lower:2"}, in);
+
+            int lastMsb = -1, lastLsb = -1;
+            bool sawNoteOff = false, msbAfterOff = false, lsbAfterOff = false;
+            for (const auto& m : out)
+            {
+                if (m.isNoteOff()) sawNoteOff = true;
+                if (m.isController() && m.getControllerNumber() == 6)  { lastMsb = m.getControllerValue(); if (sawNoteOff) msbAfterOff = true; }
+                if (m.isController() && m.getControllerNumber() == 38) { lastLsb = m.getControllerValue(); if (sawNoteOff) lsbAfterOff = true; }
+            }
+            expectEquals(lastMsb, 24);
+            expectEquals(lastLsb, 8);
+            expect(msbAfterOff);
+            expect(lsbAfterOff);
+        }
+
         beginTest("collapse folds every zone channel onto one channel");
         {
             Array<MidiMessage> in;
@@ -478,6 +533,66 @@ public:
             expectEquals(bend, 8968);
             expectEquals(timbreCount, 1);
             expectEquals(timbre, 100);       // Max(Manager 0, Member 100)
+        }
+
+        beginTest("collapse forwards a per-note 14-bit CC for the active note only");
+        {
+            // a controller other than the standard MPE dimensions (here CC 6/38,
+            // the LinnStrument's high-resolution CC pair) is still a per-note
+            // expression: only the active note's copy may reach the mono target,
+            // otherwise both held touches fight over the same 14-bit value
+            Array<MidiMessage> in;
+            in.add(MidiMessage::noteOn(2, 60, (uint8)100));           // older note
+            in.add(MidiMessage::noteOn(3, 64, (uint8)100));           // newest note -> active
+            in.add(MidiMessage::controllerEvent(2, 6, 24));           // older MSB: suppressed
+            in.add(MidiMessage::controllerEvent(2, 38, 8));           // older LSB: suppressed
+            in.add(MidiMessage::controllerEvent(3, 6, 21));           // active MSB: passes
+            in.add(MidiMessage::controllerEvent(3, 38, 118));         // active LSB: passes
+
+            auto out = runMpe(state, MPE_COLLAPSE, {"lower:15", "1"}, in);
+
+            int msb = -1, lsb = -1, msbCount = 0, lsbCount = 0;
+            for (const auto& m : out)
+            {
+                if (m.isController() && m.getControllerNumber() == 6)  { msb = m.getControllerValue(); ++msbCount; expectEquals(m.getChannel(), 1); }
+                if (m.isController() && m.getControllerNumber() == 38) { lsb = m.getControllerValue(); ++lsbCount; expectEquals(m.getChannel(), 1); }
+            }
+            expectEquals(msbCount, 1);
+            expectEquals(lsbCount, 1);
+            expectEquals(msb, 21);
+            expectEquals(lsb, 118);
+        }
+
+        beginTest("collapse re-asserts a per-note CC when the previous note regains the channel");
+        {
+            // ch2 and ch3 are both held; ch3 (active) drives CC 6/38 on the target.
+            // when ch3 releases, ch2 owns the channel again and its own held CC 6/38
+            // must be re-sent so the mono synth stops holding ch3's values.
+            Array<MidiMessage> in;
+            in.add(MidiMessage::noteOn(2, 60, (uint8)100));           // older note
+            in.add(MidiMessage::noteOn(3, 64, (uint8)100));           // newest note -> active
+            in.add(MidiMessage::controllerEvent(2, 6, 24));           // ch2 holds MSB 24 (suppressed while ch3 active)
+            in.add(MidiMessage::controllerEvent(2, 38, 8));           // ch2 holds LSB 8
+            in.add(MidiMessage::controllerEvent(3, 6, 21));           // ch3 active: passes
+            in.add(MidiMessage::controllerEvent(3, 38, 118));         // ch3 active: passes
+            in.add(MidiMessage::noteOff(3, 64, (uint8)0));           // ch3 releases -> ch2 regains channel
+
+            auto out = runMpe(state, MPE_COLLAPSE, {"lower:15", "1"}, in);
+
+            // last CC 6 and CC 38 delivered to the target should be ch2's values,
+            // and they must arrive after ch3's note-off
+            int lastMsb = -1, lastLsb = -1;
+            bool sawNoteOff = false, msbAfterOff = false, lsbAfterOff = false;
+            for (const auto& m : out)
+            {
+                if (m.isNoteOff()) sawNoteOff = true;
+                if (m.isController() && m.getControllerNumber() == 6)  { lastMsb = m.getControllerValue(); if (sawNoteOff) msbAfterOff = true; }
+                if (m.isController() && m.getControllerNumber() == 38) { lastLsb = m.getControllerValue(); if (sawNoteOff) lsbAfterOff = true; }
+            }
+            expectEquals(lastMsb, 24);
+            expectEquals(lastLsb, 8);
+            expect(msbAfterOff);
+            expect(lsbAfterOff);
         }
 
         beginTest("collapse falls back to the previous note when the active one releases");
