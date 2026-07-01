@@ -84,6 +84,10 @@ These are all the supported commands:
   chadd     number     Add N to the channel, wrapping 1-16 (may be negative)
   transp    semitones  Transpose notes by N semitones (out-of-range dropped)
   notemap   from to    Remap a specific note number to another
+  notecc    note cc    Turn a note into a Control Change (velocity as value)
+  ccnote    cc note    Turn a Control Change into a note (64+ on, else off)
+  notepc    note       Turn a note-on into a Program Change (note-off dropped)
+            program
   velscale  factor     Scale note-on velocity by a factor (clamped 1-127)
   velset    number     Set a fixed note-on velocity (1-127)
   veladd    number     Add an offset to note-on velocity (clamped 1-127)
@@ -148,6 +152,7 @@ Alternatively, you can use the following long versions of the commands:
   system-common system-exclusive system-exclusive-file time-code song-position
   song-select tune-request note-range velocity-range mpe-master mpe-member
   mpe-zone channel-map channel-set channel-add transpose note-map
+  note-to-control-change control-change-to-note note-to-program-change
   velocity-scale velocity-set velocity-add velocity-curve control-change-map
   control-change-add control-change-scale control-change-curve
   program-change-map program-change-add pitch-bend-add pitch-bend-scale
@@ -226,6 +231,14 @@ The `velcurve`, `cccurve` and `cpcurve` transforms apply a gamma curve to note-o
 ```
 routemidi in "Keyboard" velcurve 0.5 out "Synth"        # easier to play loud
 routemidi in "Fader" cccurve 7 2.0 out "Mixer"          # finer control at low end
+```
+
+A few transforms change a message from one type to another. `notecc` turns a specific note into a Control Change (the note-on velocity becomes the value, and the note-off sends 0); `ccnote` turns a Control Change into a note (a value of 64 or more triggers a note-on with that value as the velocity, below 64 a note-off); and `notepc` turns a note-on into a Program Change (the note-off is dropped). `ccnote` is aimed at switch- or pedal-style controllers; a continuously changing CC would retrigger the note. Since `notecc` uses the velocity as the value, put a `velset` in front of it for a fixed value.
+
+```
+routemidi in "Pad" notecc 60 64 out "Synth"             # a pad key holds the sustain CC
+routemidi in "Foot" ccnote 64 C1 out "Drums"            # a sustain pedal plays a kick
+routemidi in "Pads" notepc 36 0 notepc 37 1 out "Synth" # two pads select two patches
 ```
 
 For ultimate flexibility, the `js` and `jsf` commands run JavaScript on each message and can inspect it, rewrite it, drop it, or emit additional messages (so one note can become a chord, for instance). See the [JAVASCRIPT.md](JAVASCRIPT.md) documentation file for details.

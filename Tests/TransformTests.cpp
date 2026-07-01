@@ -77,6 +77,53 @@ public:
             expectEquals(m.getNoteNumber(), 37);   // unchanged
         }
 
+        beginTest("Message-type conversions (note <-> CC / program change)");
+        {
+            // notecc: a note becomes a Control Change, velocity as value
+            MidiMessage m = MidiMessage::noteOn(3, 60, (uint8)100);
+            expect(makeCommand(NOTE_TO_CC, {"60", "64"}).transform(state, m));
+            expect(m.isController());
+            expectEquals(m.getChannel(), 3);          // channel preserved
+            expectEquals(m.getControllerNumber(), 64);
+            expectEquals(m.getControllerValue(), 100);
+
+            m = MidiMessage::noteOff(3, 60, (uint8)0);
+            expect(makeCommand(NOTE_TO_CC, {"60", "64"}).transform(state, m));
+            expect(m.isController());
+            expectEquals(m.getControllerValue(), 0);  // note-off sends 0
+
+            m = MidiMessage::noteOn(1, 61, (uint8)100);
+            expect(makeCommand(NOTE_TO_CC, {"60", "64"}).transform(state, m));
+            expect(m.isNoteOn());                     // a different note is untouched
+
+            // ccnote: a Control Change becomes a note, threshold at 64
+            m = MidiMessage::controllerEvent(2, 64, 127);
+            expect(makeCommand(CC_TO_NOTE, {"64", "C3"}).transform(state, m));
+            expect(m.isNoteOn());
+            expectEquals(m.getChannel(), 2);
+            expectEquals(m.getNoteNumber(), 60);      // C3
+            expectEquals((int)m.getVelocity(), 127);
+
+            m = MidiMessage::controllerEvent(2, 64, 0);
+            expect(makeCommand(CC_TO_NOTE, {"64", "C3"}).transform(state, m));
+            expect(m.isNoteOff());
+            expectEquals(m.getNoteNumber(), 60);
+
+            m = MidiMessage::controllerEvent(2, 7, 100);
+            expect(makeCommand(CC_TO_NOTE, {"64", "C3"}).transform(state, m));
+            expect(m.isController());                 // a different CC is untouched
+
+            // notepc: a note-on becomes a Program Change, note-off dropped
+            m = MidiMessage::noteOn(5, 48, (uint8)100);
+            expect(makeCommand(NOTE_TO_PROGRAM, {"48", "5"}).transform(state, m));
+            expect(m.isProgramChange());
+            expectEquals(m.getChannel(), 5);
+            expectEquals(m.getProgramChangeNumber(), 5);
+
+            m = MidiMessage::noteOff(5, 48, (uint8)0);
+            expect(! makeCommand(NOTE_TO_PROGRAM, {"48", "5"}).transform(state, m));  // dropped
+        }
+
         beginTest("Velocity transforms (note-on only)");
         {
             MidiMessage m = MidiMessage::noteOn(1, 60, (uint8)100);

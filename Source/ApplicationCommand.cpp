@@ -98,6 +98,9 @@ bool ApplicationCommand::isTransform() const
         case CHANNEL_ADD:
         case TRANSPOSE:
         case NOTE_MAP:
+        case NOTE_TO_CC:
+        case CC_TO_NOTE:
+        case NOTE_TO_PROGRAM:
         case VELOCITY_SCALE:
         case VELOCITY_SET:
         case VELOCITY_ADD:
@@ -306,6 +309,40 @@ bool ApplicationCommand::transform(ApplicationState& state, MidiMessage& msg) co
                 msg.getNoteNumber() == state.asNoteNumber(opts_[0]))
             {
                 msg.setNoteNumber(state.asNoteNumber(opts_[1]));
+            }
+            break;
+        case NOTE_TO_CC:
+            // a note becomes a Control Change: note-on velocity is the value,
+            // note-off sends value 0
+            if (msg.isNoteOnOrOff() && msg.getNoteNumber() == state.asNoteNumber(opts_[0]))
+            {
+                const int value = msg.isNoteOn() ? msg.getVelocity() : 0;
+                msg = MidiMessage::controllerEvent(msg.getChannel(), state.asDecOrHex7BitValue(opts_[1]), value);
+                msg.setTimeStamp(timestamp);
+            }
+            break;
+        case CC_TO_NOTE:
+            // a Control Change becomes a note: a value of 64 or more triggers a
+            // note-on (the value is the velocity), below 64 a note-off
+            if (msg.isController() && msg.getControllerNumber() == state.asDecOrHex7BitValue(opts_[0]))
+            {
+                const int note = state.asNoteNumber(opts_[1]);
+                const int value = msg.getControllerValue();
+                msg = value >= 64 ? MidiMessage::noteOn(msg.getChannel(), note, (uint8)value)
+                                  : MidiMessage::noteOff(msg.getChannel(), note, (uint8)0);
+                msg.setTimeStamp(timestamp);
+            }
+            break;
+        case NOTE_TO_PROGRAM:
+            // a note-on becomes a Program Change; the note-off is dropped
+            if (msg.isNoteOnOrOff() && msg.getNoteNumber() == state.asNoteNumber(opts_[0]))
+            {
+                if (!msg.isNoteOn())
+                {
+                    return false;
+                }
+                msg = MidiMessage::programChange(msg.getChannel(), state.asDecOrHex7BitValue(opts_[1]));
+                msg.setTimeStamp(timestamp);
             }
             break;
         case VELOCITY_SCALE:

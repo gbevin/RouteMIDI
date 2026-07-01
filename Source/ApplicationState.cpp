@@ -226,6 +226,9 @@ ApplicationState::ApplicationState()
     commands_.add({"chadd",     "channel-add",            CHANNEL_ADD,             1, {"number"},           {"Add N to the channel, wrapping 1-16 (may be negative)"}});
     commands_.add({"transp",    "transpose",              TRANSPOSE,               1, {"semitones"},        {"Transpose notes by N semitones (out-of-range dropped)"}});
     commands_.add({"notemap",   "note-map",               NOTE_MAP,                2, {"from", "to"},       {"Remap a specific note number to another"}});
+    commands_.add({"notecc",    "note-to-control-change", NOTE_TO_CC,              2, {"note", "cc"},       {"Turn a note into a Control Change (velocity as value)"}});
+    commands_.add({"ccnote",    "control-change-to-note", CC_TO_NOTE,              2, {"cc", "note"},       {"Turn a Control Change into a note (64+ on, else off)"}});
+    commands_.add({"notepc",    "note-to-program-change", NOTE_TO_PROGRAM,         2, {"note", "program"},  {"Turn a note-on into a Program Change (note-off dropped)"}});
     commands_.add({"velscale",  "velocity-scale",         VELOCITY_SCALE,          1, {"factor"},           {"Scale note-on velocity by a factor (clamped 1-127)"}});
     commands_.add({"velset",    "velocity-set",           VELOCITY_SET,            1, {"number"},           {"Set a fixed note-on velocity (1-127)"}});
     commands_.add({"veladd",    "velocity-add",           VELOCITY_ADD,            1, {"number"},           {"Add an offset to note-on velocity (clamped 1-127)"}});
