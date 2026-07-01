@@ -38,9 +38,13 @@ struct RouteInput
     int ccMsb[16][32] {};                 // last 14-bit CC MSB, per channel and controller
     bool ccMsbValid[16][32] {};           // whether an MSB has been seen yet
 
-    mpe::Allocator mpeAlloc;              // voice allocation state for MPE expansion
-    mpe::Collapser mpeCollapse;           // note tracking state for MPE collapse
-    mpe::Relocator mpeRelocate;           // collision tracking for MPE relocate
+    // per-zone state (indexed [0] = Lower, [1] = Upper) so a Lower-zone and an
+    // Upper-zone operation can run on the same input without sharing state
+    mpe::Allocator mpeAlloc[2];           // voice allocation state for MPE expansion
+    mpe::Collapser mpeCollapse[2];        // note tracking state for MPE collapse
+    mpe::Relocator mpeRelocate[2];        // collision tracking for MPE relocate
+    mpe::SensitivityDeclarer mpeSens[2];  // member Pitch Bend Sensitivity declaration
+    mpe::McmTracker mcm;                  // MPE zone reconfiguration detection (both zones)
 };
 
 // A single MIDI output destination of a route.

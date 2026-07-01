@@ -16,6 +16,7 @@
       <FILE id="GBoGkP" name="ApplicationState.h" compile="0" resource="0"
             file="Source/ApplicationState.h"/>
       <FILE id="bbj9mA" name="BitScaling.h" compile="0" resource="0" file="Source/BitScaling.h"/>
+      <FILE id="cbk001" name="ChannelBucket.h" compile="0" resource="0" file="Source/ChannelBucket.h"/>
       <FILE id="hGRRus" name="Main.cpp" compile="1" resource="0" file="Source/Main.cpp"/>
       <FILE id="mpe001" name="Mpe.h" compile="0" resource="0" file="Source/Mpe.h"/>
       <FILE id="lNEBkp" name="Route.h" compile="0" resource="0" file="Source/Route.h"/>

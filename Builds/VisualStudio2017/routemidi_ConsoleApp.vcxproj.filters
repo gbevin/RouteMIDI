@@ -1194,6 +1194,9 @@
     <ClInclude Include="..\..\Source\BitScaling.h">
       <Filter>routemidi\Source</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Source\ChannelBucket.h">
+      <Filter>routemidi\Source</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Source\Mpe.h">
       <Filter>routemidi\Source</Filter>
     </ClInclude>

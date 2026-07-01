@@ -179,7 +179,7 @@ ApplicationState::ApplicationState()
     commands_.add({"vin",       "virtual-in",             VIRTUAL_IN,             -1, {"(name)"},           {"Add a virtual MIDI input to the route (Linux/macOS)"}});
     commands_.add({"vout",      "virtual-out",            VIRTUAL_OUT,            -1, {"(name)"},           {"Add a virtual MIDI output to the route (Linux/macOS)"}});
     commands_.add({"list",      "",                       LIST,                    0, {""},                 {"List the available MIDI input and output ports"}});
-    commands_.add({"panic",     "",                       PANIC,                   0, {""},                 {"Send all-notes-off to outputs on disconnect and at exit"}});
+    commands_.add({"panic",     "",                       PANIC,                   0, {""},                 {"Send all-notes-off on disconnect, exit and zone change"}});
     commands_.add({"file",      "",                       TXTFILE,                 1, {"path"},             {"Load commands from the specified program file"}});
     commands_.add({"dec",       "decimal",                DECIMAL,                 0, {""},                 {"Interpret the next numbers as decimals by default"}});
     commands_.add({"hex",       "hexadecimal",            HEXADECIMAL,             0, {""},                 {"Interpret the next numbers as hexadecimals by default"}});
@@ -220,6 +220,7 @@ ApplicationState::ApplicationState()
     commands_.add({"velrange",  "velocity-range",         VELOCITY_RANGE,          2, {"low", "high"},      {"Pass note-ons within a velocity range (vel split)"}});
     commands_.add({"mpemaster", "mpe-master",             MPE_MASTER,              1, {"zone[:n]"},         {"Pass the master channel of an MPE zone (e.g. lower)"}});
     commands_.add({"mpemember", "mpe-member",             MPE_MEMBER,              1, {"zone[:n]"},         {"Pass the member channels of an MPE zone (e.g. upper:7)"}});
+    commands_.add({"mpezone",   "mpe-zone",               MPE_ZONE,                1, {"zone[:n]"},         {"Pass a whole MPE zone (its master and member channels)"}});
     commands_.add({"chmap",     "channel-map",            CHANNEL_MAP,             2, {"from", "to"},       {"Remap channel-voice messages from one channel to another"}});
     commands_.add({"chset",     "channel-set",            CHANNEL_SET,             1, {"number"},           {"Force all channel-voice messages onto a channel"}});
     commands_.add({"chadd",     "channel-add",            CHANNEL_ADD,             1, {"number"},           {"Add N to the channel, wrapping 1-16 (may be negative)"}});
@@ -260,6 +261,10 @@ ApplicationState::ApplicationState()
                                                                                                             {"Spread a channel's notes across an MPE zone's member channels (e.g. 1 lower)"}});
     commands_.add({"mpesplit",  "mpe-split",              MPE_SPLIT,              -1, {"zone[:n]", "(channel)"},
                                                                                                             {"Distribute an MPE zone's voices over the output ports, one per port, each rechanneled to channel (default 1)"}});
+    commands_.add({"mpebend",   "mpe-bend",               MPE_BEND,                3, {"zone[:n]", "from", "to"},
+                                                                                                            {"Rescale member-channel pitch bend from one semitone range to another"}});
+    commands_.add({"mpesens",   "mpe-sensitivity",        MPE_SENS,                2, {"zone[:n]", "semitones"},
+                                                                                                            {"Declare a member-channel pitch bend range (RPN 0) for synths that honor it"}});
 
     pendingNegate_ = false;
     useHexadecimalsByDefault_ = false;
@@ -856,6 +861,8 @@ void ApplicationState::executeCommand(ApplicationCommand& cmd)
         case MPE_RELOCATE:
         case MPE_COLLAPSE:
         case MPE_EXPAND:
+        case MPE_BEND:
+        case MPE_SENS:
         {
             // validate the zone tokens up front so mistakes are reported during
             // parsing rather than silently doing nothing at routing time
@@ -1119,8 +1126,32 @@ void ApplicationState::sendPanic(Route& route)
     }
 }
 
+void ApplicationState::sendZoneReset(Route& route)
+{
+    // stop sounding notes and reset controllers downstream when an MPE zone is
+    // reconfigured (spec section 2.2.3); non-MPE devices won't do this themselves
+    for (auto* dest : route.outputs)
+    {
+        if (dest->out == nullptr)
+        {
+            continue;
+        }
+        for (int channel = 1; channel <= 16; ++channel)
+        {
+            dest->out->sendMessageNow(MidiMessage::controllerEvent(channel, 123, 0));  // all notes off
+            dest->out->sendMessageNow(MidiMessage::controllerEvent(channel, 121, 0));  // reset all controllers
+        }
+    }
+}
+
 void ApplicationState::routeMessage(Route& route, RouteInput& input, const MidiMessage& msg)
 {
+    // when the safety net is on, flush stuck notes if a zone is reconfigured
+    if (route.panic && input.mcm.reconfigures(msg))
+    {
+        sendZoneReset(route);
+    }
+
     if (!passesFilters(route, msg))
     {
         return;
@@ -1237,6 +1268,17 @@ void ApplicationState::processSplit(Route& route, const MidiMessage& msg, Array<
 
     auto& sp = route.mpeSplit;
     sp.ensureSize(ports);
+    if (!sp.expr.initialized)
+    {
+        sp.expr.resetForZone(zone);
+    }
+
+    const int managerCh = zone.masterChannel();
+    const int memberIndex = zone.memberIndexOf(ch);
+    const bool inZone = (ch >= 1 && zone.contains(ch));
+
+    // keep the expression cache current for every in-zone message
+    const int change = inZone ? sp.expr.update(zone, msg) : mpe::ExpressionState::None;
 
     auto emit = [&](int port, const MidiMessage& m) { outMsgs.add(m); outPorts.add(port); };
     auto rechannel = [&](const MidiMessage& m)
@@ -1247,32 +1289,81 @@ void ApplicationState::processSplit(Route& route, const MidiMessage& msg, Array<
         return x;
     };
 
-    // anything that isn't on a member channel (zone-wide master messages, other
-    // channels, or channelless system messages) is broadcast to every port
-    const int memberIndex = zone.memberIndexOf(ch);
+    // each port is one voice, so its expression is the combination of the Manager
+    // and the port's own Member channel (MPE spec 2.2.6-2.2.8)
+    auto emitPortBend = [&](int port)
+    {
+        const int mch = sp.portChannel[(size_t) port];
+        if (mch < 1) return;
+        const int value = sp.expr.combinedBendValue(managerCh, mch);
+        if (value == sp.portLastBend[(size_t) port]) return;
+        const int sense = sp.expr.combinedSensitivity(managerCh, mch);
+        if (sense != sp.portOutSense[(size_t) port])
+        {
+            Array<MidiMessage> rpn;
+            mpe::appendPitchBendSensitivity(rpn, targetCh, sense, ts);
+            for (auto& r : rpn) emit(port, r);
+            sp.portOutSense[(size_t) port] = sense;
+        }
+        MidiMessage pb = MidiMessage::pitchWheel(targetCh, value);
+        pb.setTimeStamp(ts);
+        emit(port, pb);
+        sp.portLastBend[(size_t) port] = value;
+    };
+    auto emitPortPressure = [&](int port)
+    {
+        const int mch = sp.portChannel[(size_t) port];
+        if (mch < 1) return;
+        MidiMessage cp = MidiMessage::channelPressureChange(targetCh, sp.expr.combinedPressure(managerCh, mch));
+        cp.setTimeStamp(ts);
+        emit(port, cp);
+    };
+    auto emitPortCC74 = [&](int port)
+    {
+        const int mch = sp.portChannel[(size_t) port];
+        if (mch < 1) return;
+        const int value = sp.expr.combinedCC74(managerCh, mch);
+        if (value == sp.portLastCC74[(size_t) port]) return;
+        MidiMessage cc = MidiMessage::controllerEvent(targetCh, 74, value);
+        cc.setTimeStamp(ts);
+        emit(port, cc);
+        sp.portLastCC74[(size_t) port] = value;
+    };
+    auto isSensitivityData = [&](int channel)
+    {
+        return msg.isController() &&
+            (msg.getControllerNumber() == 6 || msg.getControllerNumber() == 38) &&
+            sp.expr.rpnMsb[channel] == 0 && sp.expr.rpnLsb[channel] == 0;
+    };
+
+    // --- Manager (zone-wide), non-zone, and channelless messages ---
     if (ch == 0 || memberIndex < 0)
     {
-        // suppress the MPE Configuration Message (RPN 6) so the non-MPE devices
-        // on the ports aren't flooded with it; track the RPN selection so other
-        // RPNs still pass through untouched
-        if (msg.isController())
+        if (zone.isMaster(ch))
         {
-            const int cc = msg.getControllerNumber();
-            const int v = msg.getControllerValue();
-            if (cc == 101) { sp.rpnMsb[ch] = v; sp.rpnSelectionSent[ch] = false; return; }
-            if (cc == 100) { sp.rpnLsb[ch] = v; sp.rpnSelectionSent[ch] = false; return; }
-            if (cc == 6 || cc == 38)
+            // zone-wide expression is folded into every occupied port's combined value
+            if (change == mpe::ExpressionState::Bend)     { for (int p = 0; p < ports; ++p) emitPortBend(p);     return; }
+            if (change == mpe::ExpressionState::Pressure) { for (int p = 0; p < ports; ++p) emitPortPressure(p); return; }
+            if (change == mpe::ExpressionState::CC74)     { for (int p = 0; p < ports; ++p) emitPortCC74(p);     return; }
+            if (isSensitivityData(ch)) return;   // Manager RPN 0 data: consumed (captured above)
+
+            // suppress the MPE Configuration Message (RPN 6) but let other RPNs
+            // pass, replaying the selection that was held back
+            if (msg.isController())
             {
-                if (sp.rpnMsb[ch] == 0 && sp.rpnLsb[ch] == 6)
+                const int cc = msg.getControllerNumber();
+                const int v = msg.getControllerValue();
+                if (cc == 101) { sp.rpnMsb[ch] = v; sp.rpnSelectionSent[ch] = false; return; }
+                if (cc == 100) { sp.rpnLsb[ch] = v; sp.rpnSelectionSent[ch] = false; return; }
+                if (cc == 6 || cc == 38)
                 {
-                    return;  // data entry for RPN 6: drop it
-                }
-                // a different RPN: replay the selection we held back, then the data
-                if (!sp.rpnSelectionSent[ch])
-                {
-                    if (sp.rpnMsb[ch] >= 0) emit(-1, rechannel(MidiMessage::controllerEvent(ch, 101, sp.rpnMsb[ch])));
-                    if (sp.rpnLsb[ch] >= 0) emit(-1, rechannel(MidiMessage::controllerEvent(ch, 100, sp.rpnLsb[ch])));
-                    sp.rpnSelectionSent[ch] = true;
+                    if (sp.rpnMsb[ch] == 0 && sp.rpnLsb[ch] == 6) return;  // RPN 6 data: drop
+                    if (!sp.rpnSelectionSent[ch])
+                    {
+                        if (sp.rpnMsb[ch] >= 0) emit(-1, rechannel(MidiMessage::controllerEvent(ch, 101, sp.rpnMsb[ch])));
+                        if (sp.rpnLsb[ch] >= 0) emit(-1, rechannel(MidiMessage::controllerEvent(ch, 100, sp.rpnLsb[ch])));
+                        sp.rpnSelectionSent[ch] = true;
+                    }
                 }
             }
         }
@@ -1280,6 +1371,7 @@ void ApplicationState::processSplit(Route& route, const MidiMessage& msg, Array<
         return;
     }
 
+    // --- Member channel ---
     // a note-on claims a port for this member channel, allocating a free one or
     // stealing the oldest, and is rechanneled onto the target channel
     if (msg.isNoteOn() && msg.getVelocity() > 0)
@@ -1306,6 +1398,12 @@ void ApplicationState::processSplit(Route& route, const MidiMessage& msg, Array<
         sp.portNote[(size_t) port] = msg.getNoteNumber();
         sp.portOrder[(size_t) port] = ++sp.order;
 
+        // send the freshly assigned port's initial combined expression before
+        // the Note On (spec section 2.4)
+        emitPortBend(port);
+        emitPortCC74(port);
+        if (sp.expr.combinedPressure(managerCh, ch) > 0) emitPortPressure(port);
+
         MidiMessage on = MidiMessage::noteOn(targetCh, msg.getNoteNumber(), (uint8) msg.getVelocity());
         on.setTimeStamp(ts);
         emit(port, on);
@@ -1328,13 +1426,17 @@ void ApplicationState::processSplit(Route& route, const MidiMessage& msg, Array<
         return;
     }
 
-    // per-note expression follows its note to the same port; expression with no
-    // active note on its channel is dropped
+    // per-note expression follows its note to the same port, combined with the
+    // Manager; expression with no active note on its channel is dropped
     const int port = sp.channelPort[ch];
-    if (port >= 0)
-    {
-        emit(port, rechannel(msg));
-    }
+    if (port < 0) return;
+    if (change == mpe::ExpressionState::Bend)     { emitPortBend(port);     return; }
+    if (change == mpe::ExpressionState::Pressure) { emitPortPressure(port); return; }
+    if (change == mpe::ExpressionState::CC74)     { emitPortCC74(port);     return; }
+    if (isSensitivityData(ch)) return;   // Member RPN 0 data: consumed
+
+    // any other member message is forwarded rechanneled to the port
+    emit(port, rechannel(msg));
 }
 
 bool ApplicationState::selectorMatches(const String& token, int value, bool asNote) const
@@ -1511,13 +1613,25 @@ void ApplicationState::applyMpeOp(const ApplicationCommand& cmd, RouteInput& inp
             mpe::Zone src, dst;
             mpe::parseZone(cmd.opts_[0], src);
             mpe::parseZone(cmd.opts_[1], dst);
-            auto& rel = input.mpeRelocate;
+            auto& rel = input.mpeRelocate[src.lower ? 0 : 1];
 
-            // the master channel is zone-wide; just move it across
+            // the master channel is zone-wide; just move it across, but keep the
+            // MPE Configuration Message's announced member count accurate for the
+            // destination zone (rewrite the RPN 6 data entry)
             if (ch == src.masterChannel())
             {
                 MidiMessage out = msg;
                 out.setChannel(dst.masterChannel());
+                if (msg.isController())
+                {
+                    const int cc = msg.getControllerNumber();
+                    const int v = msg.getControllerValue();
+                    if (cc == 101) rel.masterRpnMsb = v;
+                    else if (cc == 100) rel.masterRpnLsb = v;
+                    else if (cc == 6 && rel.masterRpnMsb == 0 && rel.masterRpnLsb == 6)
+                        out = MidiMessage::controllerEvent(dst.masterChannel(), 6, dst.members);
+                }
+                out.setTimeStamp(ts);
                 output.add(out);
                 break;
             }
@@ -1592,11 +1706,13 @@ void ApplicationState::applyMpeOp(const ApplicationCommand& cmd, RouteInput& inp
         case MPE_COLLAPSE:
         {
             // fold every channel of the source zone onto a single channel for a
-            // non-MPE synth
+            // non-MPE synth, combining Manager (zone-wide) and Member (per-note)
+            // expression the way an MPE receiver would (MPE spec 2.2.6-2.2.8)
             mpe::Zone src;
             mpe::parseZone(cmd.opts_[0], src);
             const int target = jlimit(1, 16, asDecOrHexIntValue(cmd.opts_[1]));
-            auto& col = input.mpeCollapse;
+            auto& col = input.mpeCollapse[src.lower ? 0 : 1];
+            const int managerCh = src.masterChannel();
 
             // messages outside the zone pass straight through
             if (!src.contains(ch))
@@ -1605,21 +1721,88 @@ void ApplicationState::applyMpeOp(const ApplicationCommand& cmd, RouteInput& inp
                 break;
             }
 
-            // the master channel carries zone-wide messages: forward them as-is
-            // (rechanneled), they already apply globally
+            if (!col.expr.initialized)
+            {
+                col.expr.resetForZone(src);
+            }
+            const int change = col.expr.update(src, msg);
+
+            // emits the combined pitch bend for a member note, declaring the
+            // combined Pitch Bend Sensitivity on the target first if it changed
+            auto emitBend = [&](int memberCh)
+            {
+                if (memberCh < 1) return;
+                const int value = col.expr.combinedBendValue(managerCh, memberCh);
+                if (value == col.lastBend) return;   // nothing changed on the target
+                const int sense = col.expr.combinedSensitivity(managerCh, memberCh);
+                if (sense != col.outSense)
+                {
+                    mpe::appendPitchBendSensitivity(output, target, sense, ts);
+                    col.outSense = sense;
+                }
+                MidiMessage pb = MidiMessage::pitchWheel(target, value);
+                pb.setTimeStamp(ts);
+                output.add(pb);
+                col.lastBend = value;
+            };
+            auto emitCC74 = [&](int memberCh)
+            {
+                if (memberCh < 1) return;
+                const int value = col.expr.combinedCC74(managerCh, memberCh);
+                if (value == col.lastCC74) return;
+                MidiMessage cc = MidiMessage::controllerEvent(target, 74, value);
+                cc.setTimeStamp(ts);
+                output.add(cc);
+                col.lastCC74 = value;
+            };
+            // a member note's pressure rides on polyphonic aftertouch (so each
+            // note keeps its own), combined with the Manager pressure via Max
+            auto emitPressure = [&](int memberCh)
+            {
+                const int note = col.channelNote[memberCh];
+                if (note < 0) return;
+                MidiMessage at = MidiMessage::aftertouchChange(target, note, col.expr.combinedPressure(managerCh, memberCh));
+                at.setTimeStamp(ts);
+                output.add(at);
+            };
+
+            // a member RPN 0 data entry sets the source sensitivity (captured
+            // above); it must not reach the target, which uses our combined RPN 0
+            auto isSensitivityData = [&]()
+            {
+                return msg.isController() &&
+                    (msg.getControllerNumber() == 6 || msg.getControllerNumber() == 38) &&
+                    col.expr.rpnMsb[ch] == 0 && col.expr.rpnLsb[ch] == 0;
+            };
+
+            // --- Manager (zone-wide) messages affect the note that owns the channel ---
             if (src.isMaster(ch))
             {
+                if (change == mpe::ExpressionState::Bend)     { emitBend(col.activeChannel()); break; }
+                if (change == mpe::ExpressionState::CC74)     { emitCC74(col.activeChannel()); break; }
+                if (change == mpe::ExpressionState::Pressure)
+                {
+                    for (int c = 1; c < 17; ++c) if (col.channelNote[c] >= 0) emitPressure(c);
+                    break;
+                }
+                if (isSensitivityData()) break;
+
                 MidiMessage out = msg;
                 out.setChannel(target);
                 output.add(out);
                 break;
             }
 
-            // member channel: track its note so per-note expression can be folded
+            // --- Member channel ---
             if (msg.isNoteOn() && msg.getVelocity() > 0)
             {
                 col.channelNote[ch] = msg.getNoteNumber();
                 col.noteOrder[ch] = ++col.order;
+                // the new note owns the channel-wide dimensions; send its initial
+                // combined expression before the Note On (spec section 2.4)
+                emitBend(ch);
+                emitCC74(ch);
+                if (col.expr.combinedPressure(managerCh, ch) > 0) emitPressure(ch);
                 MidiMessage out = msg;
                 out.setChannel(target);
                 output.add(out);
@@ -1632,36 +1815,15 @@ void ApplicationState::applyMpeOp(const ApplicationCommand& cmd, RouteInput& inp
                 MidiMessage out = msg;
                 out.setChannel(target);
                 output.add(out);
+                // hand the channel-wide dimensions to whichever note now owns them
+                const int a = col.activeChannel();
+                if (a >= 1) { emitBend(a); emitCC74(a); }
                 break;
             }
-            if (msg.isChannelPressure())
-            {
-                // a single channel can't carry per-note pressure as channel
-                // pressure, but it can as polyphonic aftertouch: remap it to the
-                // note this member channel is holding
-                const int note = col.channelNote[ch];
-                if (note >= 0)
-                {
-                    MidiMessage out = MidiMessage::aftertouchChange(target, note, msg.getChannelPressureValue());
-                    out.setTimeStamp(ts);
-                    output.add(out);
-                }
-                break;  // dropped when no note is held on this channel
-            }
-            if (msg.isPitchWheel() ||
-                (msg.isController() && msg.getControllerNumber() == 74))
-            {
-                // pitch bend and timbre are channel-wide on the target, so only
-                // the most recently triggered note's expression is allowed
-                // through (last note wins); the rest is suppressed
-                if (ch == col.activeChannel())
-                {
-                    MidiMessage out = msg;
-                    out.setChannel(target);
-                    output.add(out);
-                }
-                break;
-            }
+            if (change == mpe::ExpressionState::Bend)     { if (ch == col.activeChannel()) emitBend(ch); break; }
+            if (change == mpe::ExpressionState::CC74)     { if (ch == col.activeChannel()) emitCC74(ch); break; }
+            if (change == mpe::ExpressionState::Pressure) { emitPressure(ch); break; }
+            if (isSensitivityData()) break;
 
             // any other member-channel message is forwarded rechanneled
             MidiMessage out = msg;
@@ -1676,7 +1838,7 @@ void ApplicationState::applyMpeOp(const ApplicationCommand& cmd, RouteInput& inp
             const int srcCh = jlimit(1, 16, asDecOrHexIntValue(cmd.opts_[0]));
             mpe::Zone dst;
             mpe::parseZone(cmd.opts_[1], dst);
-            auto& alloc = input.mpeAlloc;
+            auto& alloc = input.mpeAlloc[dst.lower ? 0 : 1];
 
             if (ch != srcCh)
             {
@@ -1701,11 +1863,15 @@ void ApplicationState::applyMpeOp(const ApplicationCommand& cmd, RouteInput& inp
                 const int mch = (note >= 0 && note < 128) ? alloc.noteChannel[note] : -1;
                 if (mch >= 1)
                 {
+                    // set Channel Pressure to zero before the Note Off (Appendix A.4.2)
+                    MidiMessage zero = MidiMessage::channelPressureChange(mch, 0);
+                    zero.setTimeStamp(ts);
+                    output.add(zero);
                     MidiMessage off = MidiMessage::noteOff(mch, note, msg.getVelocity());
                     off.setTimeStamp(ts);
                     output.add(off);
+                    alloc.bucket.release(mch);
                     alloc.noteChannel[note] = -1;
-                    alloc.channelNote[mch] = -1;
                 }
                 break;
             }
@@ -1715,51 +1881,41 @@ void ApplicationState::applyMpeOp(const ApplicationCommand& cmd, RouteInput& inp
                 ensureConfig();
                 const int note = msg.getNoteNumber();
 
-                // if this note is somehow still held, release it cleanly first
+                // fill the channel bucket with the destination zone's member
+                // channels the first time it is used
+                if (!alloc.bucketFilled)
+                {
+                    alloc.bucket.clear();
+                    for (int i = 0; i < dst.members; ++i) alloc.bucket.add(dst.memberChannel(i));
+                    alloc.bucketFilled = true;
+                }
+
+                // if this note is somehow still held, release its channel first
                 if (alloc.noteChannel[note] >= 1)
                 {
                     const int prev = alloc.noteChannel[note];
                     MidiMessage off = MidiMessage::noteOff(prev, note, (uint8)0);
                     off.setTimeStamp(ts);
                     output.add(off);
-                    alloc.channelNote[prev] = -1;
+                    alloc.bucket.release(prev);
                     alloc.noteChannel[note] = -1;
                 }
 
-                // pick a free member channel round-robin, stealing the oldest
-                // slot when every member channel is already in use
-                int chosen = 0;
-                for (int k = 0; k < dst.members; ++k)
+                // the bucket hands out a member channel, reusing one as late as
+                // possible and sharing a channel when the polyphony exceeds the
+                // number of member channels (MPE spec Appendix A.3)
+                const int chosen = alloc.bucket.take();
+                if (chosen >= 1)
                 {
-                    const int idx = (alloc.roundRobin + k) % dst.members;
-                    const int mch = dst.memberChannel(idx);
-                    if (alloc.channelNote[mch] == -1)
-                    {
-                        chosen = mch;
-                        alloc.roundRobin = (idx + 1) % dst.members;
-                        break;
-                    }
+                    // set Channel Pressure to zero before the Note On (Appendix A.4.2)
+                    MidiMessage zero = MidiMessage::channelPressureChange(chosen, 0);
+                    zero.setTimeStamp(ts);
+                    output.add(zero);
+                    MidiMessage on = MidiMessage::noteOn(chosen, note, msg.getVelocity());
+                    on.setTimeStamp(ts);
+                    output.add(on);
+                    alloc.noteChannel[note] = chosen;
                 }
-                if (chosen == 0)
-                {
-                    const int idx = alloc.roundRobin % dst.members;
-                    chosen = dst.memberChannel(idx);
-                    const int stolen = alloc.channelNote[chosen];
-                    if (stolen >= 0)
-                    {
-                        MidiMessage off = MidiMessage::noteOff(chosen, stolen, (uint8)0);
-                        off.setTimeStamp(ts);
-                        output.add(off);
-                        alloc.noteChannel[stolen] = -1;
-                    }
-                    alloc.roundRobin = (idx + 1) % dst.members;
-                }
-
-                MidiMessage on = MidiMessage::noteOn(chosen, note, msg.getVelocity());
-                on.setTimeStamp(ts);
-                output.add(on);
-                alloc.noteChannel[note] = chosen;
-                alloc.channelNote[chosen] = note;
                 break;
             }
 
@@ -1782,6 +1938,56 @@ void ApplicationState::applyMpeOp(const ApplicationCommand& cmd, RouteInput& inp
             MidiMessage out = msg;
             out.setChannel(dst.masterChannel());
             output.add(out);
+            break;
+        }
+        case MPE_BEND:
+        {
+            // rescale per-note pitch bend from a source semitone range to a
+            // destination range so a controller and a synth whose member-channel
+            // bend range differs play in tune (spec section 2.2.5)
+            mpe::Zone zone;
+            mpe::parseZone(cmd.opts_[0], zone);
+            const double from = cmd.opts_[1].getDoubleValue();
+            const double to = cmd.opts_[2].getDoubleValue();
+
+            if (!msg.isPitchWheel() || zone.memberIndexOf(ch) < 0 || to <= 0.0)
+            {
+                output.add(msg);   // only member-channel pitch bend is rescaled
+                break;
+            }
+
+            const int value = jlimit(0, 16383, roundToInt(8192.0 + (msg.getPitchWheelValue() - 8192) * from / to));
+            MidiMessage out = MidiMessage::pitchWheel(ch, value);
+            out.setTimeStamp(ts);
+            output.add(out);
+            break;
+        }
+        case MPE_SENS:
+        {
+            // declare a member-channel Pitch Bend Sensitivity (RPN 0) for a synth
+            // that honours it, so it interprets the controller's bend correctly
+            // without rescaling the values (spec section 2.2.5)
+            mpe::Zone zone;
+            mpe::parseZone(cmd.opts_[0], zone);
+            const int semitones = jlimit(0, 96, asDecOrHexIntValue(cmd.opts_[1]));
+            auto& sd = input.mpeSens[zone.lower ? 0 : 1];
+
+            if (sd.isMcm(msg))
+            {
+                // forward the MCM (it resets member sensitivity to 48 on the
+                // synth), then re-declare ours just after it
+                output.add(msg);
+                mpe::appendMemberSensitivity(output, zone, semitones, ts);
+                sd.declared = true;
+                break;
+            }
+            // otherwise declare it once, just before the first note is forwarded
+            if (msg.isNoteOn() && msg.getVelocity() > 0 && !sd.declared)
+            {
+                mpe::appendMemberSensitivity(output, zone, semitones, ts);
+                sd.declared = true;
+            }
+            output.add(msg);
             break;
         }
         default:

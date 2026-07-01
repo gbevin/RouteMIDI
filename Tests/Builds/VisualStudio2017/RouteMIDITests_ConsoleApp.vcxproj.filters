@@ -1218,6 +1218,9 @@
     <ClInclude Include="..\..\..\Source\BitScaling.h">
       <Filter>RouteMIDITests\Source</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\Source\ChannelBucket.h">
+      <Filter>RouteMIDITests\Source</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\Source\Mpe.h">
       <Filter>RouteMIDITests\Source</Filter>
     </ClInclude>

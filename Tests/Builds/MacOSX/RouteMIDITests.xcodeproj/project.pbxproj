@@ -51,6 +51,7 @@
 		5D1A2B5BC83A77B74BBA4212 /* JuceHeader.h */ /* JuceHeader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = JuceHeader.h; path = ../../JuceLibraryCode/JuceHeader.h; sourceTree = SOURCE_ROOT; };
 		607B019A04F2ADB1658D69C9 /* AppConfig.h */ /* AppConfig.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = AppConfig.h; path = ../../JuceLibraryCode/AppConfig.h; sourceTree = SOURCE_ROOT; };
 		623DB344C4CFD3EB80F45955 /* Mpe.h */ /* Mpe.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Mpe.h; path = ../../../Source/Mpe.h; sourceTree = SOURCE_ROOT; };
+		62460F70AA75475EFD62FB30 /* ChannelBucket.h */ /* ChannelBucket.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ChannelBucket.h; path = ../../../Source/ChannelBucket.h; sourceTree = SOURCE_ROOT; };
 		66ADBCF6A0E5E12E1116710A /* ApplicationState.cpp */ /* ApplicationState.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = ApplicationState.cpp; path = ../../../Source/ApplicationState.cpp; sourceTree = SOURCE_ROOT; };
 		685489474340A7741D0C04AA /* juce_audio_basics */ /* juce_audio_basics */ = {isa = PBXFileReference; lastKnownFileType = folder; name = juce_audio_basics; path = ../../../JuceLibraryCode/modules/juce_audio_basics; sourceTree = SOURCE_ROOT; };
 		6A5732AB232FD5EB5A927359 /* juce_data_structures */ /* juce_data_structures */ = {isa = PBXFileReference; lastKnownFileType = folder; name = juce_data_structures; path = ../../../JuceLibraryCode/modules/juce_data_structures; sourceTree = SOURCE_ROOT; };
@@ -157,6 +158,7 @@
 				66ADBCF6A0E5E12E1116710A,
 				BD7E02A8D06EAE2E568F40AF,
 				26805B057A76A735FEA3254B,
+				62460F70AA75475EFD62FB30,
 				623DB344C4CFD3EB80F45955,
 				7599A4D720B561530820F5F1,
 				15000DBCB5EC2B5BA4195BCC,

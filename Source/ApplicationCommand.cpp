@@ -82,6 +82,7 @@ bool ApplicationCommand::isFilter() const
         case VELOCITY_RANGE:
         case MPE_MASTER:
         case MPE_MEMBER:
+        case MPE_ZONE:
             return true;
         default:
             return false;
@@ -249,6 +250,12 @@ bool ApplicationCommand::matches(ApplicationState& state, const MidiMessage& msg
             // pass messages on any member channel of the given MPE zone
             mpe::Zone zone;
             return mpe::parseZone(opts_[0], zone) && zone.memberIndexOf(msg.getChannel()) >= 0;
+        }
+        case MPE_ZONE:
+        {
+            // pass a whole zone: its master channel and all its member channels
+            mpe::Zone zone;
+            return mpe::parseZone(opts_[0], zone) && zone.contains(msg.getChannel());
         }
 
         default:

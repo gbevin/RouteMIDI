@@ -37,7 +37,7 @@ These are all the supported commands:
   vin       (name)     Add a virtual MIDI input to the route (Linux/macOS)
   vout      (name)     Add a virtual MIDI output to the route (Linux/macOS)
   list                 List the available MIDI input and output ports
-  panic                Send all-notes-off to outputs on disconnect and at exit
+  panic                Send all-notes-off on disconnect, exit and zone change
   file      path       Load commands from the specified program file
   dec                  Interpret the next numbers as decimals by default
   hex                  Interpret the next numbers as hexadecimals by default
@@ -78,6 +78,7 @@ These are all the supported commands:
   velrange  low high   Pass note-ons within a velocity range (vel split)
   mpemaster zone[:n]   Pass the master channel of an MPE zone (e.g. lower)
   mpemember zone[:n]   Pass the member channels of an MPE zone (e.g. upper:7)
+  mpezone   zone[:n]   Pass a whole MPE zone (its master and member channels)
   chmap     from to    Remap channel-voice messages from one channel to another
   chset     number     Force all channel-voice messages onto a channel
   chadd     number     Add N to the channel, wrapping 1-16 (may be negative)
@@ -129,6 +130,10 @@ These are all the supported commands:
             zone[:n]   channels (e.g. 1 lower)
   mpesplit  zone[:n]   Distribute an MPE zone's voices over the output ports,
             (channel)  one per port, each rechanneled to channel (default 1)
+  mpebend   zone[:n]   Rescale member-channel pitch bend from one semitone range
+            from to    to another
+  mpesens   zone[:n]   Declare a member-channel pitch bend range (RPN 0) for
+            semitones  synths that honor it
   -h  or  --help       Print Help (this message) and exit
   --version            Print version information and exit
   --                   Read commands from standard input until it's closed
@@ -142,14 +147,14 @@ Alternatively, you can use the following long versions of the commands:
   channel-pressure pitch-bend system-realtime continue active-sensing reset
   system-common system-exclusive system-exclusive-file time-code song-position
   song-select tune-request note-range velocity-range mpe-master mpe-member
-  channel-map channel-set channel-add transpose note-map velocity-scale
-  velocity-set velocity-add velocity-curve control-change-map
+  mpe-zone channel-map channel-set channel-add transpose note-map
+  velocity-scale velocity-set velocity-add velocity-curve control-change-map
   control-change-add control-change-scale control-change-curve
   program-change-map program-change-add pitch-bend-add pitch-bend-scale
   pitch-bend-set channel-pressure-add channel-pressure-scale
   channel-pressure-set channel-pressure-curve nrpn-add nrpn-scale nrpn-curve
   rpn-add rpn-scale rpn-curve javascript javascript-file mpe-mono mpe-expand
-  mpe-split
+  mpe-split mpe-bend mpe-sensitivity
 ```
 
 ## Routes
@@ -259,7 +264,7 @@ Several conversions can be configured on one route; only the matching messages a
 
 Notable details:
 
-* **Bit scaling** follows the MIDI 2.0 *Bit Scaling and Resolution* recommendation (MA07). By default it uses the **Min-Center-Max** method, which preserves minimum, center and maximum across resolutions and round-trips losslessly: widening a 7-bit value to 14-bit and narrowing it back yields the original. So a 7-bit value of 127 becomes the 14-bit maximum 16383, 64 becomes the center 8192, and 0 stays 0.
+* **Bit scaling** by default uses a **Min-Center-Max** method, which preserves minimum, center and maximum across resolutions and round-trips losslessly: widening a 7-bit value to 14-bit and narrowing it back yields the original. So a 7-bit value of 127 becomes the 14-bit maximum 16383, 64 becomes the center 8192, and 0 stays 0.
 * For **RPNs whose parameter LSB is 0-31** (the classic absolute MIDI 1.0 RPNs such as pitch-bend sensitivity, tuning and the MPE Configuration Message), the **Zero-Extension with Rounding** method is used instead, for exact backward compatibility. Upscaling pads with zeros (7-bit 127 becomes 16256, not the full 16383) and downscaling rounds to the nearest value. NRPNs and all CCs always use Min-Center-Max.
 * Conversions to `rpn`/`nrpn` append the **RPN/NRPN null** (CC 101/100 = 127 or CC 99/98 = 127) to deselect the parameter afterwards.
 * When a route converts any `rpn` or `nrpn`, the converter takes over the whole RPN controller set (CC 6, 38, 98, 99, 100, 101) on that route to reassemble every (N)RPN: targeted parameters are converted and any other (N)RPN is regenerated and passed through. Avoid filtering out those CCs on a converting route.
@@ -282,27 +287,42 @@ MIDI Polyphonic Expression (MPE) spreads the notes of a performance across sever
 
 Throughout the MPE commands a zone is written as a single token, `<side>[:<members>]`, where the side is `lower` or `upper` (or just `l`/`u`) and the optional member count defaults to 15. For example `lower`, `upper:7` or `l:5`.
 
-RouteMIDI is *zone-aware*: it knows which channels belong to a zone, so it can relocate, collapse or build an MPE stream without scrambling its per-note channels.
+RouteMIDI is *zone-aware*: it knows which channels belong to a zone, so it can relocate, collapse, build or split an MPE stream without scrambling its per-note channels. At a glance, the MPE commands cover these use cases:
+
+| Use case | Command |
+|----------|---------|
+| Move a stream between zones, or resize it | [`mpe`](#routing-mpe-between-zones) |
+| Play a non-MPE synth from an MPE controller | [`mpemono`](#collapsing-mpe-to-a-single-channel) |
+| Turn a regular keyboard into MPE | [`mpexp`](#expanding-a-single-channel-to-mpe) |
+| Drive a rack of mono synths from one MPE controller | [`mpesplit`](#splitting-mpe-across-separate-output-ports) |
+| Make a controller and a synth agree on the bend range | [`mpebend`](#adapting-pitch-bend-range), [`mpesens`](#adapting-pitch-bend-range) |
+| Edit or filter just part of a zone | [`mpemaster`, `mpemember`, `mpezone`](#zone-filters) |
+| Handle a two-zone (split) controller | [zone filters + per-zone state](#two-zone-controllers) |
+| Stop stuck notes when a zone is reconfigured | [`panic`](#panic) |
+
+Wherever a command takes a value (a pitch bend value, a pressure, a sensitivity), RouteMIDI combines the zone's Manager (zone-wide) and Member (per-note) information the way an MPE receiver would, and applies the standard defaults (Manager pitch bend ±2 semitones, Members ±48) when no Pitch Bend Sensitivity has been declared.
 
 ### Routing MPE between zones
 
 `mpe <from> <to>` relocates a whole MPE stream from one zone to another, remapping the master channel and each member channel by position (member *i* of the source becomes member *i* of the destination). This is the safe way to, for instance, feed a Lower-Zone controller into a synth configured for the Upper Zone, or to place two controllers on two different zones of one multitimbral synth.
 
-If the destination has fewer member channels than the source uses, the extra members wrap around onto the available ones, so two notes can end up sharing a destination channel. While a destination channel holds a single note its pitch bend, channel pressure and CC 74 pass through as genuine per-note expression; once notes collide on it, those channel-wide dimensions follow a **last-note-wins** rule (only the most recently triggered note's expression is kept, falling back to the remaining note when it is released). Note-ons, note-offs and polyphonic aftertouch (which carries its own note number) always pass through unchanged.
+If the destination has fewer member channels than the source uses, the extra members wrap around onto the available ones, so two notes can end up sharing a destination channel. While a destination channel holds a single note its pitch bend, channel pressure and CC 74 pass through as genuine per-note expression; once notes collide on it, those channel-wide dimensions follow a **last-note-wins** rule (only the most recently triggered note's expression is kept, falling back to the remaining note when it is released). Note-ons, note-offs and polyphonic aftertouch (which carries its own note number) always pass through unchanged. When the member count changes, the relocated MPE Configuration Message is rewritten to announce the destination's member count.
 
 ```
 routemidi in "Seaboard" mpe lower upper out "Synth"      # Lower Zone -> Upper Zone
 routemidi in "LinnStrument" mpe lower:15 lower:8 out "8-voice Synth"
+# put two Lower-zone controllers onto the two zones of one multitimbral synth
+routemidi in "Controller A" out "Synth" \
+          in "Controller B" mpe lower upper out "Synth"
 ```
 
 ### Collapsing MPE to a single channel
 
-`mpemono <zone> <channel>` folds every channel of a zone onto one ordinary channel, so an MPE controller can play a non-MPE synth. The notes all play polyphonically on the one channel, and RouteMIDI keeps as much per-note expression as a single channel allows:
+`mpemono <zone> <channel>` folds every channel of a zone onto one ordinary channel, so an MPE controller can play a non-MPE synth. The notes all play polyphonically on the one channel, and RouteMIDI combines the zone's Manager (zone-wide) and Member (per-note) expression the way an MPE receiver would, keeping as much per-note expression as a single channel allows:
 
-* **Per-note channel pressure** is remapped to **polyphonic aftertouch** for the note that played it, so each note keeps its own pressure (the one MPE dimension a single channel *can* still carry per-note).
-* **Pitch bend** and **timbre (CC 74)** are channel-wide on a single channel and can't be independent, so they follow a **last-note-wins** rule: only the most recently triggered (and still held) note's bend and timbre pass through, falling back to the previous held note when that note is released.
-
-The zone's master channel (its zone-wide bend, CC and so on) is forwarded too.
+* **Channel pressure** is combined with the **maximum** of the Manager and Member values, and carried per-note as **polyphonic aftertouch**, so each note keeps its own pressure (the one MPE dimension a single channel *can* still carry per-note).
+* **Pitch bend** is **summed in semitones** (so the per-note 48-semitone range and the 2-semitone zone range combine correctly), with the result expressed at the combined range — RouteMIDI emits an **RPN 0** on the target declaring that range so the synth reproduces it. Because pitch bend is channel-wide, only the most recently triggered (and still held) note's bend is applied, falling back to the previous held note on release.
+* **Timbre (CC 74)** is combined with the **maximum** of the Manager and Member values, also last-note-wins.
 
 ```
 routemidi in "Seaboard" mpemono lower 1 out "Mono Synth"
@@ -310,7 +330,7 @@ routemidi in "Seaboard" mpemono lower 1 out "Mono Synth"
 
 ### Expanding a single channel to MPE
 
-`mpexp <channel> <zone>` does the opposite: it voice-allocates the notes arriving on one channel across an MPE zone's member channels (round-robin, stealing the oldest note when every member channel is busy) and emits the zone's MPE Configuration Message so the receiver is set up correctly. Zone-wide messages (pitch bend, channel pressure, CC) on the source channel are sent to the master channel. **Polyphonic aftertouch** is turned into **per-note channel pressure** on the note's member channel — the mirror image of what collapse does — so a keyboard with poly aftertouch drives each MPE note's pressure independently. This "MPE-ifies" a regular keyboard so a downstream MPE synth gives each note its own channel.
+`mpexp <channel> <zone>` does the opposite: it voice-allocates the notes arriving on one channel across an MPE zone's member channels and emits the zone's MPE Configuration Message so the receiver is set up correctly. Each note is given a member channel, reusing a channel as late as possible — which matters for long releases — and sharing a channel with another note when the polyphony exceeds the member-channel count, rather than stealing an already sounding note. Zone-wide messages (pitch bend, channel pressure, CC) on the source channel are sent to the master channel. **Polyphonic aftertouch** is turned into **per-note channel pressure** on the note's member channel — the mirror image of what collapse does — so a keyboard with poly aftertouch drives each MPE note's pressure independently. Channel pressure is set to zero just before each Note On and Note Off. This "MPE-ifies" a regular keyboard so a downstream MPE synth gives each note its own channel.
 
 ```
 routemidi in "Keyboard" mpexp 1 lower:15 out "MPE Synth"
@@ -318,7 +338,7 @@ routemidi in "Keyboard" mpexp 1 lower:15 out "MPE Synth"
 
 ### Splitting MPE across separate output ports
 
-`mpesplit <zone> [channel]` fans an MPE zone out across the route's output ports, treating **each output port as one monophonic voice**. This connects a rack of ordinary mono synths to an MPE controller: a note-on is allocated to a free port (round-robin, stealing the oldest voice when every port is busy), and that note's per-note pitch bend, pressure and CC 74 follow it to the same port until it is released. Everything is rechanneled onto a single channel (channel 1 by default, or the optional `channel` argument) so each non-MPE device sees a plain monophonic stream. Zone-wide messages on the master channel are broadcast to every port, except the MPE Configuration Message (RPN 6), which is suppressed so the non-MPE devices aren't flooded with it (other RPNs still pass through).
+`mpesplit <zone> [channel]` fans an MPE zone out across the route's output ports, treating **each output port as one monophonic voice**. This connects a rack of ordinary mono synths to an MPE controller: a note-on is allocated to a free port (round-robin, stealing the oldest voice when every port is busy), and that note's expression follows it to the same port until it is released. Everything is rechanneled onto a single channel (channel 1 by default, or the optional `channel` argument) so each non-MPE device sees a plain monophonic stream. Because each port carries one voice, the Manager (zone-wide) and that note's Member (per-note) expression are combined per port exactly as in collapse — pitch bend summed in semitones (with an RPN 0 declaring the combined range on the port), channel pressure and CC 74 combined with the maximum. The MPE Configuration Message (RPN 6) is suppressed so the non-MPE devices aren't flooded with it (other RPNs still pass through).
 
 ```
 # drive three mono synths polyphonically from one MPE controller
@@ -327,17 +347,50 @@ routemidi in "LinnStrument" mpesplit lower:15 out "Bass" out "Lead" out "Pad"
 routemidi in "Keyboard" mpexp 1 lower:3 mpesplit lower:3 out "A" out "B" out "C"
 ```
 
-There are as many simultaneous voices as there are output ports; with fewer ports than fingers, the oldest note is released to make room.
+There are as many simultaneous voices as there are output ports; with fewer ports than fingers, the oldest note is released to make room. In both collapse and split a note's initial combined expression is sent *before* its Note On, so the note starts in the right state.
+
+### Adapting pitch bend range
+
+`mpebend <zone> <from> <to>` rescales the per-note pitch bend on a zone's member channels from one Pitch Bend Sensitivity to another (the master channel and everything else are left untouched). MPE controllers default to a 48-semitone per-note range, but some synths have a smaller or fixed bend range that can't be changed; rescaling makes the two play in tune. For example, a 48-semitone controller feeding a synth whose member channels bend ±12 semitones:
+
+```
+routemidi in "Seaboard" mpebend lower:15 48 12 out "12-semitone Synth"
+```
+
+`mpesens <zone> <semitones>` takes the complementary approach: instead of rewriting the bend values, it *declares* the member-channel Pitch Bend Sensitivity by injecting an **RPN 0** on the zone's member channels, for a synth that honours RPN 0. Use it when the synth can adopt the range rather than being stuck at one — then no rescaling is needed and the original values play correctly. RouteMIDI sends the declaration once before the first note and again after each MPE Configuration Message (which resets the receiver's sensitivity to its 48-semitone default).
+
+```
+routemidi in "Seaboard" mpesens lower:15 48 out "Synth"   # tell the synth members bend +/-48
+```
+
+Use `mpebend` for synths with a fixed bend range, or `mpesens` for synths you can configure — not both, since they would correct the same difference twice.
 
 ### Zone filters
 
-The `mpemaster <zone>` and `mpemember <zone>` filters pass only the master channel or only the member channels of a zone. Combined with the normal transforms this gives zone-safe editing: filter to the part you want to touch, then transform it, without disturbing the rest of the zone.
+The `mpemaster <zone>` and `mpemember <zone>` filters pass only the master channel or only the member channels of a zone, and `mpezone <zone>` passes a whole zone (its master *and* members). Combined with the normal transforms this gives zone-safe editing: filter to the part you want to touch, then transform it, without disturbing the rest of the zone. Like any filter, prefixing one with `not` blocks instead of passes, which is handy for keeping just one half of a split controller.
 
 ```
 # nudge only the zone-wide bend, leaving the per-note channels alone
 routemidi in "Seaboard" mpemaster lower pbscale 0.5 out "Synth"
-# split a zone: master + members to one synth is the default; here only members
-routemidi in "Seaboard" mpemember lower out "Per-note Synth"
+# forward only the lower zone of a split controller (master and members)
+routemidi in "Seaboard" mpezone lower:7 out "Synth"
+# forward everything except the upper zone
+routemidi in "Seaboard" not mpezone upper:7 out "Synth"
+```
+
+### Two-zone controllers
+
+A split controller can run a **Lower** zone (master channel 1, members counting up) and an **Upper** zone (master channel 16, members counting down) at the same time, with non-overlapping member ranges — for example `lower:7` (channel 1 + channels 2-8) and `upper:7` (channel 16 + channels 9-15). Each zone is handled independently, so the simplest approach is one route per zone, isolating it with `mpezone`:
+
+```
+routemidi in "Seaboard" mpezone lower mpemono lower:7 1 out "Bass" \
+          in "Seaboard" mpezone upper mpemono upper:7 2 out "Lead"
+```
+
+Both zones can also be processed in a single route — a Lower-zone operation and an Upper-zone operation keep separate per-zone state (each gets its own sensitivity defaults, voice allocation, and so on), so they don't interfere:
+
+```
+routemidi in "Linn" mpe lower:7 lower:7 mpe upper:7 upper:7 out "Synth"
 ```
 
 ## Monitoring
@@ -351,7 +404,7 @@ routemidi in "A" in "B" mon src out "Synth"         # show which input each came
 
 ## Panic
 
-Add `panic` to a route to make it send an all-notes-off safety net (sustain off and all-notes-off on every channel) to that route's outputs whenever one of its inputs disconnects, and once more when RouteMIDI exits. This prevents stuck notes when a controller is unplugged mid-performance.
+Add `panic` to a route to make it send an all-notes-off safety net (sustain off and all-notes-off on every channel) to that route's outputs whenever one of its inputs disconnects, and once more when RouteMIDI exits. This prevents stuck notes when a controller is unplugged mid-performance. It also fires when an **MPE zone is reconfigured** mid-stream — when an MPE Configuration Message changes a zone's member count (or turns the zone off), it sends all-notes-off and reset-all-controllers downstream, since non-MPE devices won't reset themselves.
 
 ```
 routemidi in "Keyboard" panic out "Synth"
@@ -486,7 +539,7 @@ RouteMIDI has a unit test suite living in the sibling `Tests` folder. It uses th
 JUCE `UnitTest` framework, so it has no external dependencies, and it is built as
 its own console application from the `Tests/RouteMIDITests.jucer` Projucer
 project (which reuses the same JUCE modules as the main app). The tests cover the
-MA07 bit-scaling math, every native transform, the filter logic (including range
+the bit-scaling math, every native transform, the filter logic (including range
 selectors), the CC/CC14/RPN/NRPN conversions and value transforms, the MPE zone
 routing, the text-MIDI codec, and command-stream parsing.
 

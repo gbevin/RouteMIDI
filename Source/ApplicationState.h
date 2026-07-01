@@ -84,6 +84,7 @@ private:
     void routeMessage(Route& route, RouteInput& input, const MidiMessage& msg);
     void applyMpeOp(const ApplicationCommand& cmd, RouteInput& input, const MidiMessage& msg, Array<MidiMessage>& output);
     void sendToDest(OutputDest* dest, const MidiMessage& msg);
+    void sendZoneReset(Route& route);
     void sendPanic(Route& route);
     bool hasStdinInput() const;
     void readStdinMidi();

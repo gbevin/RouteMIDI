@@ -77,6 +77,7 @@ enum CommandIndex
     VELOCITY_RANGE,
     MPE_MASTER,
     MPE_MEMBER,
+    MPE_ZONE,
 
     // transforms
     CHANNEL_MAP,
@@ -122,7 +123,9 @@ enum CommandIndex
     MPE_RELOCATE,
     MPE_COLLAPSE,
     MPE_EXPAND,
-    MPE_SPLIT
+    MPE_SPLIT,
+    MPE_BEND,
+    MPE_SENS
 };
 
 class ApplicationState;
