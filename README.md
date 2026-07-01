@@ -200,6 +200,13 @@ routemidi in "Keyboard" out "Synth A" out "Synth B" \
           in "Pads" in "Drums" out "Sampler"
 ```
 
+On Linux and macOS, `vin` and `vout` create virtual ports that other applications can connect to, which is handy for bridging software that has no direct connection of its own:
+
+```
+routemidi vin "RouteMIDI In" out "USB MIDI"     # apps send to the virtual input -> hardware
+routemidi in "USB MIDI" vout "RouteMIDI Out"    # hardware -> a virtual output apps can read
+```
+
 Filter and transform commands can be placed anywhere within a route's commands:
 
 ```
@@ -243,6 +250,9 @@ routemidi in "Wheel" ccrange 1 64 127 out "Synth"   # mod wheel only in its top 
 # key split: bottom half to a bass, top half to a lead
 routemidi in "Keyboard" noterange C-2 B2 out "Bass" \
           in "Keyboard" noterange C3 G8 out "Lead"
+# velocity split: soft notes to a pad, hard notes to a lead
+routemidi in "Keyboard" velrange 1 63 out "Pad" \
+          in "Keyboard" velrange 64 127 out "Lead"
 ```
 
 ## Transforms
@@ -251,6 +261,7 @@ Transforms modify the messages that pass the filters, and are applied in the ord
 
 ```
 routemidi in "Keyboard" transp 12 chset 2 out "Synth"   # octave up, on channel 2
+routemidi in "Multi" chmap 10 1 out "Synth"             # move channel 10 onto channel 1
 routemidi in "Pads" notemap 36 60 out "Drum"            # remap note 36 to 60
 routemidi in "Fader" ccmap 7 11 out "Mixer"             # remap CC 7 to CC 11
 routemidi in "Fader" ccscale 7 0.5 out "Mixer"          # halve the values of CC 7
