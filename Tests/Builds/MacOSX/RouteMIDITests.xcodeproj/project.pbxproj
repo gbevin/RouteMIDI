@@ -40,6 +40,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		113BCE723884E45DD7A8FC4F /* Latch.h */ /* Latch.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Latch.h; path = ../../../Source/Latch.h; sourceTree = SOURCE_ROOT; };
 		12EC7E424823937C91922576 /* ConversionTests.cpp */ /* ConversionTests.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = ConversionTests.cpp; path = ../../ConversionTests.cpp; sourceTree = SOURCE_ROOT; };
 		1400F847F96ECA957A8DA55E /* ApplicationCommand.h */ /* ApplicationCommand.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ApplicationCommand.h; path = ../../../Source/ApplicationCommand.h; sourceTree = SOURCE_ROOT; };
 		146991EFBFEF92DC926AECA4 /* ScriptOscClass.h */ /* ScriptOscClass.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ScriptOscClass.h; path = ../../../Source/ScriptOscClass.h; sourceTree = SOURCE_ROOT; };
@@ -159,6 +160,7 @@
 				BD7E02A8D06EAE2E568F40AF,
 				26805B057A76A735FEA3254B,
 				62460F70AA75475EFD62FB30,
+				113BCE723884E45DD7A8FC4F,
 				623DB344C4CFD3EB80F45955,
 				7599A4D720B561530820F5F1,
 				15000DBCB5EC2B5BA4195BCC,

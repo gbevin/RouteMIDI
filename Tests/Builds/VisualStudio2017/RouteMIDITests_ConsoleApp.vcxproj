@@ -1063,6 +1063,7 @@
     <ClInclude Include="..\..\..\Source\ApplicationState.h"/>
     <ClInclude Include="..\..\..\Source\BitScaling.h"/>
     <ClInclude Include="..\..\..\Source\ChannelBucket.h"/>
+    <ClInclude Include="..\..\..\Source\Latch.h"/>
     <ClInclude Include="..\..\..\Source\Mpe.h"/>
     <ClInclude Include="..\..\..\Source\Route.h"/>
     <ClInclude Include="..\..\..\Source\ScriptMidiMessageClass.h"/>

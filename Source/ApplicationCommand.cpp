@@ -221,6 +221,7 @@ bool ApplicationCommand::isTransform() const
         case NOTE_TO_PROGRAM:
         case SCALE:
         case CHORD:
+        case LATCH:
         case VELOCITY_SCALE:
         case VELOCITY_SET:
         case VELOCITY_ADD:

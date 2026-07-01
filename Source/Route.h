@@ -21,6 +21,7 @@
 #include "JuceHeader.h"
 
 #include "ApplicationCommand.h"
+#include "Latch.h"
 #include "Mpe.h"
 
 // A single MIDI input port of a route.
@@ -45,6 +46,8 @@ struct RouteInput
     mpe::Relocator mpeRelocate[2];        // collision tracking for MPE relocate
     mpe::SensitivityDeclarer mpeSens[2];  // member Pitch Bend Sensitivity declaration
     mpe::McmTracker mcm;                  // MPE zone reconfiguration detection (both zones)
+
+    LatchState latch;                     // held-note tracking for the latch transform
 };
 
 // A single MIDI output destination of a route.

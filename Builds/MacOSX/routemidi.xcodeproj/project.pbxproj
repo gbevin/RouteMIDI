@@ -54,6 +54,7 @@
 		8A5BABA1DEBF1BBC38C35A84 /* AppConfig.h */ /* AppConfig.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = AppConfig.h; path = ../../JuceLibraryCode/AppConfig.h; sourceTree = SOURCE_ROOT; };
 		8C841A693EA83A57B62FDF16 /* Cocoa.framework */ /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = System/Library/Frameworks/Cocoa.framework; sourceTree = SDKROOT; };
 		92335890AFA077CA46856B96 /* ConsoleApp */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = routemidi; sourceTree = BUILT_PRODUCTS_DIR; };
+		984B89DA298818FDB2DF5FC5 /* Latch.h */ /* Latch.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Latch.h; path = ../../Source/Latch.h; sourceTree = SOURCE_ROOT; };
 		9CD2954B59A33B0796DD0778 /* ScriptOscClass.h */ /* ScriptOscClass.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ScriptOscClass.h; path = ../../Source/ScriptOscClass.h; sourceTree = SOURCE_ROOT; };
 		AE03F584DF5EFEE8BE9C71BE /* RecentFilesMenuTemplate.nib */ /* RecentFilesMenuTemplate.nib */ = {isa = PBXFileReference; lastKnownFileType = file.nib; name = RecentFilesMenuTemplate.nib; path = RecentFilesMenuTemplate.nib; sourceTree = SOURCE_ROOT; };
 		B2451D1DBA700503A8FEDC18 /* Main.cpp */ /* Main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Main.cpp; path = ../../Source/Main.cpp; sourceTree = SOURCE_ROOT; };
@@ -158,6 +159,7 @@
 				B3F525C4B60601DCE10BD37C,
 				14D92B2040A282CCDC3A0918,
 				27131189176A2D0C2E910C11,
+				984B89DA298818FDB2DF5FC5,
 				B2451D1DBA700503A8FEDC18,
 				C824511B9526921A9B1CD762,
 				1AEEB2610132487771E735B2,

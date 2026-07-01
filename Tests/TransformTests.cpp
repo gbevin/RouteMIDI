@@ -192,8 +192,10 @@ public:
         {
             // chord adds notes at fixed semitone intervals above each played note
             Route route;
+            route.inputs.add(new RouteInput());
+            auto& input = *route.inputs[0];
             route.transforms.add(makeCommand(CHORD, {"4", "7"}));     // major triad
-            auto out = state.applyTransforms(route, MidiMessage::noteOn(1, 60, (uint8)100));
+            auto out = state.applyTransforms(route, input, MidiMessage::noteOn(1, 60, (uint8)100));
             expectEquals(out.size(), 3);
             expectEquals(out[0].getNoteNumber(), 60);
             expectEquals(out[1].getNoteNumber(), 64);
@@ -206,32 +208,88 @@ public:
             }
 
             // note-offs expand the same way, so the whole chord is released
-            out = state.applyTransforms(route, MidiMessage::noteOff(1, 60, (uint8)0));
+            out = state.applyTransforms(route, input, MidiMessage::noteOff(1, 60, (uint8)0));
             expectEquals(out.size(), 3);
             for (auto& n : out) expect(n.isNoteOff());
 
             // chord notes out of range are dropped, the played note still passes
             Route high;
+            high.inputs.add(new RouteInput());
             high.transforms.add(makeCommand(CHORD, {"7"}));
-            out = state.applyTransforms(high, MidiMessage::noteOn(1, 125, (uint8)100));
+            out = state.applyTransforms(high, *high.inputs[0], MidiMessage::noteOn(1, 125, (uint8)100));
             expectEquals(out.size(), 1);
             expectEquals(out[0].getNoteNumber(), 125);
 
             // non-note messages pass through a chord untouched
-            out = state.applyTransforms(route, MidiMessage::controllerEvent(1, 7, 100));
+            out = state.applyTransforms(route, input, MidiMessage::controllerEvent(1, 7, 100));
             expectEquals(out.size(), 1);
             expect(out[0].isController());
 
             // chord then scale yields diatonic chords: a triad on E in C major
             // becomes E-G-B (the raw G# is snapped down to G)
             Route diatonic;
+            diatonic.inputs.add(new RouteInput());
             diatonic.transforms.add(makeCommand(CHORD, {"4", "7"}));
             diatonic.transforms.add(makeCommand(SCALE, {"C", "major"}));
-            out = state.applyTransforms(diatonic, MidiMessage::noteOn(1, 64, (uint8)100));
+            out = state.applyTransforms(diatonic, *diatonic.inputs[0], MidiMessage::noteOn(1, 64, (uint8)100));
             expectEquals(out.size(), 3);
             expectEquals(out[0].getNoteNumber(), 64);   // E
             expectEquals(out[1].getNoteNumber(), 67);   // G# -> G
             expectEquals(out[2].getNoteNumber(), 71);   // B
+        }
+
+        beginTest("Note latch (toggle and hold modes)");
+        {
+            // toggle: the first press latches the note on, the second releases it
+            Route route;
+            route.inputs.add(new RouteInput());
+            auto& input = *route.inputs[0];
+            route.transforms.add(makeCommand(LATCH, {"toggle"}));
+
+            auto out = state.applyTransforms(route, input, MidiMessage::noteOn(1, 60, (uint8)100));
+            expectEquals(out.size(), 1);
+            expect(out[0].isNoteOn());                   // latched on
+
+            out = state.applyTransforms(route, input, MidiMessage::noteOff(1, 60, (uint8)0));
+            expectEquals(out.size(), 0);                 // note-off is swallowed
+
+            out = state.applyTransforms(route, input, MidiMessage::noteOn(1, 60, (uint8)100));
+            expectEquals(out.size(), 1);
+            expect(out[0].isNoteOff());                  // second press toggles it off
+            expectEquals(out[0].getNoteNumber(), 60);
+
+            // a second note-off after toggling off is swallowed too
+            out = state.applyTransforms(route, input, MidiMessage::noteOff(1, 60, (uint8)0));
+            expectEquals(out.size(), 0);
+
+            // non-note messages pass through untouched
+            out = state.applyTransforms(route, input, MidiMessage::controllerEvent(1, 7, 100));
+            expectEquals(out.size(), 1);
+            expect(out[0].isController());
+
+            // hold: a new gesture replaces the previously held chord
+            Route hold;
+            hold.inputs.add(new RouteInput());
+            auto& hin = *hold.inputs[0];
+            hold.transforms.add(makeCommand(LATCH, {"hold"}));
+
+            // play and release C and E together: both keep sounding
+            expectEquals(state.applyTransforms(hold, hin, MidiMessage::noteOn(1, 60, (uint8)100)).size(), 1);
+            expectEquals(state.applyTransforms(hold, hin, MidiMessage::noteOn(1, 64, (uint8)100)).size(), 1);
+            expectEquals(state.applyTransforms(hold, hin, MidiMessage::noteOff(1, 60, (uint8)0)).size(), 0);
+            expectEquals(state.applyTransforms(hold, hin, MidiMessage::noteOff(1, 64, (uint8)0)).size(), 0);
+
+            // pressing a new note releases the held chord, then sounds the new note
+            out = state.applyTransforms(hold, hin, MidiMessage::noteOn(1, 67, (uint8)100));
+            expectEquals(out.size(), 3);                 // off C, off E, on G (order may vary)
+            int noteOns = 0, noteOffs = 0;
+            for (auto& n : out)
+            {
+                if (n.isNoteOn())  ++noteOns;
+                if (n.isNoteOff()) ++noteOffs;
+            }
+            expectEquals(noteOns, 1);
+            expectEquals(noteOffs, 2);
         }
 
         beginTest("Velocity transforms (note-on only)");

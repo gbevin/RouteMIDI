@@ -17,6 +17,7 @@
             file="../Source/ApplicationState.h"/>
       <FILE id="src005" name="BitScaling.h" compile="0" resource="0" file="../Source/BitScaling.h"/>
       <FILE id="src014" name="ChannelBucket.h" compile="0" resource="0" file="../Source/ChannelBucket.h"/>
+      <FILE id="src015" name="Latch.h" compile="0" resource="0" file="../Source/Latch.h"/>
       <FILE id="src013" name="Mpe.h" compile="0" resource="0" file="../Source/Mpe.h"/>
       <FILE id="src006" name="Route.h" compile="0" resource="0" file="../Source/Route.h"/>
       <FILE id="src007" name="ScriptMidiMessageClass.cpp" compile="1" resource="0"

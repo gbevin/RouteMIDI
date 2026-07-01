@@ -90,6 +90,7 @@ These are all the supported commands:
             program
   scale     root scale Snap notes to the nearest note of a scale (root, name)
   chord     intervals  Stack notes at the given semitone intervals (a chord)
+  latch     (mode)     Keep notes on after release; toggle (default) or hold
   velscale  factor     Scale note-on velocity by a factor (clamped 1-127)
   velset    number     Set a fixed note-on velocity (1-127)
   veladd    number     Add an offset to note-on velocity (clamped 1-127)
@@ -284,6 +285,14 @@ Because transforms run in order, `chord` and `scale` combine into a diatonic har
 routemidi in "Keyboard" scale C minor out "Synth"       # keep a solo in C minor
 routemidi in "Keyboard" chord 4 7 out "Synth"           # play major triads
 routemidi in "Keyboard" chord 4 7 scale C major out "Synth"  # diatonic triads in C major
+```
+
+The `latch` transform keeps notes sounding after their keys are released, so you can hold a drone or a chord without keeping your fingers down. It has two modes, given as an optional argument. In `toggle` mode (the default) each press of a note flips it on or off: press a key to start it, press the same key again to stop it. In `hold` mode the note or chord you play keeps sounding until you start a new gesture, and pressing a fresh key (after letting go of all the others) releases the previous notes and latches the new ones, like an arpeggiator's hold. Incoming note-offs are swallowed in both modes, and everything is released when the route hits `panic` (on disconnect, exit or an MPE zone change). Because transforms run in order, putting `latch` after `chord` latches whole generated chords at once.
+
+```
+routemidi in "Keyboard" latch out "Synth"               # tap notes to toggle a drone
+routemidi in "Keyboard" latch hold out "Synth"          # hold the last chord you played
+routemidi in "Keyboard" chord 4 7 latch hold out "Synth"  # hold whole triads hands-free
 ```
 
 For ultimate flexibility, the `js` and `jsf` commands run JavaScript on each message and can inspect it, rewrite it, drop it, or emit additional messages (so one note can become a chord, for instance). See the [JAVASCRIPT.md](JAVASCRIPT.md) documentation file for details.

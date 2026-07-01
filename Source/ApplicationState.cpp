@@ -231,6 +231,7 @@ ApplicationState::ApplicationState()
     commands_.add({"notepc",    "note-to-program-change", NOTE_TO_PROGRAM,         2, {"note", "program"},  {"Turn a note-on into a Program Change (note-off dropped)"}});
     commands_.add({"scale",     "",                       SCALE,                   2, {"root", "scale"},    {"Snap notes to the nearest note of a scale (root, name)"}});
     commands_.add({"chord",     "",                       CHORD,                  -1, {"intervals"},        {"Stack notes at the given semitone intervals (a chord)"}});
+    commands_.add({"latch",     "",                       LATCH,                  -1, {"(mode)"},           {"Keep notes on after release; toggle (default) or hold"}});
     commands_.add({"velscale",  "velocity-scale",         VELOCITY_SCALE,          1, {"factor"},           {"Scale note-on velocity by a factor (clamped 1-127)"}});
     commands_.add({"velset",    "velocity-set",           VELOCITY_SET,            1, {"number"},           {"Set a fixed note-on velocity (1-127)"}});
     commands_.add({"veladd",    "velocity-add",           VELOCITY_ADD,            1, {"number"},           {"Add an offset to note-on velocity (clamped 1-127)"}});
@@ -1129,6 +1130,12 @@ void ApplicationState::sendPanic(Route& route)
             dest->out->sendMessageNow(MidiMessage::controllerEvent(channel, 123, 0));  // all notes off
         }
     }
+
+    // the all-notes-off above silences any latched notes, so drop their state too
+    for (auto* input : route.inputs)
+    {
+        input->latch.clear();
+    }
 }
 
 void ApplicationState::sendZoneReset(Route& route)
@@ -1147,6 +1154,12 @@ void ApplicationState::sendZoneReset(Route& route)
             dest->out->sendMessageNow(MidiMessage::controllerEvent(channel, 121, 0));  // reset all controllers
         }
     }
+
+    // a zone change flushes stuck notes downstream, so drop latched state as well
+    for (auto* input : route.inputs)
+    {
+        input->latch.clear();
+    }
 }
 
 void ApplicationState::routeMessage(Route& route, RouteInput& input, const MidiMessage& msg)
@@ -1163,7 +1176,7 @@ void ApplicationState::routeMessage(Route& route, RouteInput& input, const MidiM
     }
 
     Array<MidiMessage> outputMessages;
-    for (auto& transformed : applyTransforms(route, msg))
+    for (auto& transformed : applyTransforms(route, input, msg))
     {
         // the MPE stage may rechannel a message or, when expanding, turn one
         // message into several, before the converter stage runs
@@ -1545,7 +1558,7 @@ bool ApplicationState::passesFilters(Route& route, const MidiMessage& msg)
     return whitelistOK && !negativeMatched;
 }
 
-Array<MidiMessage> ApplicationState::applyTransforms(Route& route, const MidiMessage& msg)
+Array<MidiMessage> ApplicationState::applyTransforms(Route& route, RouteInput& input, const MidiMessage& msg)
 {
     Array<MidiMessage> current;
     current.add(msg);
@@ -1591,6 +1604,13 @@ Array<MidiMessage> ApplicationState::applyTransforms(Route& route, const MidiMes
                         next.add(chordNote);
                     }
                 }
+            }
+            else if (cmd.command_ == LATCH)
+            {
+                // keeps notes sounding after release; toggle flips a note per
+                // press, hold replaces the held chord when a new gesture starts
+                const bool hold = cmd.opts_.size() > 0 && cmd.opts_[0].equalsIgnoreCase("hold");
+                input.latch.process(hold, m, next);
             }
             else
             {
