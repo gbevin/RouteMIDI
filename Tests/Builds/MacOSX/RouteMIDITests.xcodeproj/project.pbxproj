@@ -49,6 +49,7 @@
 		26805B057A76A735FEA3254B /* BitScaling.h */ /* BitScaling.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = BitScaling.h; path = ../../../Source/BitScaling.h; sourceTree = SOURCE_ROOT; };
 		2B54B313A59D8706066CF382 /* juce_core */ /* juce_core */ = {isa = PBXFileReference; lastKnownFileType = folder; name = juce_core; path = ../../../JuceLibraryCode/modules/juce_core; sourceTree = SOURCE_ROOT; };
 		41B62099CE86C4F708E1D8A8 /* ScalingTests.cpp */ /* ScalingTests.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = ScalingTests.cpp; path = ../../ScalingTests.cpp; sourceTree = SOURCE_ROOT; };
+		58D0B3575FB9968BBAA517F1 /* Conversion.h */ /* Conversion.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Conversion.h; path = ../../../Source/Conversion.h; sourceTree = SOURCE_ROOT; };
 		5D1A2B5BC83A77B74BBA4212 /* JuceHeader.h */ /* JuceHeader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = JuceHeader.h; path = ../../JuceLibraryCode/JuceHeader.h; sourceTree = SOURCE_ROOT; };
 		607B019A04F2ADB1658D69C9 /* AppConfig.h */ /* AppConfig.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = AppConfig.h; path = ../../JuceLibraryCode/AppConfig.h; sourceTree = SOURCE_ROOT; };
 		623DB344C4CFD3EB80F45955 /* Mpe.h */ /* Mpe.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Mpe.h; path = ../../../Source/Mpe.h; sourceTree = SOURCE_ROOT; };
@@ -161,6 +162,7 @@
 				BD7E02A8D06EAE2E568F40AF,
 				26805B057A76A735FEA3254B,
 				62460F70AA75475EFD62FB30,
+				58D0B3575FB9968BBAA517F1,
 				113BCE723884E45DD7A8FC4F,
 				72E9C82602A4CA1128EC1E47,
 				623DB344C4CFD3EB80F45955,
