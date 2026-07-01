@@ -6,7 +6,15 @@ Note that this is not fully standards-compliant, and is not as fast as the fancy
 
 JavaScript code can be provided directly on the command line by using `js` or `javascript`, but the code can also be read from a file by using the `jsf` and `javascript-file` commands. A `js`/`jsf` command applies to the current route, and runs in the order it appears among that route's transforms, so you can combine it with the native transforms.
 
-The engine that is running the code is stateful and processes all the MIDI messages with the same code. This can be used to make more complex decisions by looking at multiple MIDI messages and keeping track of the state in global variables.
+The engine that is running the code is stateful and processes all the MIDI messages with the same code. This can be used to make more complex decisions by looking at multiple MIDI messages and keeping track of the state in global variables. Any global variable you set survives from one message to the next, so you can keep counters, remember earlier notes, or count clock ticks.
+
+For example, this accents every fourth note-on by keeping a running count in a global variable:
+
+```
+routemidi in "Keyboard" \
+  js "if (MIDI.isNoteOn()) { if (typeof count == 'undefined') count = 0; if (++count % 4 == 0) MIDI.setVelocity(127); }" \
+  out "Synth"
+```
 
 For instance, this route transposes every note up an octave, forces a fixed velocity, and drops the sustain pedal, all in one script:
 
@@ -42,7 +50,7 @@ MIDI.block();                  // drop this message, alias drop()
 
 ## Emitting extra messages
 
-A script can emit additional MIDI messages, which are forwarded to the route's output ports alongside the current message (or instead of it, if you also call `block()`). This lets one input message turn into several — for instance a chord from a single note, or a CC alongside a note.
+A script can emit additional MIDI messages, which are forwarded to the route's output ports alongside the current message (or instead of it, if you also call `block()`). This lets one input message turn into several, for instance a chord from a single note, or a CC alongside a note.
 
 ```javascript
 MIDI.sendNoteOn(channel, note, velocity);
@@ -70,6 +78,8 @@ Util.print('some text');
 Util.println('some text with newline');
 Util.sleep(<milliseconds>);
 ```
+
+Because the script runs synchronously as each message passes through, `Util.sleep` blocks the whole route for its duration: the current message and every message queued behind it are held up. It's fine for pacing a generated or offline stream, but avoid it when routing a live instrument.
 
 ## Sending OSC messages
 

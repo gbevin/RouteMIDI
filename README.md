@@ -224,7 +224,7 @@ Prefix any filter with `not` to make it block instead: matching messages are dro
 
 The `ch` command narrows a route to a single MIDI channel; combined with type filters it restricts them to that channel.
 
-The number that selects which message a filter matches — for `ch`, `on`, `off`, `pp`, `cc`, `cc14` and `pc` — may be a single value or an inclusive range written as `lo..hi`. The range form also accepts note names. The `..` separator is used (rather than `-`) so it doesn't clash with note names like `C-2`.
+The number that selects which message a filter matches (for `ch`, `on`, `off`, `pp`, `cc`, `cc14` and `pc`) may be a single value or an inclusive range written as `lo..hi`. The range form also accepts note names. The `..` separator is used (rather than `-`) so it doesn't clash with note names like `C-2`.
 
 ```
 routemidi in "Keyboard" cc 1..10 out "Synth"        # only CC 1 through 10
@@ -277,7 +277,7 @@ routemidi in "Keyboard" velcurve 0.5 out "Synth"        # easier to play loud
 routemidi in "Fader" cccurve 7 2.0 out "Mixer"          # finer control at low end
 ```
 
-Two more velocity transforms tame dynamics. `velclip` clamps note-on velocity into a `min max` window (the order of the two bounds doesn't matter), so nothing plays quieter or louder than you want. `velcomp` squeezes velocity toward the mid-range by an amount from 0 to 1: `1` leaves it untouched, `0.5` halves the distance from the centre, and `0` flattens everything to a single value — a quick way to even out an uneven playing hand.
+Two more velocity transforms tame dynamics. `velclip` clamps note-on velocity into a `min max` window (the order of the two bounds doesn't matter), so nothing plays quieter or louder than you want. `velcomp` squeezes velocity toward the mid-range by an amount from 0 to 1: `1` leaves it untouched, `0.5` halves the distance from the centre, and `0` flattens everything to a single value, a quick way to even out an uneven playing hand.
 
 ```
 routemidi in "Keyboard" velclip 40 100 out "Synth"      # never too soft or too loud
@@ -350,7 +350,7 @@ routemidi in "Keyboard" latch hold out "Synth"          # hold the last chord yo
 routemidi in "Keyboard" chord 4 7 latch hold out "Synth"  # hold whole triads hands-free
 ```
 
-The `mono` transform forces monophony — only one note sounds at a time — which is handy for driving a mono synth from a polyphonic controller. When you hold several notes it picks the winner by an optional priority: `last` (the default) lets each new note take over, `low` keeps the lowest held note (classic bass-synth behaviour) and `high` the highest. Releasing the sounding note falls back to the next note still held, retriggered at its own velocity, and notes that lose priority simply wait silently until they win it. It works per channel, so to collapse a polyphonic MPE performance onto one mono synth, put a `chset` in front of it (or run it after an MPE collapse) to bring the notes onto a single channel first.
+The `mono` transform forces monophony (only one note sounds at a time), which is handy for driving a mono synth from a polyphonic controller. When you hold several notes it picks the winner by an optional priority: `last` (the default) lets each new note take over, `low` keeps the lowest held note (classic bass-synth behaviour) and `high` the highest. Releasing the sounding note falls back to the next note still held, retriggered at its own velocity, and notes that lose priority simply wait silently until they win it. It works per channel, so to collapse a polyphonic MPE performance onto one mono synth, put a `chset` in front of it (or run it after an MPE collapse) to bring the notes onto a single channel first.
 
 ```
 routemidi in "Keyboard" mono out "Synth"                # last-note mono
@@ -383,9 +383,9 @@ where each type is one of:
 
 The `cc`, `cc14`, `rpn` and `nrpn` types are followed by a number selecting which controller or parameter. The `pb`, `cp` and `pc` types have a single value per channel, so they take no number.
 
-`pp` is the only per-*note* type, so its number is a note (a name like `C3` or a number). Because poly pressure carries a note that the other types don't, the note behaves differently on each side: as a **destination** it is required (poly pressure has to land on a specific note), while as a **source** it is optional — give one to convert just that note, or omit it to fold *every* note's poly pressure into the destination. That "any note" collapse (`convert pp cp`) is the usual way to feed a synth that has no poly aftertouch.
+`pp` is the only per-*note* type, so its number is a note (a name like `C3` or a number). Because poly pressure carries a note that the other types don't, the note behaves differently on each side: as a **destination** it is required (poly pressure has to land on a specific note), while as a **source** it is optional: give one to convert just that note, or omit it to fold *every* note's poly pressure into the destination. That "any note" collapse (`convert pp cp`) is the usual way to feed a synth that has no poly aftertouch.
 
-When several notes are held, the any-note collapse combines them with the **maximum** — the destination follows the hardest-pressed key, and drops back when it is released. This matches how MPE itself combines channel pressure (and what RouteMIDI's own `mpemono` does), so the loudest finger drives the value rather than whichever note happened to move last.
+When several notes are held, the any-note collapse combines them with the **maximum**: the destination follows the hardest-pressed key, and drops back when it is released. This matches how MPE itself combines channel pressure (and what RouteMIDI's own `mpemono` does), so the loudest finger drives the value rather than whichever note happened to move last.
 
 ```
 routemidi in "Knobs"  convert nrpn 245 cc14 1   out "Synth"
@@ -409,7 +409,7 @@ Notable details:
 
 ### Transforming RPN and NRPN values
 
-You can also modify an RPN or NRPN value in place, the same way `ccadd`/`ccscale`/`cccurve` modify a Control Change. `rpnadd`/`nrpnadd`, `rpnscale`/`nrpnscale` and `rpncurve`/`nrpncurve` each take the parameter number followed by the offset, factor or gamma, reassemble the (N)RPN from its constituent CCs, apply the change to the assembled value, and regenerate it. The value is clamped to its own resolution (14-bit when a data-entry LSB is present, otherwise 7-bit). Parameter *remapping* doesn't need a dedicated command — `convert nrpn 245 nrpn 1000` re-emits NRPN 245 as NRPN 1000.
+You can also modify an RPN or NRPN value in place, the same way `ccadd`/`ccscale`/`cccurve` modify a Control Change. `rpnadd`/`nrpnadd`, `rpnscale`/`nrpnscale` and `rpncurve`/`nrpncurve` each take the parameter number followed by the offset, factor or gamma, reassemble the (N)RPN from its constituent CCs, apply the change to the assembled value, and regenerate it. The value is clamped to its own resolution (14-bit when a data-entry LSB is present, otherwise 7-bit). Parameter *remapping* doesn't need a dedicated command: `convert nrpn 245 nrpn 1000` re-emits NRPN 245 as NRPN 1000.
 
 ```
 routemidi in "Synth" nrpnscale 1000 0.5 out "Synth"   # halve NRPN 1000's value
@@ -459,7 +459,7 @@ routemidi in "Controller A" out "Synth" \
 `mpemono <zone> <channel>` folds every channel of a zone onto one ordinary channel, so an MPE controller can play a non-MPE synth. The notes all play polyphonically on the one channel, and RouteMIDI combines the zone's Manager (zone-wide) and Member (per-note) expression the way an MPE receiver would, keeping as much per-note expression as a single channel allows:
 
 * **Channel pressure** is combined with the **maximum** of the Manager and Member values, and carried per-note as **polyphonic aftertouch**, so each note keeps its own pressure (the one MPE dimension a single channel *can* still carry per-note).
-* **Pitch bend** is **summed in semitones** (so the per-note 48-semitone range and the 2-semitone zone range combine correctly), with the result expressed at the combined range — RouteMIDI emits an **RPN 0** on the target declaring that range so the synth reproduces it. Because pitch bend is channel-wide, only the most recently triggered (and still held) note's bend is applied, falling back to the previous held note on release.
+* **Pitch bend** is **summed in semitones** (so the per-note 48-semitone range and the 2-semitone zone range combine correctly), with the result expressed at the combined range; RouteMIDI emits an **RPN 0** on the target declaring that range so the synth reproduces it. Because pitch bend is channel-wide, only the most recently triggered (and still held) note's bend is applied, falling back to the previous held note on release.
 * **Timbre (CC 74)** is combined with the **maximum** of the Manager and Member values, also last-note-wins.
 
 ```
@@ -468,7 +468,7 @@ routemidi in "Seaboard" mpemono lower 1 out "Mono Synth"
 
 ### Expanding a single channel to MPE
 
-`mpexp <channel> <zone>` does the opposite: it voice-allocates the notes arriving on one channel across an MPE zone's member channels and emits the zone's MPE Configuration Message so the receiver is set up correctly. Each note is given a member channel, reusing a channel as late as possible — which matters for long releases — and sharing a channel with another note when the polyphony exceeds the member-channel count, rather than stealing an already sounding note. Zone-wide messages (pitch bend, channel pressure, CC) on the source channel are sent to the master channel. **Polyphonic aftertouch** is turned into **per-note channel pressure** on the note's member channel — the mirror image of what collapse does — so a keyboard with poly aftertouch drives each MPE note's pressure independently. Channel pressure is set to zero just before each Note On and Note Off. This "MPE-ifies" a regular keyboard so a downstream MPE synth gives each note its own channel.
+`mpexp <channel> <zone>` does the opposite: it voice-allocates the notes arriving on one channel across an MPE zone's member channels and emits the zone's MPE Configuration Message so the receiver is set up correctly. Each note is given a member channel, reusing a channel as late as possible (which matters for long releases) and sharing a channel with another note when the polyphony exceeds the member-channel count, rather than stealing an already sounding note. Zone-wide messages (pitch bend, channel pressure, CC) on the source channel are sent to the master channel. **Polyphonic aftertouch** is turned into **per-note channel pressure** on the note's member channel (the mirror image of what collapse does), so a keyboard with poly aftertouch drives each MPE note's pressure independently. Channel pressure is set to zero just before each Note On and Note Off. This "MPE-ifies" a regular keyboard so a downstream MPE synth gives each note its own channel.
 
 ```
 routemidi in "Keyboard" mpexp 1 lower:15 out "MPE Synth"
@@ -476,7 +476,7 @@ routemidi in "Keyboard" mpexp 1 lower:15 out "MPE Synth"
 
 ### Splitting MPE across separate output ports
 
-`mpesplit <zone> [channel]` fans an MPE zone out across the route's output ports, treating **each output port as one monophonic voice**. This connects a rack of ordinary mono synths to an MPE controller: a note-on is allocated to a free port (round-robin, stealing the oldest voice when every port is busy), and that note's expression follows it to the same port until it is released. Everything is rechanneled onto a single channel (channel 1 by default, or the optional `channel` argument) so each non-MPE device sees a plain monophonic stream. Because each port carries one voice, the Manager (zone-wide) and that note's Member (per-note) expression are combined per port exactly as in collapse — pitch bend summed in semitones (with an RPN 0 declaring the combined range on the port), channel pressure and CC 74 combined with the maximum. The MPE Configuration Message (RPN 6) is suppressed so the non-MPE devices aren't flooded with it (other RPNs still pass through).
+`mpesplit <zone> [channel]` fans an MPE zone out across the route's output ports, treating **each output port as one monophonic voice**. This connects a rack of ordinary mono synths to an MPE controller: a note-on is allocated to a free port (round-robin, stealing the oldest voice when every port is busy), and that note's expression follows it to the same port until it is released. Everything is rechanneled onto a single channel (channel 1 by default, or the optional `channel` argument) so each non-MPE device sees a plain monophonic stream. Because each port carries one voice, the Manager (zone-wide) and that note's Member (per-note) expression are combined per port exactly as in collapse: pitch bend summed in semitones (with an RPN 0 declaring the combined range on the port), channel pressure and CC 74 combined with the maximum. The MPE Configuration Message (RPN 6) is suppressed so the non-MPE devices aren't flooded with it (other RPNs still pass through).
 
 ```
 # drive three mono synths polyphonically from one MPE controller
@@ -495,13 +495,13 @@ There are as many simultaneous voices as there are output ports; with fewer port
 routemidi in "Seaboard" mpebend lower:15 48 12 out "12-semitone Synth"
 ```
 
-`mpesens <zone> <semitones>` takes the complementary approach: instead of rewriting the bend values, it *declares* the member-channel Pitch Bend Sensitivity by injecting an **RPN 0** on the zone's member channels, for a synth that honours RPN 0. Use it when the synth can adopt the range rather than being stuck at one — then no rescaling is needed and the original values play correctly. RouteMIDI sends the declaration once before the first note and again after each MPE Configuration Message (which resets the receiver's sensitivity to its 48-semitone default).
+`mpesens <zone> <semitones>` takes the complementary approach: instead of rewriting the bend values, it *declares* the member-channel Pitch Bend Sensitivity by injecting an **RPN 0** on the zone's member channels, for a synth that honours RPN 0. Use it when the synth can adopt the range rather than being stuck at one, so no rescaling is needed and the original values play correctly. RouteMIDI sends the declaration once before the first note and again after each MPE Configuration Message (which resets the receiver's sensitivity to its 48-semitone default).
 
 ```
 routemidi in "Seaboard" mpesens lower:15 48 out "Synth"   # tell the synth members bend +/-48
 ```
 
-Use `mpebend` for synths with a fixed bend range, or `mpesens` for synths you can configure — not both, since they would correct the same difference twice.
+Use `mpebend` for synths with a fixed bend range, or `mpesens` for synths you can configure. Don't use both, since they would correct the same difference twice.
 
 ### Zone filters
 
@@ -518,14 +518,14 @@ routemidi in "Seaboard" not mpezone upper:7 out "Synth"
 
 ### Two-zone controllers
 
-A split controller can run a **Lower** zone (master channel 1, members counting up) and an **Upper** zone (master channel 16, members counting down) at the same time, with non-overlapping member ranges — for example `lower:7` (channel 1 + channels 2-8) and `upper:7` (channel 16 + channels 9-15). Each zone is handled independently, so the simplest approach is one route per zone, isolating it with `mpezone`:
+A split controller can run a **Lower** zone (master channel 1, members counting up) and an **Upper** zone (master channel 16, members counting down) at the same time, with non-overlapping member ranges, for example `lower:7` (channel 1 + channels 2-8) and `upper:7` (channel 16 + channels 9-15). Each zone is handled independently, so the simplest approach is one route per zone, isolating it with `mpezone`:
 
 ```
 routemidi in "Seaboard" mpezone lower mpemono lower:7 1 out "Bass" \
           in "Seaboard" mpezone upper mpemono upper:7 2 out "Lead"
 ```
 
-Both zones can also be processed in a single route — a Lower-zone operation and an Upper-zone operation keep separate per-zone state (each gets its own sensitivity defaults, voice allocation, and so on), so they don't interfere:
+Both zones can also be processed in a single route. A Lower-zone operation and an Upper-zone operation keep separate per-zone state (each gets its own sensitivity defaults, voice allocation, and so on), so they don't interfere:
 
 ```
 routemidi in "Linn" mpe lower:7 lower:7 mpe upper:7 upper:7 out "Synth"
@@ -542,7 +542,7 @@ routemidi in "A" in "B" mon src out "Synth"         # show which input each came
 
 ## Panic
 
-Add `panic` to a route to make it send an all-notes-off safety net (sustain off and all-notes-off on every channel) to that route's outputs whenever one of its inputs disconnects, and once more when RouteMIDI exits. This prevents stuck notes when a controller is unplugged mid-performance. It also fires when an **MPE zone is reconfigured** mid-stream — when an MPE Configuration Message changes a zone's member count (or turns the zone off), it sends all-notes-off and reset-all-controllers downstream, since non-MPE devices won't reset themselves.
+Add `panic` to a route to make it send an all-notes-off safety net (sustain off and all-notes-off on every channel) to that route's outputs whenever one of its inputs disconnects, and once more when RouteMIDI exits. This prevents stuck notes when a controller is unplugged mid-performance. It also fires when an **MPE zone is reconfigured** mid-stream: when an MPE Configuration Message changes a zone's member count (or turns the zone off), it sends all-notes-off and reset-all-controllers downstream, since non-MPE devices won't reset themselves.
 
 ```
 routemidi in "Keyboard" panic out "Synth"

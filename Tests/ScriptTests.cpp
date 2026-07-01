@@ -109,6 +109,31 @@ public:
             midi->setMidiMessage(MidiMessage::noteOn(1, 60, (uint8)100));
             expectEquals(midi->getEmitted().size(), 0);
         }
+
+        beginTest("Global state persists across messages");
+        {
+            // the engine is reused for every message, so a global variable set in
+            // one execution is still there in the next -- this is the accent-every-
+            // fourth-note example from JAVASCRIPT.md, which counts note-ons
+            const String accent =
+                "if (MIDI.isNoteOn()) { if (typeof count == 'undefined') count = 0;"
+                " if (++count % 4 == 0) MIDI.setVelocity(127); }";
+
+            int velocities[5] = {};
+            for (int i = 0; i < 5; ++i)
+            {
+                midi->setMidiMessage(MidiMessage::noteOn(1, 60, (uint8)50));
+                auto r = engine.execute(accent);
+                expect(r.wasOk(), r.getErrorMessage());
+                velocities[i] = (int)midi->getMidiMessage().getVelocity();
+            }
+
+            expectEquals(velocities[0], 50);
+            expectEquals(velocities[1], 50);
+            expectEquals(velocities[2], 50);
+            expectEquals(velocities[3], 127);   // the 4th note-on is accented
+            expectEquals(velocities[4], 50);    // and the count keeps going
+        }
     }
 };
 
