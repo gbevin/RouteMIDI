@@ -390,6 +390,84 @@ public:
                               (size_t)syx.getRawDataSize()) == 0);
             }
         }
+
+        beginTest("A long realistic routing spans config, filters, transforms, conversion and monitoring");
+        {
+            // A keyboard into a synth: pass only channel 1 (dropping clock and
+            // aftertouch), transpose up an octave, quantise to C major, shape the
+            // velocity, move everything to channel 5, halve the pitch bend, trim
+            // and remap the mod wheel -- with monitoring switched on for good measure.
+            ApplicationState state;
+            parse(state, "dec omc 3 in Keyboard ch 1 not clock not cp "
+                         "transp 12 scale C major velclip 40 120 veladd 10 chset 5 pbscale 0.5 ccadd 1 -5 "
+                         "convert cc 1 cc 11 mon nn ts src out Synth");
+
+            // the parser sorted each command into its own stage bucket; the config
+            // and monitoring words (dec, omc, mon, nn, ts, src) stay global
+            expectEquals(state.getRoutes().size(), 1);
+            Route& route = *state.getRoutes().getFirst();
+            expectEquals(route.filters.size(), 3);       // ch, not clock, not cp
+            expectEquals(route.transforms.size(), 7);    // transp scale velclip veladd chset pbscale ccadd
+            expectEquals(route.converters.size(), 1);    // convert cc 1 cc 11
+            expect(route.mpeOps.isEmpty());
+            RouteInput& input = *route.inputs.getFirst();
+
+            // runs a message through the whole transformation pipeline the way
+            // routeMessage does: filters -> transforms -> MPE -> converters
+            auto run = [&state, &route, &input](const MidiMessage& msg)
+            {
+                Array<MidiMessage> out;
+                if (! state.passesFilters(route, msg))
+                    return out;
+                for (auto& t : state.applyTransforms(route, input, msg))
+                {
+                    Array<MidiMessage> afterMpe;
+                    if (route.mpeOps.isEmpty()) afterMpe.add(t);
+                    else                        state.processMpe(route, input, t, afterMpe);
+                    for (auto& m : afterMpe)
+                    {
+                        if (route.converters.isEmpty()) out.add(m);
+                        else                            state.processConverters(route, input, m, out);
+                    }
+                }
+                return out;
+            };
+
+            // a played C#4 climbs an octave, snaps to C in the scale, keeps its
+            // (in-range, boosted) velocity, and lands on channel 5
+            auto a = run(MidiMessage::noteOn(1, 61, (uint8)100));
+            expectEquals(a.size(), 1);
+            expect(a[0].isNoteOn());
+            expectEquals(a[0].getChannel(), 5);
+            expectEquals(a[0].getNoteNumber(), 72);           // 61 +12 -> 73, snapped down to 72
+            expectEquals((int)a[0].getVelocity(), 110);       // 100 (within 40-120) +10
+
+            // a soft note has its velocity clamped up to the floor before the boost
+            auto b = run(MidiMessage::noteOn(1, 60, (uint8)20));
+            expectEquals(b.size(), 1);
+            expectEquals(b[0].getNoteNumber(), 72);           // 60 +12 -> 72, already in scale
+            expectEquals((int)b[0].getVelocity(), 50);        // 20 -> clamped 40 -> +10
+
+            // the mod wheel is trimmed by ccadd and converted to CC 11 on channel 5
+            auto c = run(MidiMessage::controllerEvent(1, 1, 90));
+            expectEquals(c.size(), 1);
+            expect(c[0].isController());
+            expectEquals(c[0].getChannel(), 5);
+            expectEquals(c[0].getControllerNumber(), 11);     // convert cc 1 -> cc 11
+            expectEquals(c[0].getControllerValue(), 85);      // 90 - 5 (ccadd), 7-bit unchanged by convert
+
+            // pitch bend is halved around centre and moved to channel 5
+            auto d = run(MidiMessage::pitchWheel(1, 12288));
+            expectEquals(d.size(), 1);
+            expect(d[0].isPitchWheel());
+            expectEquals(d[0].getChannel(), 5);
+            expectEquals(d[0].getPitchWheelValue(), 10240);   // 8192 + (12288-8192)/2
+
+            // clock and channel pressure are blacklisted, and a wrong channel is out
+            expect(run(MidiMessage::midiClock()).isEmpty());
+            expect(run(MidiMessage::channelPressureChange(1, 50)).isEmpty());
+            expect(run(MidiMessage::noteOn(2, 60, (uint8)100)).isEmpty());
+        }
     }
 };
 
