@@ -150,6 +150,38 @@ static int snapToScale(int note, int root, uint16 mask)
     return -1;
 }
 
+// transposes a note by a number of scale steps, staying within the key: the note
+// is first snapped into the scale, then moved that many degrees up or down
+// (wrapping through octaves); returns -1 when the result falls outside 0-127
+static int diatonicShift(int note, int root, uint16 mask, int steps)
+{
+    int degrees[12];
+    int count = 0;
+    for (int p = 0; p < 12; ++p)
+    {
+        if ((mask >> p) & 1) degrees[count++] = p;
+    }
+    if (count == 0) return note;
+
+    const int snapped = snapToScale(note, root, mask);
+    if (snapped < 0) return -1;
+
+    const int base = snapped - root;
+    const int octave = (int) std::floor(base / 12.0);
+    const int pitchClass = base - 12 * octave;   // 0-11, guaranteed a scale degree
+
+    int index = 0;
+    while (index < count && degrees[index] != pitchClass) ++index;
+    if (index == count) return -1;
+
+    const int target = index + steps;
+    const int newOctave = octave + (int) std::floor((double) target / count);
+    const int newIndex = ((target % count) + count) % count;
+    const int result = root + 12 * newOctave + degrees[newIndex];
+
+    return (result < 0 || result > 127) ? -1 : result;
+}
+
 ApplicationCommand ApplicationCommand::Dummy()
 {
     return {"", "", NONE, 0, {""}, {""}};
@@ -198,6 +230,7 @@ bool ApplicationCommand::isFilter() const
         case TUNE_REQUEST:
         case NOTE_RANGE:
         case VELOCITY_RANGE:
+        case IN_SCALE:
         case MPE_MASTER:
         case MPE_MEMBER:
         case MPE_ZONE:
@@ -215,6 +248,7 @@ bool ApplicationCommand::isTransform() const
         case CHANNEL_SET:
         case CHANNEL_ADD:
         case TRANSPOSE:
+        case DIATONIC_TRANSPOSE:
         case NOTE_MAP:
         case NOTE_TO_CC:
         case CC_TO_NOTE:
@@ -226,6 +260,8 @@ bool ApplicationCommand::isTransform() const
         case VELOCITY_SET:
         case VELOCITY_ADD:
         case VELOCITY_CURVE:
+        case VELOCITY_CLIP:
+        case VELOCITY_COMPRESS:
         case CONTROL_CHANGE_MAP:
         case CONTROL_CHANGE_ADD:
         case CONTROL_CHANGE_SCALE:
@@ -362,6 +398,17 @@ bool ApplicationCommand::matches(ApplicationState& state, const MidiMessage& msg
             return msg.isNoteOn() &&
                 msg.getVelocity() >= state.asDecOrHex7BitValue(opts_[0]) &&
                 msg.getVelocity() <= state.asDecOrHex7BitValue(opts_[1]);
+        case IN_SCALE:
+        {
+            // pass note messages whose note belongs to the given key and scale
+            if (!checkChannel(msg, channelLow, channelHigh) || !(msg.isNoteOnOrOff() || msg.isAftertouch()))
+            {
+                return false;
+            }
+            const uint16 mask = scaleMask(opts_[1]);
+            const int pc = (((msg.getNoteNumber() - parsePitchClass(state, opts_[0])) % 12) + 12) % 12;
+            return (mask >> pc) & 1;
+        }
 
         case MPE_MASTER:
         {
@@ -423,6 +470,24 @@ bool ApplicationCommand::transform(ApplicationState& state, MidiMessage& msg) co
                     return false;
                 }
                 msg.setNoteNumber(note);
+            }
+            break;
+        case DIATONIC_TRANSPOSE:
+            // transpose by scale steps within the given key instead of semitones
+            if (msg.isNoteOnOrOff() || msg.isAftertouch())
+            {
+                const uint16 mask = scaleMask(opts_[1]);
+                if (mask == 0)
+                {
+                    break;   // unrecognised scale, leave the note untouched
+                }
+                const int shifted = diatonicShift(msg.getNoteNumber(), parsePitchClass(state, opts_[0]),
+                                                  mask, state.asDecOrHexIntValue(opts_[2]));
+                if (shifted < 0)
+                {
+                    return false;
+                }
+                msg.setNoteNumber(shifted);
             }
             break;
         case NOTE_MAP:
@@ -511,6 +576,28 @@ bool ApplicationCommand::transform(ApplicationState& state, MidiMessage& msg) co
             if (msg.isNoteOn() && msg.getVelocity() > 0)
             {
                 int v = jlimit(1, 127, applyGammaCurve(msg.getVelocity(), 127, opts_[0].getDoubleValue()));
+                msg = MidiMessage::noteOn(msg.getChannel(), msg.getNoteNumber(), (uint8)v);
+                msg.setTimeStamp(timestamp);
+            }
+            break;
+        case VELOCITY_CLIP:
+            // clamp note-on velocity into a min-max window (order-independent)
+            if (msg.isNoteOn() && msg.getVelocity() > 0)
+            {
+                const int a = jlimit(1, 127, state.asDecOrHexIntValue(opts_[0]));
+                const int b = jlimit(1, 127, state.asDecOrHexIntValue(opts_[1]));
+                int v = jlimit(jmin(a, b), jmax(a, b), (int)msg.getVelocity());
+                msg = MidiMessage::noteOn(msg.getChannel(), msg.getNoteNumber(), (uint8)v);
+                msg.setTimeStamp(timestamp);
+            }
+            break;
+        case VELOCITY_COMPRESS:
+            // squeeze note-on velocity toward the mid-range by the given amount
+            // (1 leaves it unchanged, 0 flattens everything to the centre)
+            if (msg.isNoteOn() && msg.getVelocity() > 0)
+            {
+                const double amount = opts_[0].getDoubleValue();
+                int v = jlimit(1, 127, roundToInt(64.0 + ((int)msg.getVelocity() - 64.0) * amount));
                 msg = MidiMessage::noteOn(msg.getChannel(), msg.getNoteNumber(), (uint8)v);
                 msg.setTimeStamp(timestamp);
             }

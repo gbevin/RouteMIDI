@@ -77,6 +77,39 @@ public:
             expectEquals(m.getNoteNumber(), 37);   // unchanged
         }
 
+        beginTest("Diatonic transpose (shift by scale steps)");
+        {
+            // C major, +2 scale steps: C4 -> E4, D4 -> F4 (a diatonic third)
+            MidiMessage m = MidiMessage::noteOn(1, 60, (uint8)100);
+            expect(makeCommand(DIATONIC_TRANSPOSE, {"C", "major", "2"}).transform(state, m));
+            expectEquals(m.getNoteNumber(), 64);
+
+            m = MidiMessage::noteOn(1, 62, (uint8)100);
+            expect(makeCommand(DIATONIC_TRANSPOSE, {"C", "major", "2"}).transform(state, m));
+            expectEquals(m.getNoteNumber(), 65);
+
+            // negative steps wrap down through the octave: C4 -1 step -> B3
+            m = MidiMessage::noteOn(1, 60, (uint8)100);
+            expect(makeCommand(DIATONIC_TRANSPOSE, {"C", "major", "-1"}).transform(state, m));
+            expectEquals(m.getNoteNumber(), 59);
+
+            // a full seven steps in a heptatonic scale is exactly one octave
+            m = MidiMessage::noteOn(1, 60, (uint8)100);
+            expect(makeCommand(DIATONIC_TRANSPOSE, {"C", "major", "7"}).transform(state, m));
+            expectEquals(m.getNoteNumber(), 72);
+
+            // an out-of-scale note is snapped into the key before shifting: C#4
+            // snaps to C4, then +1 step -> D4
+            m = MidiMessage::noteOn(1, 61, (uint8)100);
+            expect(makeCommand(DIATONIC_TRANSPOSE, {"C", "major", "1"}).transform(state, m));
+            expectEquals(m.getNoteNumber(), 62);
+
+            // an unknown scale leaves the note untouched
+            m = MidiMessage::noteOn(1, 61, (uint8)100);
+            expect(makeCommand(DIATONIC_TRANSPOSE, {"C", "bogus", "2"}).transform(state, m));
+            expectEquals(m.getNoteNumber(), 61);
+        }
+
         beginTest("Message-type conversions (note <-> CC / program change)");
         {
             // notecc: a note becomes a Control Change, velocity as value
@@ -309,6 +342,26 @@ public:
             m = MidiMessage::noteOn(1, 60, (uint8)100);
             expect(makeCommand(VELOCITY_ADD, {"50"}).transform(state, m));
             expectEquals((int)m.getVelocity(), 127);  // clamped to maximum
+
+            // velclip clamps into a window (order of bounds does not matter)
+            m = MidiMessage::noteOn(1, 60, (uint8)10);
+            expect(makeCommand(VELOCITY_CLIP, {"40", "100"}).transform(state, m));
+            expectEquals((int)m.getVelocity(), 40);
+            m = MidiMessage::noteOn(1, 60, (uint8)127);
+            expect(makeCommand(VELOCITY_CLIP, {"40", "100"}).transform(state, m));
+            expectEquals((int)m.getVelocity(), 100);
+            m = MidiMessage::noteOn(1, 60, (uint8)64);
+            expect(makeCommand(VELOCITY_CLIP, {"100", "40"}).transform(state, m));  // reversed bounds
+            expectEquals((int)m.getVelocity(), 64);
+
+            // velcomp squeezes toward the mid-range (64): amount 0.5 halves the
+            // distance, amount 1 leaves it unchanged
+            m = MidiMessage::noteOn(1, 60, (uint8)100);
+            expect(makeCommand(VELOCITY_COMPRESS, {"0.5"}).transform(state, m));
+            expectEquals((int)m.getVelocity(), 82);   // 64 + (100-64)*0.5
+            m = MidiMessage::noteOn(1, 60, (uint8)20);
+            expect(makeCommand(VELOCITY_COMPRESS, {"0.5"}).transform(state, m));
+            expectEquals((int)m.getVelocity(), 42);   // 64 + (20-64)*0.5
 
             // note-off velocity is left untouched
             m = MidiMessage::noteOff(1, 60, (uint8)80);

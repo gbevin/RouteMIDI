@@ -83,6 +83,7 @@ Filters:
   tun                  Pass Tune Request
   noterange low high   Pass notes within a note range (key split)
   velrange  low high   Pass note-ons within a velocity range (vel split)
+  inscale   root scale Pass notes that belong to a scale (root and name)
   mpemaster zone[:n]   Pass the master channel of an MPE zone (e.g. lower)
   mpemember zone[:n]   Pass the member channels of an MPE zone (e.g. upper:7)
   mpezone   zone[:n]   Pass a whole MPE zone (its master and member channels)
@@ -92,6 +93,8 @@ Transforms:
   chset     number     Force all channel-voice messages onto a channel
   chadd     number     Add N to the channel, wrapping 1-16 (may be negative)
   transp    semitones  Transpose notes by N semitones (out-of-range dropped)
+  dtransp   root scale Transpose within a scale by N scale steps (stays in key)
+            steps
   notemap   from to    Remap a specific note number to another
   scale     root scale Snap notes to the nearest note of a scale (root, name)
   chord     intervals  Stack notes at the given semitone intervals (a chord)
@@ -104,6 +107,8 @@ Transforms:
   velset    number     Set a fixed note-on velocity (1-127)
   veladd    number     Add an offset to note-on velocity (clamped 1-127)
   velcurve  gamma      Apply a gamma curve to note-on velocity (1-127)
+  velclip   min max    Clamp note-on velocity into a min-max range
+  velcomp   amount     Squeeze note-on velocity toward the mid-range (0-1)
   ccmap     from to    Remap a Control Change controller number
   ccadd     number     Add an offset to a controller's value (clamped 0-127)
             value
@@ -167,10 +172,11 @@ Alternatively, you can use the following long versions of the commands:
   poly-pressure control-change control-change-14 program-change
   channel-pressure pitch-bend system-realtime continue active-sensing reset
   system-common system-exclusive system-exclusive-file time-code song-position
-  song-select tune-request note-range velocity-range mpe-master mpe-member
-  mpe-zone channel-map channel-set channel-add transpose note-map
-  note-to-control-change control-change-to-note note-to-program-change
-  velocity-scale velocity-set velocity-add velocity-curve control-change-map
+  song-select tune-request note-range velocity-range in-scale mpe-master
+  mpe-member mpe-zone channel-map channel-set channel-add transpose
+  diatonic-transpose note-map note-to-control-change control-change-to-note
+  note-to-program-change velocity-scale velocity-set velocity-add
+  velocity-curve velocity-clip velocity-compress control-change-map
   control-change-add control-change-scale control-change-curve
   program-change-map program-change-add pitch-bend-add pitch-bend-scale
   pitch-bend-set channel-pressure-add channel-pressure-scale
@@ -219,11 +225,14 @@ The `noterange` and `velrange` filters pass notes within a note or velocity rang
 
 The `cc14`, `nrpn` and `rpn` filters match the constituent Control Change messages of a 14-bit CC, an NRPN or an RPN. `cc14` without a number passes every 14-bit-capable controller (MSB 0-31 together with its LSB 32-63), or with a number just that MSB controller and its LSB. `nrpn` passes the NRPN traffic (CC 98, 99 plus the data-entry CC 6, 38) and `rpn` the RPN traffic (CC 100, 101 plus CC 6, 38).
 
+The `inscale` filter passes only the notes that belong to a key, taking a root and a scale name from the [same list as the `scale` transform](#transforms). It's the filtering counterpart of `scale`: where `scale` bends stray notes onto the nearest scale note, `inscale` simply drops them (and `not inscale` keeps only the out-of-key notes). It matches note-ons, note-offs and poly pressure together, so a note that passes is always released.
+
 ```
 routemidi in "Keyboard" note out "Synth"            # only note messages
 routemidi in "Keyboard" not clock out "Synth"       # everything except clock
 routemidi in "Keyboard" ch 1 cc 1 out "Synth"       # only CC 1 on channel 1
 routemidi in "Knobs" rpn out "Synth"                # only RPN traffic
+routemidi in "Keyboard" inscale C major out "Synth" # only notes in C major
 # key split: bottom half to a bass, top half to a lead
 routemidi in "Keyboard" noterange C-2 B2 out "Bass" \
           in "Keyboard" noterange C3 G8 out "Lead"
@@ -248,6 +257,13 @@ The `velcurve`, `cccurve` and `cpcurve` transforms apply a gamma curve to note-o
 ```
 routemidi in "Keyboard" velcurve 0.5 out "Synth"        # easier to play loud
 routemidi in "Fader" cccurve 7 2.0 out "Mixer"          # finer control at low end
+```
+
+Two more velocity transforms tame dynamics. `velclip` clamps note-on velocity into a `min max` window (the order of the two bounds doesn't matter), so nothing plays quieter or louder than you want. `velcomp` squeezes velocity toward the mid-range by an amount from 0 to 1: `1` leaves it untouched, `0.5` halves the distance from the centre, and `0` flattens everything to a single value — a quick way to even out an uneven playing hand.
+
+```
+routemidi in "Keyboard" velclip 40 100 out "Synth"      # never too soft or too loud
+routemidi in "Keyboard" velcomp 0.5 out "Synth"         # tighten the dynamic range
 ```
 
 A few transforms change a message from one type to another. `notecc` turns a specific note into a Control Change (the note-on velocity becomes the value, and the note-off sends 0); `ccnote` turns a Control Change into a note (a value of 64 or more triggers a note-on with that value as the velocity, below 64 a note-off); and `notepc` turns a note-on into a Program Change (the note-off is dropped). `ccnote` is aimed at switch- or pedal-style controllers; a continuously changing CC would retrigger the note. Since `notecc` uses the velocity as the value, put a `velset` in front of it for a fixed value.
@@ -290,6 +306,13 @@ These scale names are supported (aliases in parentheses):
 | `fifth` (`power`, `5th`) | 0 7 |
 
 You can also give a custom scale as a comma-separated list of semitone degrees from the root, for instance `scale D 0,2,3,5,7,9,10` for a D minor scale.
+
+The `dtransp` transform is a diatonic transpose: it shifts notes by a number of *scale steps* within a key rather than by a fixed number of semitones, so the result always stays in the scale. It takes a root, a scale name (the same list as `scale`) and a step count that may be negative. In C major, `dtransp C major 2` turns every note into the note a diatonic third above it (C becomes E, D becomes F, and so on), and seven steps of a seven-note scale is exactly one octave. Notes that aren't already in the key are snapped into it before the shift. This is different from `transp`, which moves everything by the same chromatic interval regardless of key.
+
+```
+routemidi in "Keyboard" dtransp C major 2 out "Synth"   # harmonize a diatonic third up
+routemidi in "Keyboard" dtransp A minor -2 out "Synth"  # a third down, staying in A minor
+```
 
 The `chord` transform turns each note into a chord by stacking extra notes at fixed semitone intervals above (or below) the one that was played. `chord 4 7` adds a major third and a fifth, `chord 3 7` a minor third and a fifth, and negative intervals stack notes underneath (`chord -12` doubles an octave down). Each note-on emits the whole chord and each note-off releases it, and chord notes that fall outside 0-127 are dropped.
 

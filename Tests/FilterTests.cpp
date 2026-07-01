@@ -151,6 +151,35 @@ public:
             expect(! state.passesFilters(route, MidiMessage::controllerEvent(1, 7, 100)));
         }
 
+        beginTest("inscale passes only notes that belong to the key");
+        {
+            Route route;
+            route.filters.add(makeCommand(IN_SCALE, {"C", "major"}));
+            expect(  state.passesFilters(route, MidiMessage::noteOn(1, 60, (uint8)100)));   // C
+            expect(  state.passesFilters(route, MidiMessage::noteOn(1, 62, (uint8)100)));   // D
+            expect(! state.passesFilters(route, MidiMessage::noteOn(1, 61, (uint8)100)));   // C#
+            expect(! state.passesFilters(route, MidiMessage::noteOn(1, 66, (uint8)100)));   // F#
+            expect(  state.passesFilters(route, MidiMessage::noteOff(1, 60, (uint8)0)));    // in-key off
+            expect(! state.passesFilters(route, MidiMessage::noteOff(1, 61, (uint8)0)));    // out-of-key off
+            expect(! state.passesFilters(route, MidiMessage::controllerEvent(1, 7, 100)));  // non-note
+
+            // the root and scale matter: F# belongs to G major
+            Route g;
+            g.filters.add(makeCommand(IN_SCALE, {"G", "major"}));
+            expect(  state.passesFilters(g, MidiMessage::noteOn(1, 66, (uint8)100)));       // F#
+            expect(! state.passesFilters(g, MidiMessage::noteOn(1, 65, (uint8)100)));       // F natural
+        }
+
+        beginTest("'not inscale' passes only notes outside the key");
+        {
+            Route route;
+            ApplicationCommand cmd = makeCommand(IN_SCALE, {"C", "major"});
+            cmd.negate_ = true;
+            route.filters.add(cmd);
+            expect(! state.passesFilters(route, MidiMessage::noteOn(1, 60, (uint8)100)));   // C in key, blocked
+            expect(  state.passesFilters(route, MidiMessage::noteOn(1, 61, (uint8)100)));   // C# out of key, passes
+        }
+
         beginTest("cc14 matches an MSB/LSB controller pair");
         {
             // without a number, any 14-bit-capable controller (MSB 0-31) passes
