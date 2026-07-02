@@ -336,7 +336,9 @@ public:
                 route.transforms.add(makeCommand(MONO, opts));
                 Array<MidiMessage> out;
                 for (const auto& m : in)
+                {
                     out.addArray(state.applyTransforms(route, *route.inputs[0], m));
+                }
                 return out;
             };
 
@@ -357,8 +359,12 @@ public:
             expect(got == StringArray({ "on 60", "off 60", "on 64", "off 64", "on 60", "off 60" }));
             // the fallback note keeps its own velocity
             for (const auto& m : out)
+            {
                 if (m.isNoteOn() && m.getNoteNumber() == 60)
+                {
                     expectEquals((int)m.getVelocity(), 100);
+                }
+            }
 
             // low-note priority: a higher note waits under a held lower one
             out = runMono({"low"}, {

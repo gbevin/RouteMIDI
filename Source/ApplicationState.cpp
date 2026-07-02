@@ -414,10 +414,16 @@ void ApplicationState::timerCallback()
                 // done locked, and only if the input still wants it
                 String identifier, fullName;
                 for (auto&& d : availableIns)
+                {
                     if (d.name == toConnect) { identifier = d.identifier; fullName = d.name; break; }
+                }
                 if (identifier.isEmpty())
+                {
                     for (auto&& d : availableIns)
+                    {
                         if (d.name.containsIgnoreCase(toConnect)) { identifier = d.identifier; fullName = d.name; break; }
+                    }
+                }
 
                 if (identifier.isNotEmpty())
                 {
@@ -463,7 +469,9 @@ void ApplicationState::timerCallback()
 
             String identifier, fullName;
             for (auto&& device : availableOuts)
+            {
                 if (device.name.containsIgnoreCase(toOpen)) { identifier = device.identifier; fullName = device.name; break; }
+            }
 
             if (identifier.isNotEmpty())
             {
@@ -1551,7 +1559,9 @@ void ApplicationState::processConverters(Route& route, RouteInput& input, const 
     // converters are only appended at setup, so a size mismatch means the compiled
     // cache is stale; rebuild it once and then match rules without parsing strings
     if (route.convertRules.size() != route.converters.size())
+    {
         rebuildConvertRules(route);
+    }
 
     conversion::processMessage(route.convertRules, input.conv, msg, output);
 }

@@ -332,7 +332,9 @@ int Splitter::oldestPort(int ports)
 {
     int best = 0;
     for (int p = 1; p < ports; ++p)
+    {
         if (portOrder[(size_t) p] < portOrder[(size_t) best]) best = p;
+    }
     return best;
 }
 
@@ -358,7 +360,9 @@ void relocate(Relocator& rel, const Zone& src, const Zone& dst,
             if (cc == 101) rel.masterRpnMsb = v;
             else if (cc == 100) rel.masterRpnLsb = v;
             else if (cc == 6 && rel.masterRpnMsb == 0 && rel.masterRpnLsb == 6)
+            {
                 out = MidiMessage::controllerEvent(dst.masterChannel(), 6, dst.members);
+            }
         }
         out.setTimeStamp(ts);
         output.add(out);

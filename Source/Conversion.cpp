@@ -231,8 +231,12 @@ int State::selectedParam(int ch) const
 static bool hasRpnRule(const Array<Rule>& rules)
 {
     for (const auto& r : rules)
+    {
         if (r.isTransform || r.src == Rpn || r.src == Nrpn)
+        {
             return true;
+        }
+    }
     return false;
 }
 
@@ -249,7 +253,9 @@ static void convertNonController(const Array<Rule>& rules, State& state,
     {
         bool anyNotePP = false;
         for (const auto& r : rules)
+        {
             if (! r.isTransform && r.src == Pp && r.srcNum == -1) { anyNotePP = true; break; }
+        }
 
         if (anyNotePP)
         {
@@ -264,9 +270,15 @@ static void convertNonController(const Array<Rule>& rules, State& state,
             {
                 const int maxP = state.pressure.maxPressure(ch);
                 if (state.pressure.changed(ch, maxP))
+                {
                     for (const auto& r : rules)
+                    {
                         if (! r.isTransform && r.src == Pp && r.srcNum == -1)
+                        {
                             emit(output, ch, maxP, 7, r.dst, r.dstNum, r.method, ts);
+                        }
+                    }
+                }
             }
 
             if (msg.isAftertouch())
@@ -274,8 +286,12 @@ static void convertNonController(const Array<Rule>& rules, State& state,
                 // rules for this specific note still see the pressure before the
                 // collapse consumes it, so any-note and per-note conversions coexist
                 for (const auto& r : rules)
+                {
                     if (! r.isTransform && r.src == Pp && r.srcNum == msg.getNoteNumber())
+                    {
                         emit(output, ch, msg.getAfterTouchValue(), 7, r.dst, r.dstNum, r.method, ts);
+                    }
+                }
                 return;   // the poly pressure is consumed by the collapse
             }
             // note-ons and note-offs fall through to pass the note message onward
@@ -303,7 +319,9 @@ static void convertNonController(const Array<Rule>& rules, State& state,
         }
     }
     if (matched)
+    {
         return;
+    }
 
     output.add(msg);
 }
@@ -328,16 +346,22 @@ static void convertRpnSet(const Array<Rule>& rules, State& state,
         {
             if (! r.isTransform && ((r.src == Rpn && ! isNRPN) || (r.src == Nrpn && isNRPN))
                 && r.srcNum == param)
+            {
                 return true;
+            }
             if (r.isTransform && r.nrpn == isNRPN && r.param == param)
+            {
                 return true;
+            }
         }
         return false;
     };
     auto flushSelects = [&]()
     {
         for (int i = 0; i < state.selBufLen[ch - 1]; ++i)
+        {
             output.add(state.selBuf[ch - 1][i]);
+        }
         state.selBufLen[ch - 1] = 0;
     };
 
@@ -351,7 +375,9 @@ static void convertRpnSet(const Array<Rule>& rules, State& state,
     if (cc >= 98 && cc <= 101)
     {
         if (state.selBufLen[ch - 1] >= 4)   // shouldn't happen; drain as a safety valve
+        {
             flushSelects();
+        }
         state.selBuf[ch - 1][state.selBufLen[ch - 1]++] = msg;
 
         int msb = -1, lsb = -1;
@@ -371,9 +397,13 @@ static void convertRpnSet(const Array<Rule>& rules, State& state,
             const bool drop = isNull ? state.selIntercepted[ch - 1]
                                      : paramIntercepted(param, nrpnSel);
             if (drop)
+            {
                 state.selBufLen[ch - 1] = 0;   // replaced by the conversion output
+            }
             else
+            {
                 flushSelects();                // pass through unchanged
+            }
             // a real select updates which parameter is active; a null deselects
             state.selIntercepted[ch - 1] = isNull ? false : drop;
         }
@@ -388,7 +418,9 @@ static void convertRpnSet(const Array<Rule>& rules, State& state,
     {
         const int param = state.selectedParam(ch);
         if (param >= 0 && paramIntercepted(param, state.selectionIsNrpn(ch)))
+        {
             return;
+        }
         flushSelects();
         output.add(msg);
         return;
@@ -445,11 +477,15 @@ static void convertRpnSet(const Array<Rule>& rules, State& state,
                     state.selIntercepted[ch - 1] = true;   // and consume the closing null
                     converted = true;
                     if (! awaitLsb)
+                    {
                         emit(output, ch, value, bits, r.dst, r.dstNum, r.method, ts);
+                    }
                 }
             }
             if (converted)
+            {
                 return;
+            }
 
             // value transform (add/scale/curve): apply every matching rule in
             // order and regenerate the (N)RPN with the modified value
@@ -459,7 +495,9 @@ static void convertRpnSet(const Array<Rule>& rules, State& state,
             for (const auto& r : rules)
             {
                 if (! r.isTransform || r.nrpn != nrpn || r.param != param)
+                {
                     continue;
+                }
                 transformed = true;
                 switch (r.op)
                 {
@@ -490,7 +528,9 @@ static void convertRpnSet(const Array<Rule>& rules, State& state,
                 state.selBufLen[ch - 1] = 0;
                 state.selIntercepted[ch - 1] = true;
                 if (! awaitLsb)
+                {
                     emitRpn(output, ch, param, newValue, nrpn, bits == 14, ts);
+                }
                 return;
             }
         }
@@ -522,7 +562,9 @@ static bool convertCc(const Array<Rule>& rules, State& state,
 
         bool targeted = false;
         for (const auto& r : rules)
+        {
             if (! r.isTransform && r.src == Cc14 && (r.srcNum & 0x1f) == n) { targeted = true; break; }
+        }
 
         if (targeted)
         {
@@ -531,8 +573,12 @@ static bool convertCc(const Array<Rule>& rules, State& state,
                 state.cc14LsbSeen[ch - 1][n] = true;
                 const int msb = state.ccMsbValid[ch - 1][n] ? state.ccMsb[ch - 1][n] : 0;
                 for (const auto& r : rules)
+                {
                     if (! r.isTransform && r.src == Cc14 && (r.srcNum & 0x1f) == n)
+                    {
                         emit(output, ch, (msb << 7) | val, 14, r.dst, r.dstNum, r.method, ts);
+                    }
+                }
             }
             else
             {
@@ -545,8 +591,12 @@ static bool convertCc(const Array<Rule>& rules, State& state,
                 else
                 {
                     for (const auto& r : rules)
+                    {
                         if (! r.isTransform && r.src == Cc14 && (r.srcNum & 0x1f) == n)
+                        {
                             emit(output, ch, val, 7, r.dst, r.dstNum, r.method, ts);
+                        }
+                    }
                 }
             }
             return true;
@@ -612,7 +662,9 @@ void processMessage(const Array<Rule>& rules, State& state,
     }
 
     if (convertCc(rules, state, msg, output))
+    {
         return;
+    }
 
     output.add(msg);   // not managed by any conversion rule: forward unchanged
 }

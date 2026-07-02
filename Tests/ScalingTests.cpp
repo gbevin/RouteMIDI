@@ -36,7 +36,9 @@ public:
             const int in[]  = {  0,    5,    30,    32,    64,    70,    96,   120,   127 };
             const int out[] = {  0, 2560, 15360, 16384, 32768, 35888, 49412, 61895, 65535 };
             for (int i = 0; i < numElementsInArray(in); ++i)
+            {
                 expectEquals(scaleValue(in[i], 7, 16, MinCenterMax), out[i]);
+            }
         }
 
         beginTest("Min-Center-Max upscale 7 -> 14 bits (min/center/max preserved)");

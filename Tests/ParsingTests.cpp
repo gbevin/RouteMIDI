@@ -30,7 +30,9 @@ namespace
         params.addTokens(line, true);
         params.removeEmptyStrings(true);
         for (auto& p : params)
+        {
             p = p.trimCharactersAtStart("\"").trimCharactersAtEnd("\"");
+        }
 
         auto* previous = std::cerr.rdbuf(nullptr);
         state.parseParameters(params);
@@ -418,7 +420,9 @@ public:
             {
                 Array<MidiMessage> out;
                 if (! state.passesFilters(route, msg))
+                {
                     return out;
+                }
                 for (auto& t : state.applyTransforms(route, input, msg))
                 {
                     Array<MidiMessage> afterMpe;

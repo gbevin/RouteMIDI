@@ -36,7 +36,9 @@ namespace
 
         Array<MidiMessage> out;
         for (const auto& m : in)
+        {
             state.processMpe(route, input, m, out);
+        }
         return out;
     }
 
@@ -50,11 +52,15 @@ namespace
         Route route;
         route.outputSplit.add(makeCommand(MPE_SPLIT, opts));
         for (int i = 0; i < numPorts; ++i)
+        {
             route.outputs.add(new OutputDest());
+        }
 
         SplitResult r;
         for (const auto& m : in)
+        {
             state.processSplit(route, m, r.msgs, r.ports);
+        }
         return r;
     }
 }
@@ -266,12 +272,14 @@ public:
 
             int bendCount = 0, bend2 = -1, bend3 = -1;
             for (const auto& m : out)
+            {
                 if (m.isPitchWheel())
                 {
                     ++bendCount;
                     if (m.getChannel() == 2) bend2 = m.getPitchWheelValue();
                     if (m.getChannel() == 3) bend3 = m.getPitchWheelValue();
                 }
+            }
             expectEquals(bendCount, 2);     // both per-note bends pass through
             expectEquals(bend2, 9000);
             expectEquals(bend3, 5000);
@@ -364,9 +372,13 @@ public:
             for (const auto& m : out)
             {
                 if (m.isController() && m.getControllerNumber() == 6 && m.getChannel() == 1 && m.getControllerValue() == 3)
+                {
                     mcmForwarded = true;
+                }
                 if (m.isController() && m.getControllerNumber() == 6 && m.getChannel() != 1)
+                {
                     memberSense = m.getControllerValue();
+                }
             }
             expect(mcmForwarded);          // the MCM passes through untouched
             expectEquals(memberSense, 24); // and our sensitivity follows it
@@ -403,7 +415,9 @@ public:
 
             int bend = -1, bendCount = 0;
             for (const auto& m : out)
+            {
                 if (m.isPitchWheel()) { bend = m.getPitchWheelValue(); ++bendCount; }
+            }
             expectEquals(bendCount, 1);
             expectEquals(bend, 7000);
         }
@@ -503,8 +517,12 @@ public:
             expectEquals(at64, 40);
             // and they land on the collapse target channel
             for (const auto& m : out)
+            {
                 if (m.isAftertouch())
+                {
                     expectEquals(m.getChannel(), 1);
+                }
+            }
         }
 
         beginTest("collapse applies pitch bend and CC74 for the active note only");
@@ -608,7 +626,9 @@ public:
 
             int bend = -1, bendCount = 0;
             for (const auto& m : out)
+            {
                 if (m.isPitchWheel()) { bend = m.getPitchWheelValue(); ++bendCount; }
+            }
             expectEquals(bendCount, 1);
             expectEquals(bend, 5128);        // member 2's 5000 summed with neutral Manager at 50-st range
         }
@@ -670,7 +690,9 @@ public:
 
             Array<MidiMessage> out;
             for (const auto& m : in)
+            {
                 state.processMpe(route, input, m, out);
+            }
 
             int onCh1 = 0, onCh2 = 0, upperSense = -1;
             for (const auto& m : out)
@@ -731,8 +753,12 @@ public:
             // collect the channels of the three note-ons (after the config block)
             Array<int> noteChannels;
             for (const auto& m : out)
+            {
                 if (m.isNoteOn())
+                {
                     noteChannels.add(m.getChannel());
+                }
+            }
             expectEquals(noteChannels.size(), 3);
             // a 3-member Lower zone uses channels 2, 3, 4, each once
             expect(noteChannels.contains(2) && noteChannels.contains(3) && noteChannels.contains(4));
@@ -783,7 +809,9 @@ public:
             auto out2 = runMpe(state, MPE_EXPAND, {"1", "lower:1"}, in2);
             int offs = 0;
             for (const auto& m : out2)
+            {
                 if (m.isNoteOff()) { ++offs; expectEquals(m.getChannel(), 2); }
+            }
             expectEquals(offs, 2);
         }
 
@@ -799,7 +827,9 @@ public:
 
             Array<int> onChannels;
             for (const auto& m : out)
+            {
                 if (m.isNoteOn()) onChannels.add(m.getChannel());
+            }
             expectEquals(onChannels.size(), 2);
             expectEquals(onChannels[0], 2);
             expectEquals(onChannels[1], 3);   // postponed reuse of channel 2
@@ -833,7 +863,9 @@ public:
 
             // no notes, so no config block; both go to master channel 1
             for (const auto& m : out)
+            {
                 expectEquals(m.getChannel(), 1);
+            }
             expectEquals(out.size(), 2);
         }
 
@@ -1018,7 +1050,9 @@ public:
             expectEquals(noteOns, 2);
             expectEquals(noteOffs, 1);     // only the explicit note-off, no stolen one
             for (const auto& p : r.ports)
+            {
                 expectEquals(p, 0);
+            }
         }
 
         beginTest("split rechannels onto a chosen target channel");

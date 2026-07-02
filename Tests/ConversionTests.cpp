@@ -27,7 +27,9 @@ namespace
     {
         Array<MidiMessage> in;
         for (const auto meta : MidiRPNGenerator::generate(ch, param, value, isNRPN, use14))
+        {
             in.add(meta.getMessage());
+        }
         return in;
     }
 
@@ -48,7 +50,9 @@ namespace
 
         Array<MidiMessage> out;
         for (const auto& m : in)
+        {
             state.processConverters(route, input, m, out);
+        }
         return out;
     }
 
@@ -56,8 +60,12 @@ namespace
     {
         int v = -1;
         for (const auto& m : out)
+        {
             if (m.isController() && m.getControllerNumber() == ccNum)
+            {
                 v = m.getControllerValue();
+            }
+        }
         return v;
     }
 
@@ -65,8 +73,12 @@ namespace
     {
         int v = -1;
         for (const auto& m : out)
+        {
             if (m.isPitchWheel())
+            {
                 v = m.getPitchWheelValue();
+            }
+        }
         return v;
     }
 
@@ -74,8 +86,12 @@ namespace
     {
         int v = -1;
         for (const auto& m : out)
+        {
             if (m.isChannelPressure())
+            {
                 v = m.getChannelPressureValue();
+            }
+        }
         return v;
     }
 
@@ -83,8 +99,12 @@ namespace
     {
         int v = -1;
         for (const auto& m : out)
+        {
             if (m.isProgramChange())
+            {
                 v = m.getProgramChangeNumber();
+            }
+        }
         return v;
     }
 
@@ -92,8 +112,12 @@ namespace
     {
         int v = -1;
         for (const auto& m : out)
+        {
             if (m.isAftertouch() && m.getNoteNumber() == note)
+            {
                 v = m.getAfterTouchValue();
+            }
+        }
         return v;
     }
 
@@ -109,7 +133,9 @@ namespace
 
         Array<MidiMessage> out;
         for (const auto& m : in)
+        {
             state.processConverters(route, input, m, out);
+        }
         return out;
     }
 
@@ -118,8 +144,12 @@ namespace
     {
         int n = 0;
         for (const auto& m : out)
+        {
             if (m.isController() && m.getControllerNumber() == ccNum && m.getControllerValue() == value)
+            {
                 ++n;
+            }
+        }
         return n;
     }
 
@@ -151,13 +181,17 @@ namespace
     {
         Route route;
         for (const auto& c : cmds)
+        {
             route.converters.add(makeCommand(c.first, c.second));
+        }
         route.inputs.add(new RouteInput());
         auto& input = *route.inputs[0];
 
         Array<MidiMessage> out;
         for (const auto& m : in)
+        {
             state.processConverters(route, input, m, out);
+        }
         return out;
     }
 
@@ -167,12 +201,16 @@ namespace
         MidiRPNDetector detector;
         Array<int> values;
         for (const auto& m : out)
+        {
             if (m.isController())
             {
                 auto parsed = detector.tryParse(m.getChannel(), m.getControllerNumber(), m.getControllerValue());
                 if (parsed.has_value() && parsed->is14BitValue)
+                {
                     values.add(parsed->value);
+                }
             }
+        }
         return values;
     }
 
@@ -180,7 +218,9 @@ namespace
     {
         int n = 0;
         for (const auto& m : out)
+        {
             if (m.isPitchWheel()) ++n;
+        }
         return n;
     }
 }
@@ -459,8 +499,12 @@ public:
 
             Array<int> cps;
             for (const auto& m : out)
+            {
                 if (m.isChannelPressure())
+                {
                     cps.add(m.getChannelPressureValue());
+                }
+            }
 
             expectEquals(cps.size(), 4);           // 100, 40, 30, 0 (the 40-update is suppressed)
             expectEquals(cps[0], 100);
