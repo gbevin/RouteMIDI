@@ -359,7 +359,6 @@ void ApplicationState::timerCallback()
     // Enumerate CoreMIDI devices WITHOUT holding midiCallbackLock_. These queries
     // can take milliseconds, and doing them under the lock stalls the real-time
     // MIDI input callback (which needs the same lock), risking dropped packets.
-    // Snapshot first, then take the lock only to reconcile connection state.
     auto availableIns  = MidiInput::getAvailableDevices();
     auto availableOuts = MidiOutput::getAvailableDevices();
     StringArray inNames;
@@ -368,8 +367,11 @@ void ApplicationState::timerCallback()
         inNames.add(d.name);
     }
 
-    const ScopedLock sl(midiCallbackLock_);
-
+    // The route graph is built entirely during startup and never changes once the
+    // timer is running, so it can be walked without the lock. The lock is taken only
+    // in short bursts around the connection fields the MIDI callback also reads, and
+    // never across a blocking CoreMIDI open below, so the callback waits as little as
+    // possible (holding it across an openDevice was enough to drop incoming packets).
     for (auto* route : routes_)
     {
         for (auto* input : route->inputs)
@@ -379,41 +381,108 @@ void ApplicationState::timerCallback()
                 continue;
             }
 
-            if (input->fullInName.isNotEmpty() && !inNames.contains(input->fullInName))
+            // decide what to do under a brief lock, then act on it unlocked
+            String lostName;    // a previously connected port that just vanished
+            String toConnect;   // an inName still waiting to be (re)connected
             {
-                std::cerr << "MIDI input port \"" << input->fullInName << "\" got disconnected, waiting" << std::endl;
-                input->fullInName = String();
-                input->midiIn = nullptr;
+                const ScopedLock sl(midiCallbackLock_);
+                if (input->fullInName.isNotEmpty() && !inNames.contains(input->fullInName))
+                {
+                    lostName = input->fullInName;
+                    input->fullInName = String();
+                    input->midiIn = nullptr;
+                }
+                else if (input->inName.isNotEmpty() && input->midiIn == nullptr)
+                {
+                    toConnect = input->inName;
+                }
+            }
+
+            if (lostName.isNotEmpty())
+            {
+                std::cerr << "MIDI input port \"" << lostName << "\" got disconnected, waiting" << std::endl;
                 if (route->panic)
                 {
+                    const ScopedLock sl(midiCallbackLock_);
                     sendPanic(*route);
                 }
             }
-            else if (input->inName.isNotEmpty() && input->midiIn == nullptr)
+            else if (toConnect.isNotEmpty())
             {
-                if (tryToConnectInput(*input))
+                // resolve a device from the snapshot (exact name first, then a
+                // substring match) and open it WITHOUT the lock; only the swap-in is
+                // done locked, and only if the input still wants it
+                String identifier, fullName;
+                for (auto&& d : availableIns)
+                    if (d.name == toConnect) { identifier = d.identifier; fullName = d.name; break; }
+                if (identifier.isEmpty())
+                    for (auto&& d : availableIns)
+                        if (d.name.containsIgnoreCase(toConnect)) { identifier = d.identifier; fullName = d.name; break; }
+
+                if (identifier.isNotEmpty())
                 {
-                    std::cerr << "Connected to MIDI input port \"" << input->fullInName << "\"" << std::endl;
+                    std::unique_ptr<MidiInput> opened = MidiInput::openDevice(identifier, this);
+                    if (opened)
+                    {
+                        opened->start();
+                        bool connected = false;
+                        {
+                            const ScopedLock sl(midiCallbackLock_);
+                            if (input->midiIn == nullptr && input->inName == toConnect)
+                            {
+                                input->midiIn.swap(opened);
+                                input->fullInName = fullName;
+                                connected = true;
+                            }
+                        }
+                        if (connected)
+                        {
+                            std::cerr << "Connected to MIDI input port \"" << fullName << "\"" << std::endl;
+                        }
+                        // if not adopted, `opened` closes the device as it goes out of scope
+                    }
                 }
             }
         }
 
-        // retry any output ports that could not be opened yet
+        // retry any output ports that could not be opened yet, opening unlocked
         for (auto* dest : route->outputs)
         {
-            if (!dest->isVirtual && !dest->isStdout && dest->out == nullptr && dest->name.isNotEmpty())
+            String toOpen;
             {
-                for (auto&& device : availableOuts)
+                const ScopedLock sl(midiCallbackLock_);
+                if (!dest->isVirtual && !dest->isStdout && dest->out == nullptr && dest->name.isNotEmpty())
                 {
-                    if (device.name.containsIgnoreCase(dest->name))
+                    toOpen = dest->name;
+                }
+            }
+            if (toOpen.isEmpty())
+            {
+                continue;
+            }
+
+            String identifier, fullName;
+            for (auto&& device : availableOuts)
+                if (device.name.containsIgnoreCase(toOpen)) { identifier = device.identifier; fullName = device.name; break; }
+
+            if (identifier.isNotEmpty())
+            {
+                std::unique_ptr<MidiOutput> opened = MidiOutput::openDevice(identifier);
+                if (opened)
+                {
+                    bool connected = false;
                     {
-                        dest->out = MidiOutput::openDevice(device.identifier);
-                        if (dest->out)
+                        const ScopedLock sl(midiCallbackLock_);
+                        if (dest->out == nullptr && dest->name == toOpen)
                         {
-                            dest->fullName = device.name;
-                            std::cerr << "Connected to MIDI output port \"" << dest->fullName << "\"" << std::endl;
+                            dest->out.swap(opened);
+                            dest->fullName = fullName;
+                            connected = true;
                         }
-                        break;
+                    }
+                    if (connected)
+                    {
+                        std::cerr << "Connected to MIDI output port \"" << fullName << "\"" << std::endl;
                     }
                 }
             }

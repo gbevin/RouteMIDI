@@ -59,6 +59,13 @@ public:
     void processMpe(Route& route, RouteInput& input, const MidiMessage& msg, Array<MidiMessage>& output);
     void processConverters(Route& route, RouteInput& input, const MidiMessage& msg, Array<MidiMessage>& output);
     void rebuildConvertRules(Route& route);   // compile route.converters to route.convertRules
+    // drives one round of the connect/disconnect reconciliation the timer normally
+    // runs; the test suite uses it to exercise that logic without a live timer
+    void pollConnectionsForTest() { timerCallback(); }
+    // start/stop the background output sender (normally run by initialise); the test
+    // suite uses these to let routed messages actually reach a connected output
+    void startOutputSenderForTest() { startOutputSender(); }
+    void stopOutputSenderForTest()  { stopOutputSender(); }
     // distributes a message across a route's output ports as MPE voices; fills
     // parallel arrays where outPorts[i] is the destination index for outMsgs[i]
     // (-1 means broadcast to every output)

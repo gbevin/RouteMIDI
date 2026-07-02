@@ -85,6 +85,7 @@ OBJECTS_CONSOLEAPP := \
   $(JUCE_OBJDIR)/ParsingTests_ed594946.o \
   $(JUCE_OBJDIR)/ScriptTests_bfe5520b.o \
   $(JUCE_OBJDIR)/MpeTests_c7653914.o \
+  $(JUCE_OBJDIR)/ConnectionTests_32ca958.o \
   $(JUCE_OBJDIR)/include_juce_audio_basics_8a4e984a.o \
   $(JUCE_OBJDIR)/include_juce_audio_devices_63111d02.o \
   $(JUCE_OBJDIR)/include_juce_core_f26d17db.o \
@@ -169,6 +170,11 @@ $(JUCE_OBJDIR)/ScriptTests_bfe5520b.o: ../../ScriptTests.cpp
 $(JUCE_OBJDIR)/MpeTests_c7653914.o: ../../MpeTests.cpp
 	-$(V_AT)mkdir -p $(@D)
 	@echo "Compiling MpeTests.cpp"
+	$(V_AT)$(CXX) $(JUCE_CXXFLAGS) $(JUCE_CPPFLAGS_CONSOLEAPP) $(JUCE_CFLAGS_CONSOLEAPP) -o "$@" -c "$<"
+
+$(JUCE_OBJDIR)/ConnectionTests_32ca958.o: ../../ConnectionTests.cpp
+	-$(V_AT)mkdir -p $(@D)
+	@echo "Compiling ConnectionTests.cpp"
 	$(V_AT)$(CXX) $(JUCE_CXXFLAGS) $(JUCE_CPPFLAGS_CONSOLEAPP) $(JUCE_CFLAGS_CONSOLEAPP) -o "$@" -c "$<"
 
 $(JUCE_OBJDIR)/include_juce_audio_basics_8a4e984a.o: ../../JuceLibraryCode/include_juce_audio_basics.cpp
