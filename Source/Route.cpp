@@ -18,30 +18,5 @@
 
 #include "Route.h"
 
-void PressureCollapse::reset()
-{
-    for (int c = 0; c < 16; ++c)
-    {
-        lastMax[c] = -1;
-        for (int n = 0; n < 128; ++n) pressure[c][n] = -1;
-    }
-}
-
-int PressureCollapse::maxPressure(int channel) const
-{
-    int m = -1;
-    for (int n = 0; n < 128; ++n) m = jmax(m, pressure[channel - 1][n]);
-    return jmax(0, m);
-}
-
-bool PressureCollapse::changed(int channel, int value)
-{
-    if (lastMax[channel - 1] == value) return false;
-    lastMax[channel - 1] = value;
-    return true;
-}
-
-RouteInput::RouteInput()
-{
-    for (int c = 0; c < 16; ++c) { rpnSelMSB[c] = -1; rpnSelLSB[c] = -1; }
-}
+// The route structures are plain aggregates; their converter state lives in
+// conversion::State (Conversion.cpp) and their MPE state in mpe (Mpe.cpp).

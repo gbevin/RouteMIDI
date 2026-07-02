@@ -26,33 +26,6 @@
 #include "Mono.h"
 #include "Mpe.h"
 
-// Per-input state for the "any note" poly-pressure collapse (convert pp -> a
-// per-channel value without a source note). It tracks the pressure of every held
-// note per channel so the combined value can be reduced with the maximum, the
-// same way MPE combines channel pressure (see Mpe.h). A cache of the last value
-// emitted per channel avoids redundant sends.
-struct PressureCollapse
-{
-    PressureCollapse() { reset(); }
-
-    void reset();
-
-    void noteOn(int channel, int note)         { int& p = pressure[channel - 1][note]; if (p < 0) p = 0; }
-    void noteOff(int channel, int note)        { pressure[channel - 1][note] = -1; }
-    void set(int channel, int note, int value) { pressure[channel - 1][note] = value; }
-
-    // the highest pressure among the notes currently held on the channel, or 0
-    // when none are held
-    int maxPressure(int channel) const;
-
-    // returns true (updating the cache) when the channel's combined value differs
-    // from the last one emitted, so unchanged values aren't resent
-    bool changed(int channel, int value);
-
-    int pressure[16][128];  // held-note pressures per channel, -1 = note not held
-    int lastMax[16];        // last combined value emitted per channel, -1 = none yet
-};
-
 // A single MIDI input port of a route.
 struct RouteInput
 {
@@ -62,25 +35,9 @@ struct RouteInput
     bool isStdin { false };               // reads MIDI as text from standard input
     std::unique_ptr<MidiInput> midiIn;
 
-    // converter runtime state, kept per input because RPN/NRPN and 14-bit CC
-    // detection is stateful per incoming MIDI stream
-    MidiRPNDetector rpnDetector;          // assembles RPN/NRPN from constituent CCs
-    int ccMsb[16][32] {};                 // last 14-bit CC MSB, per channel and controller
-    bool ccMsbValid[16][32] {};           // whether an MSB has been seen yet
-
-    // pending RPN/NRPN parameter-select bytes, per channel, buffered until the
-    // MSB+LSB pair is complete so the converter can decide whether the selected
-    // parameter is intercepted (drop its constituents) or passes through (forward
-    // the raw selects verbatim)
-    int rpnSelMSB[16];                    // pending select MSB byte, -1 = none yet
-    int rpnSelLSB[16];                    // pending select LSB byte, -1 = none yet
-    MidiMessage rpnSelBuf[16][4];         // raw select CCs awaiting classification
-    int rpnSelBufLen[16] {};              // number buffered per channel
-    bool rpnSelIntercepted[16] {};        // the currently-selected parameter is a
-                                          // converter target, so its closing null
-                                          // (in either RPN or NRPN form) is consumed too
-
-    RouteInput();
+    // converter runtime state, kept per input because (N)RPN reassembly and
+    // 14-bit CC pairing are stateful per incoming MIDI stream
+    conversion::State conv;
 
     // per-zone state (indexed [0] = Lower, [1] = Upper) so a Lower-zone and an
     // Upper-zone operation can run on the same input without sharing state
@@ -92,7 +49,6 @@ struct RouteInput
 
     LatchState latch;                     // held-note tracking for the latch transform
     MonoState mono;                       // held-note tracking for the mono transform
-    PressureCollapse pressureCollapse;    // held-note pressure tracking for convert pp -> value
 };
 
 // A single MIDI output destination of a route.

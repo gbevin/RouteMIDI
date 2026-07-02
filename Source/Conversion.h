@@ -116,4 +116,85 @@ struct Rule
     double gamma = 1.0;                   // curve gamma
 };
 
+// Per-input state for the "any note" poly-pressure collapse (convert pp -> a
+// per-channel value without a source note). It tracks the pressure of every held
+// note per channel so the combined value can be reduced with the maximum, the
+// same way MPE combines channel pressure (see Mpe.h). A cache of the last value
+// emitted per channel avoids redundant sends.
+struct PressureCollapse
+{
+    PressureCollapse() { reset(); }
+
+    void reset();
+
+    void noteOn(int channel, int note)         { int& p = pressure[channel - 1][note]; if (p < 0) p = 0; }
+    void noteOff(int channel, int note)        { pressure[channel - 1][note] = -1; }
+    void set(int channel, int note, int value) { pressure[channel - 1][note] = value; }
+
+    // the highest pressure among the notes currently held on the channel, or 0
+    // when none are held
+    int maxPressure(int channel) const;
+
+    // returns true (updating the cache) when the channel's combined value differs
+    // from the last one emitted, so unchanged values aren't resent
+    bool changed(int channel, int value)
+    {
+        if (lastMax[channel - 1] == value) return false;
+        lastMax[channel - 1] = value;
+        return true;
+    }
+
+    int pressure[16][128];  // held-note pressures per channel, -1 = note not held
+    int lastMax[16];        // last combined value emitted per channel, -1 = none yet
+};
+
+// The per-input runtime state of the converter stage: (N)RPN reassembly and
+// 14-bit CC pairing are stateful per incoming MIDI stream.
+struct State
+{
+    State();
+
+    // --- (N)RPN parameter selection, tracked for every stream ----------------
+    // CC 99/101 carry the select MSB and 98/100 the LSB; a 127 byte clears its
+    // half, so a completed null (127/127) ends the selection. While a selection
+    // is active, CC 6/38/96/97 are (N)RPN data for the selected parameter;
+    // outside one they are plain (14-bit) controllers.
+    void trackSelect(int ch, int cc, int value);   // also resets the data-entry MSB
+    bool selectionActive(int ch) const;
+    int  selectedParam(int ch) const;              // -1 until both halves are known
+    bool selectionIsNrpn(int ch) const { return selNrpn[ch - 1]; }
+
+    int  selMsb[16], selLsb[16];    // last select bytes seen, -1 = never
+    bool selNrpn[16];               // whether the selection came in via 98/99
+
+    // --- raw select CCs awaiting classification ------------------------------
+    // buffered until their MSB+LSB pair is complete, then either dropped (the
+    // parameter is a rule target) or forwarded verbatim
+    MidiMessage selBuf[16][4];
+    int  selBufLen[16] {};
+    bool selIntercepted[16] {};     // the selected parameter is a rule target, so
+                                    // its closing null (in either RPN or NRPN
+                                    // form) is consumed too
+
+    // --- (N)RPN data-entry value assembly -------------------------------------
+    int valMsb[16];                 // last data-entry MSB (CC 6) since the last
+                                    // select, -1 = none; pairs with CC 38
+
+    // --- adaptive MSB+LSB pairing ---------------------------------------------
+    // once an LSB has been seen for a source, the MSB half of the next pair is
+    // consumed silently and the pair emits once, exactly, on its LSB; the flag
+    // clears on each suppression so an MSB-only sender loses at most one value
+    int  rpn14Param[16][2];         // last param with an LSB, per [0]=RPN/[1]=NRPN
+    int  ccMsb[16][32] {};          // last 14-bit CC MSB, per channel and controller
+    bool ccMsbValid[16][32] {};     // whether an MSB has been seen yet
+    bool cc14LsbSeen[16][32] {};    // whether the controller's last pair had an LSB
+
+    PressureCollapse pressure;      // held-note tracking for the any-note pp source
+};
+
+// runs one message through the converter stage: matching rules emit their
+// destination messages, everything else is forwarded untouched
+void processMessage(const Array<Rule>& rules, State& state,
+                    const MidiMessage& msg, Array<MidiMessage>& output);
+
 } // namespace conversion

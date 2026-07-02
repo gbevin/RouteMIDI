@@ -143,6 +143,46 @@ namespace
         }
         return found;
     }
+
+    // runs several converter-stage commands together over a sequence of messages
+    Array<MidiMessage> runConverters(ApplicationState& state,
+                                     const Array<std::pair<CommandIndex, StringArray>>& cmds,
+                                     const Array<MidiMessage>& in)
+    {
+        Route route;
+        for (const auto& c : cmds)
+            route.converters.add(makeCommand(c.first, c.second));
+        route.inputs.add(new RouteInput());
+        auto& input = *route.inputs[0];
+
+        Array<MidiMessage> out;
+        for (const auto& m : in)
+            state.processConverters(route, input, m, out);
+        return out;
+    }
+
+    // all complete 14-bit (N)RPN values that a downstream detector would see
+    Array<int> collect14BitRpnValues(const Array<MidiMessage>& out)
+    {
+        MidiRPNDetector detector;
+        Array<int> values;
+        for (const auto& m : out)
+            if (m.isController())
+            {
+                auto parsed = detector.tryParse(m.getChannel(), m.getControllerNumber(), m.getControllerValue());
+                if (parsed.has_value() && parsed->is14BitValue)
+                    values.add(parsed->value);
+            }
+        return values;
+    }
+
+    int countPitchWheels(const Array<MidiMessage>& out)
+    {
+        int n = 0;
+        for (const auto& m : out)
+            if (m.isPitchWheel()) ++n;
+        return n;
+    }
 }
 
 class ConversionTests : public UnitTest
@@ -544,6 +584,208 @@ public:
             expectEquals(rpn.value, 110);
             expectEquals(countController(rpnOut, 101, 127), 1);
             expectEquals(countController(rpnOut, 100, 127), 1);
+        }
+
+        beginTest("a 14-bit CC pair converts to exactly one value once its LSB is known");
+        {
+            // a device streaming MSB+LSB pairs (like the LinnStrument's CC 6/38)
+            // must produce one destination value per pair, not an approximate one on
+            // the MSB and an exact one on the LSB. The first pair may still emit
+            // twice (pairing is learned on the first LSB); from then on each pair
+            // emits once, with the exact 14-bit value.
+            Array<MidiMessage> in;
+            in.addArray(cc14Input(1, 6, 0));                     // pair 1: learning
+            in.addArray(cc14Input(1, 6, (44 << 7) | 8));         // pair 2
+            in.addArray(cc14Input(1, 6, (44 << 7) | 9));         // pair 3
+            auto out = runConvert(state, {"cc14", "6", "nrpn", "6"}, in);
+
+            auto values = collect14BitRpnValues(out);
+            expectEquals(values.size(), 4);          // 2 (learning pair) + 1 + 1
+            expectEquals(values[2], (44 << 7) | 8);
+            expectEquals(values[3], (44 << 7) | 9);
+        }
+
+        beginTest("an MSB-only 14-bit CC sender keeps converting on every MSB");
+        {
+            // a sender that never transmits the LSB half still converts each MSB
+            Array<MidiMessage> in;
+            in.add(MidiMessage::controllerEvent(1, 7, 100));
+            in.add(MidiMessage::controllerEvent(1, 7, 101));
+            in.add(MidiMessage::controllerEvent(1, 7, 102));
+            auto out = runConvert(state, {"cc14", "7", "cc", "1"}, in);
+
+            expectEquals(out.size(), 3);
+            expectEquals(countController(out, 1, 100), 1);
+            expectEquals(countController(out, 1, 101), 1);
+            expectEquals(countController(out, 1, 102), 1);
+        }
+
+        beginTest("an (N)RPN data pair converts to exactly one value once its LSB is known");
+        {
+            // same adaptive pairing as the 14-bit CC: the second identical NRPN
+            // frame produces a single destination CC instead of two
+            Array<MidiMessage> in;
+            in.addArray(rpnInput(1, 245, 12873, true, true));    // frame 1: learning
+            in.addArray(rpnInput(1, 245, 12873, true, true));    // frame 2
+            auto out = runConvert(state, {"nrpn", "245", "cc", "7"}, in);
+
+            expectEquals(out.size(), 3);                         // 2 (learning) + 1
+            expectEquals(countController(out, 7, 100), 3);       // 12873 >> 7 = 100
+        }
+
+        beginTest("a value transform regenerates a 14-bit pair once, at full resolution");
+        {
+            // transforms apply at the parsed resolution, so acting on the 7-bit MSB
+            // half of a pair would glitch (an add lands 128x too big); once pairing
+            // is learned, only the exact 14-bit value is transformed and regenerated
+            Array<MidiMessage> in;
+            in.addArray(rpnInput(1, 1000, 8000, true, true));    // frame 1: learning
+            in.addArray(rpnInput(1, 1000, 8000, true, true));    // frame 2
+            auto out = runConverterCommand(state, NRPN_ADD, {"1000", "100"}, in);
+
+            auto values = collect14BitRpnValues(out);
+            expectEquals(values.size(), 2);                      // one 14-bit regen per frame
+            expectEquals(values[0], 8100);
+            expectEquals(values[1], 8100);
+            // frame 1's MSB half regenerated a (glitched, clamped) 7-bit NRPN while
+            // pairing was unknown; frame 2's MSB half regenerated nothing
+            expectEquals(countController(out, 6, 127), 1);
+        }
+
+        beginTest("an active (N)RPN selection protects CC 6/38 from cc14 rules");
+        {
+            // a device doing genuine RPN work - declaring Pitch Bend Sensitivity,
+            // announcing an MPE zone - must not have its data entry hijacked by a
+            // cc14 rule on controller 6: inside a selection CC 6/38 are (N)RPN data,
+            // and only the bare pairs after the closing null convert as a 14-bit CC
+            Array<MidiMessage> in;
+            in.add(MidiMessage::controllerEvent(1, 101, 0));     // RPN 0 select
+            in.add(MidiMessage::controllerEvent(1, 100, 0));
+            in.add(MidiMessage::controllerEvent(1, 6, 24));      // sensitivity: protected
+            in.add(MidiMessage::controllerEvent(1, 101, 127));   // null closes the selection
+            in.add(MidiMessage::controllerEvent(1, 100, 127));
+            in.add(MidiMessage::controllerEvent(1, 6, 40));      // bare pair: converts
+            in.add(MidiMessage::controllerEvent(1, 38, 10));
+            auto out = runConvert(state, {"cc14", "6", "pb", "0"}, in);
+
+            expectEquals(countController(out, 6, 24), 1);        // RPN data survived
+            expectEquals(countController(out, 101, 0), 1);       // selects and null too
+            expectEquals(countController(out, 100, 0), 1);
+            expectEquals(countController(out, 101, 127), 1);
+            expectEquals(countController(out, 100, 127), 1);
+            expectEquals(countPitchWheels(out), 2);              // only the bare pair
+            expectEquals(lastPitchWheel(out), (40 << 7) | 10);
+        }
+
+        beginTest("cc14 rules work even when the route also has (N)RPN rules");
+        {
+            // with an RPN transform in the same route, bare CC 6/38 traffic (no
+            // selection active) must still reach the cc14 rule instead of being
+            // treated as stray (N)RPN data, including after a closing null
+            Array<std::pair<CommandIndex, StringArray>> cmds;
+            cmds.add({ CONVERT, {"cc14", "6", "nrpn", "6"} });
+            cmds.add({ RPN_ADD, {"100", "10"} });
+
+            Array<MidiMessage> in;
+            in.add(MidiMessage::controllerEvent(1, 101, 0));     // MCM: RPN 6, untargeted
+            in.add(MidiMessage::controllerEvent(1, 100, 6));
+            in.add(MidiMessage::controllerEvent(1, 6, 15));
+            in.add(MidiMessage::controllerEvent(1, 101, 127));   // null
+            in.add(MidiMessage::controllerEvent(1, 100, 127));
+            in.add(MidiMessage::controllerEvent(1, 6, 44));      // bare pair -> nrpn 6
+            in.add(MidiMessage::controllerEvent(1, 38, 8));
+            auto out = runConverters(state, cmds, in);
+
+            expectEquals(countController(out, 6, 15), 1);        // the MCM passed through
+            expectEquals(countController(out, 100, 6), 1);
+            expect(parseLastRpn(out, rpn));
+            expect(rpn.isNRPN);                                  // the bare pair converted
+            expectEquals(rpn.parameterNumber, 6);
+            expectEquals(rpn.value, (44 << 7) | 8);
+        }
+
+        beginTest("data increment/decrement of an intercepted parameter is consumed");
+        {
+            // CC 96/97 act on the selected parameter; when that parameter's selects
+            // were consumed by a rule, forwarding an increment would let it land on
+            // whatever parameter is still selected downstream
+            Array<MidiMessage> in;
+            in.add(MidiMessage::controllerEvent(1, 99, 32));     // NRPN 4128: intercepted
+            in.add(MidiMessage::controllerEvent(1, 98, 32));
+            in.add(MidiMessage::controllerEvent(1, 96, 1));      // increment: consumed
+            in.add(MidiMessage::controllerEvent(1, 101, 127));   // null: consumed
+            in.add(MidiMessage::controllerEvent(1, 100, 127));
+            auto out = runConvert(state, {"nrpn", "4128", "cc", "2"}, in);
+            expectEquals(out.size(), 0);
+
+            // for an untargeted parameter the increment passes through with its selects
+            Array<MidiMessage> other;
+            other.add(MidiMessage::controllerEvent(1, 99, 32));  // NRPN 4129: untargeted
+            other.add(MidiMessage::controllerEvent(1, 98, 33));
+            other.add(MidiMessage::controllerEvent(1, 96, 1));
+            auto outOther = runConvert(state, {"nrpn", "4128", "cc", "2"}, other);
+            expectEquals(outOther.size(), 3);
+            expectEquals(countController(outOther, 96, 1), 1);
+        }
+
+        beginTest("the closing null of a parameter converted after split selects is consumed");
+        {
+            // a stray RPN select byte interleaved into an NRPN selection means the
+            // NRPN select pair never completes cleanly, so interception can't be
+            // decided at select time. The data entry still converts through the
+            // tracked selection, and converting must mark the selection intercepted
+            // so the closing null is consumed with the frame instead of leaking
+            // downstream (where it would deselect an unrelated parameter)
+            Array<MidiMessage> in;
+            in.add(MidiMessage::controllerEvent(1, 99, 32));    // NRPN select MSB (4128)
+            in.add(MidiMessage::controllerEvent(1, 100, 32));   // stray RPN select LSB
+            in.add(MidiMessage::controllerEvent(1, 98, 32));    // NRPN select LSB completes 4128
+            in.add(MidiMessage::controllerEvent(1, 6, 3));      // data -> converted to CC 2
+            in.add(MidiMessage::controllerEvent(1, 101, 127));  // closing null
+            in.add(MidiMessage::controllerEvent(1, 100, 127));
+            auto out = runConvert(state, {"nrpn", "4128", "cc", "2"}, in);
+
+            expectEquals(lastCC(out, 2), 3);                    // the NRPN was converted
+            expectEquals(countController(out, 101, 127), 0);    // closing null consumed
+            expectEquals(countController(out, 100, 127), 0);
+            expectEquals(countController(out, 98, 32), 0);      // NRPN select consumed
+            // the ambiguous 99/100 pair read as an untargeted RPN selection and was
+            // forwarded verbatim before the NRPN interpretation could win
+            expectEquals(countController(out, 99, 32), 1);
+            expectEquals(countController(out, 100, 32), 1);
+            expectEquals(out.size(), 3);                        // those two selects + CC 2
+        }
+
+        beginTest("one source fans out to every matching rule's destination");
+        {
+            Array<std::pair<CommandIndex, StringArray>> cmds;
+            cmds.add({ CONVERT, {"pb", "0", "cc", "1"} });
+            cmds.add({ CONVERT, {"pb", "0", "cc", "2"} });
+            auto out = runConverters(state, cmds, { MidiMessage::pitchWheel(1, 16383) });
+            expectEquals(lastCC(out, 1), 127);
+            expectEquals(lastCC(out, 2), 127);
+
+            Array<std::pair<CommandIndex, StringArray>> ccCmds;
+            ccCmds.add({ CONVERT, {"cc", "7", "cc", "20"} });
+            ccCmds.add({ CONVERT, {"cc", "7", "cc", "21"} });
+            auto ccOut = runConverters(state, ccCmds, { MidiMessage::controllerEvent(1, 7, 90) });
+            expectEquals(lastCC(ccOut, 20), 90);
+            expectEquals(lastCC(ccOut, 21), 90);
+        }
+
+        beginTest("a specific-note pp rule fires alongside an any-note pp rule");
+        {
+            Array<std::pair<CommandIndex, StringArray>> cmds;
+            cmds.add({ CONVERT, {"pp", "60", "cc", "1"} });
+            cmds.add({ CONVERT, {"pp", "-1", "cp", "0"} });
+
+            Array<MidiMessage> in;
+            in.add(MidiMessage::noteOn(1, 60, (uint8) 100));
+            in.add(MidiMessage::aftertouchChange(1, 60, 90));
+            auto out = runConverters(state, cmds, in);
+
+            expectEquals(lastCC(out, 1), 90);                    // the per-note rule
+            expectEquals(lastChannelPressure(out), 90);          // and the collapse
         }
     }
 };

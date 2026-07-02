@@ -168,4 +168,453 @@ void emit(Array<MidiMessage>& out, int channel, int srcValue, int srcBits,
     }
 }
 
+//==============================================================================
+
+void PressureCollapse::reset()
+{
+    for (int c = 0; c < 16; ++c)
+    {
+        lastMax[c] = -1;
+        for (int n = 0; n < 128; ++n) pressure[c][n] = -1;
+    }
+}
+
+int PressureCollapse::maxPressure(int channel) const
+{
+    int m = -1;
+    for (int n = 0; n < 128; ++n) m = jmax(m, pressure[channel - 1][n]);
+    return jmax(0, m);
+}
+
+State::State()
+{
+    for (int c = 0; c < 16; ++c)
+    {
+        selMsb[c] = -1;
+        selLsb[c] = -1;
+        selNrpn[c] = false;
+        valMsb[c] = -1;
+        rpn14Param[c][0] = -1;
+        rpn14Param[c][1] = -1;
+    }
+}
+
+void State::trackSelect(int ch, int cc, int value)
+{
+    if (cc == 99 || cc == 101) selMsb[ch - 1] = value;
+    else                       selLsb[ch - 1] = value;
+    selNrpn[ch - 1] = (cc == 98 || cc == 99);
+    valMsb[ch - 1] = -1;   // a (re)selection starts a fresh data-entry value
+}
+
+bool State::selectionActive(int ch) const
+{
+    // at least one real (non-127) select byte, not closed by a completed null
+    const int msb = selMsb[ch - 1];
+    const int lsb = selLsb[ch - 1];
+    return (msb >= 0 && msb < 127) || (lsb >= 0 && lsb < 127);
+}
+
+int State::selectedParam(int ch) const
+{
+    return (selMsb[ch - 1] >= 0 && selLsb[ch - 1] >= 0)
+         ? ((selMsb[ch - 1] << 7) | selLsb[ch - 1]) : -1;
+}
+
+//==============================================================================
+// The converter stage, driven by Rule values compiled once from the route's
+// string rules (see ApplicationState::rebuildConvertRules). Split into the three
+// source families it handles: single-message types, the RPN/NRPN controller set,
+// and plain 7/14-bit CC.
+
+// whether the route converts or transforms any RPN/NRPN parameter
+static bool hasRpnRule(const Array<Rule>& rules)
+{
+    for (const auto& r : rules)
+        if (r.isTransform || r.src == Rpn || r.src == Nrpn)
+            return true;
+    return false;
+}
+
+// pb, cp, pc and pp sources, each carrying one value per message. Poly pressure
+// with an "any note" source (srcNum -1) is collapsed to the maximum held pressure
+// (matching how MPE combines channel pressure) before conversion.
+static void convertNonController(const Array<Rule>& rules, State& state,
+                                 const MidiMessage& msg, Array<MidiMessage>& output)
+{
+    const int ch = msg.getChannel();
+    const double ts = msg.getTimeStamp();
+
+    if (msg.isNoteOnOrOff() || msg.isAftertouch())
+    {
+        bool anyNotePP = false;
+        for (const auto& r : rules)
+            if (! r.isTransform && r.src == Pp && r.srcNum == -1) { anyNotePP = true; break; }
+
+        if (anyNotePP)
+        {
+            const int note = msg.getNoteNumber();
+            if      (msg.isNoteOn())  state.pressure.noteOn(ch, note);
+            else if (msg.isNoteOff()) state.pressure.noteOff(ch, note);
+            else                      state.pressure.set(ch, note, msg.getAfterTouchValue());
+
+            // a note-on only adds a note at zero pressure, which never raises the
+            // maximum, so only poly pressure and note-offs need to re-emit
+            if (! msg.isNoteOn())
+            {
+                const int maxP = state.pressure.maxPressure(ch);
+                if (state.pressure.changed(ch, maxP))
+                    for (const auto& r : rules)
+                        if (! r.isTransform && r.src == Pp && r.srcNum == -1)
+                            emit(output, ch, maxP, 7, r.dst, r.dstNum, r.method, ts);
+            }
+
+            if (msg.isAftertouch())
+            {
+                // rules for this specific note still see the pressure before the
+                // collapse consumes it, so any-note and per-note conversions coexist
+                for (const auto& r : rules)
+                    if (! r.isTransform && r.src == Pp && r.srcNum == msg.getNoteNumber())
+                        emit(output, ch, msg.getAfterTouchValue(), 7, r.dst, r.dstNum, r.method, ts);
+                return;   // the poly pressure is consumed by the collapse
+            }
+            // note-ons and note-offs fall through to pass the note message onward
+        }
+    }
+
+    // every matching rule emits, so one source can fan out to several destinations;
+    // the message is consumed once any rule claimed it
+    bool matched = false;
+    for (const auto& r : rules)
+    {
+        if (r.isTransform) continue;
+
+        int srcValue = -1;
+        if      (r.src == Pb && msg.isPitchWheel())        srcValue = msg.getPitchWheelValue();
+        else if (r.src == Cp && msg.isChannelPressure())   srcValue = msg.getChannelPressureValue();
+        else if (r.src == Pc && msg.isProgramChange())     srcValue = msg.getProgramChangeNumber();
+        else if (r.src == Pp && msg.isAftertouch() && r.srcNum != -1
+                 && msg.getNoteNumber() == r.srcNum)       srcValue = msg.getAfterTouchValue();
+
+        if (srcValue >= 0)
+        {
+            emit(output, ch, srcValue, r.srcBits, r.dst, r.dstNum, r.method, ts);
+            matched = true;
+        }
+    }
+    if (matched)
+        return;
+
+    output.add(msg);
+}
+
+// the RPN/NRPN controller set (6, 38, 96-101), reached only while a parameter
+// selection is in progress. A parameter targeted by a rule is intercepted - its
+// constituent CCs, and the null that closes it, are consumed and replaced by the
+// converted or transformed result - while every other parameter passes through
+// verbatim.
+static void convertRpnSet(const Array<Rule>& rules, State& state,
+                          const MidiMessage& msg, Array<MidiMessage>& output)
+{
+    const int ch = msg.getChannel();
+    const double ts = msg.getTimeStamp();
+    const int cc = msg.getControllerNumber();
+    const int val = msg.getControllerValue();
+
+    // whether any convert or transform rule targets this parameter as a source
+    auto paramIntercepted = [&](int param, bool isNRPN) -> bool
+    {
+        for (const auto& r : rules)
+        {
+            if (! r.isTransform && ((r.src == Rpn && ! isNRPN) || (r.src == Nrpn && isNRPN))
+                && r.srcNum == param)
+                return true;
+            if (r.isTransform && r.nrpn == isNRPN && r.param == param)
+                return true;
+        }
+        return false;
+    };
+    auto flushSelects = [&]()
+    {
+        for (int i = 0; i < state.selBufLen[ch - 1]; ++i)
+            output.add(state.selBuf[ch - 1][i]);
+        state.selBufLen[ch - 1] = 0;
+    };
+
+    // parameter select (98/99 = NRPN, 100/101 = RPN) or null: buffer the CC and,
+    // once the buffered selects hold both halves of a pair, either drop them (the
+    // parameter is intercepted, so the constituents disappear into the conversion)
+    // or forward them verbatim (an untargeted parameter). The null (MSB+LSB both
+    // 127) that closes a parameter is dropped along with it when that parameter
+    // was intercepted, even if the device closes with the universal RPN null
+    // (100/101) after selecting with NRPN (98/99), as the LinnStrument does.
+    if (cc >= 98 && cc <= 101)
+    {
+        if (state.selBufLen[ch - 1] >= 4)   // shouldn't happen; drain as a safety valve
+            flushSelects();
+        state.selBuf[ch - 1][state.selBufLen[ch - 1]++] = msg;
+
+        int msb = -1, lsb = -1;
+        bool nrpnSel = false;
+        for (int i = 0; i < state.selBufLen[ch - 1]; ++i)
+        {
+            const int c = state.selBuf[ch - 1][i].getControllerNumber();
+            const int v = state.selBuf[ch - 1][i].getControllerValue();
+            if (c == 99 || c == 101) msb = v;
+            else                     lsb = v;
+            nrpnSel = (c == 98 || c == 99);
+        }
+        if (msb >= 0 && lsb >= 0)
+        {
+            const int param = (msb << 7) | lsb;
+            const bool isNull = (param == 0x3fff);
+            const bool drop = isNull ? state.selIntercepted[ch - 1]
+                                     : paramIntercepted(param, nrpnSel);
+            if (drop)
+                state.selBufLen[ch - 1] = 0;   // replaced by the conversion output
+            else
+                flushSelects();                // pass through unchanged
+            // a real select updates which parameter is active; a null deselects
+            state.selIntercepted[ch - 1] = isNull ? false : drop;
+        }
+        return;
+    }
+
+    // data increment/decrement (96/97) act on the selected parameter. When that
+    // parameter is intercepted its selects were consumed, so an increment must not
+    // leak downstream where it would land on whatever parameter is still selected
+    // there; for untargeted parameters it passes through with its selects.
+    if (cc == 96 || cc == 97)
+    {
+        const int param = state.selectedParam(ch);
+        if (param >= 0 && paramIntercepted(param, state.selectionIsNrpn(ch)))
+            return;
+        flushSelects();
+        output.add(msg);
+        return;
+    }
+
+    // data entry (6/38): assemble the selected parameter's value, CC 6 carrying
+    // the MSB and CC 38 the LSB. A device sending MSB+LSB pairs would produce two
+    // values per pair (a 7-bit one on the MSB, the exact 14-bit one on the LSB):
+    // once an LSB has been seen for a parameter, the MSB half of the next pair is
+    // consumed silently and the pair converts once, exactly. MSB-only parameters -
+    // like RPN 0 or the MPE Configuration Message - never see an LSB and keep
+    // converting on every MSB. The learned parameter is cleared on each
+    // suppression, so a device that stops sending LSBs loses a single value.
+    const int param = state.selectedParam(ch);
+    if (param >= 0)
+    {
+        int value = -1, bits = 7;
+        if (cc == 6)
+        {
+            state.valMsb[ch - 1] = val;
+            value = val;
+        }
+        else if (state.valMsb[ch - 1] >= 0)   // an LSB needs an MSB to pair with
+        {
+            value = (state.valMsb[ch - 1] << 7) | val;
+            bits = 14;
+        }
+
+        if (value >= 0)
+        {
+            const bool nrpn = state.selectionIsNrpn(ch);
+            const int typeIdx = nrpn ? 1 : 0;
+
+            bool awaitLsb = false;
+            if (bits == 14)
+            {
+                state.rpn14Param[ch - 1][typeIdx] = param;
+            }
+            else if (state.rpn14Param[ch - 1][typeIdx] == param)
+            {
+                awaitLsb = true;
+                state.rpn14Param[ch - 1][typeIdx] = -1;
+            }
+
+            // convert rules: every matching rule emits (one source can fan out to
+            // several destinations); the constituents are consumed either way
+            bool converted = false;
+            for (const auto& r : rules)
+            {
+                if (r.isTransform) continue;
+                if (((r.src == Rpn && ! nrpn) || (r.src == Nrpn && nrpn)) && r.srcNum == param)
+                {
+                    state.selBufLen[ch - 1] = 0;        // drop any dangling selects
+                    state.selIntercepted[ch - 1] = true;   // and consume the closing null
+                    converted = true;
+                    if (! awaitLsb)
+                        emit(output, ch, value, bits, r.dst, r.dstNum, r.method, ts);
+                }
+            }
+            if (converted)
+                return;
+
+            // value transform (add/scale/curve): apply every matching rule in
+            // order and regenerate the (N)RPN with the modified value
+            bool transformed = false;
+            int newValue = value;
+            const int maxValue = (bits == 14) ? 16383 : 127;
+            for (const auto& r : rules)
+            {
+                if (! r.isTransform || r.nrpn != nrpn || r.param != param)
+                    continue;
+                transformed = true;
+                switch (r.op)
+                {
+                    case NRPN_ADD:
+                    case RPN_ADD:
+                        newValue = jlimit(0, maxValue, newValue + r.addAmount);
+                        break;
+                    case NRPN_SCALE:
+                    case RPN_SCALE:
+                        newValue = jlimit(0, maxValue, roundToInt(newValue * (float) r.factor));
+                        break;
+                    case NRPN_CURVE:
+                    case RPN_CURVE:
+                        newValue = gammaCurve(newValue, maxValue, r.gamma);
+                        break;
+                    default:
+                        break;
+                }
+            }
+
+            if (transformed)
+            {
+                // regenerate the whole (N)RPN, selects and closing null included,
+                // so a transformed parameter is framed exactly like a converted
+                // one; the suppressed 7-bit half of a pair regenerates nothing
+                // (transforming an MSB at 7-bit resolution would glitch, e.g. an
+                // add would land 128x too big)
+                state.selBufLen[ch - 1] = 0;
+                state.selIntercepted[ch - 1] = true;
+                if (! awaitLsb)
+                    emitRpn(output, ch, param, newValue, nrpn, bits == 14, ts);
+                return;
+            }
+        }
+    }
+
+    // untargeted: forward any buffered selects and this data entry verbatim
+    flushSelects();
+    output.add(msg);
+}
+
+// plain CC sources: 14-bit (MSB on controller N in 0-31, LSB on N+32) then 7-bit.
+// A controller acting as half of a targeted 14-bit pair is claimed entirely, so a
+// cc7 rule never sees it. Every matching rule emits (one source can fan out to
+// several destinations). Returns whether a rule claimed the message.
+static bool convertCc(const Array<Rule>& rules, State& state,
+                      const MidiMessage& msg, Array<MidiMessage>& output)
+{
+    const int ch = msg.getChannel();
+    const double ts = msg.getTimeStamp();
+    const int cc = msg.getControllerNumber();
+    const int val = msg.getControllerValue();
+
+    // the MSB (controller 0-31) or LSB (32-63) of a targeted 14-bit CC, paired
+    // adaptively exactly like the (N)RPN data entries above
+    if (cc < 64)
+    {
+        const bool isLsb = (cc >= 32);
+        const int n = isLsb ? cc - 32 : cc;
+
+        bool targeted = false;
+        for (const auto& r : rules)
+            if (! r.isTransform && r.src == Cc14 && (r.srcNum & 0x1f) == n) { targeted = true; break; }
+
+        if (targeted)
+        {
+            if (isLsb)
+            {
+                state.cc14LsbSeen[ch - 1][n] = true;
+                const int msb = state.ccMsbValid[ch - 1][n] ? state.ccMsb[ch - 1][n] : 0;
+                for (const auto& r : rules)
+                    if (! r.isTransform && r.src == Cc14 && (r.srcNum & 0x1f) == n)
+                        emit(output, ch, (msb << 7) | val, 14, r.dst, r.dstNum, r.method, ts);
+            }
+            else
+            {
+                state.ccMsb[ch - 1][n] = val;
+                state.ccMsbValid[ch - 1][n] = true;
+                if (state.cc14LsbSeen[ch - 1][n])
+                {
+                    state.cc14LsbSeen[ch - 1][n] = false;   // re-learned on the next LSB
+                }
+                else
+                {
+                    for (const auto& r : rules)
+                        if (! r.isTransform && r.src == Cc14 && (r.srcNum & 0x1f) == n)
+                            emit(output, ch, val, 7, r.dst, r.dstNum, r.method, ts);
+                }
+            }
+            return true;
+        }
+    }
+
+    bool matched = false;
+    for (const auto& r : rules)
+    {
+        if (r.isTransform || r.src != Cc7) continue;
+        if (cc == r.srcNum)
+        {
+            emit(output, ch, val, 7, r.dst, r.dstNum, r.method, ts);
+            matched = true;
+        }
+    }
+
+    return matched;
+}
+
+void processMessage(const Array<Rule>& rules, State& state,
+                    const MidiMessage& msg, Array<MidiMessage>& output)
+{
+    if (! msg.isController())
+    {
+        convertNonController(rules, state, msg, output);
+        return;
+    }
+
+    const int ch = msg.getChannel();
+    const int cc = msg.getControllerNumber();
+
+    // CC 6/38 do double duty: inside an (N)RPN parameter selection they are data
+    // entry for the selected parameter, outside one they are the halves of a plain
+    // 14-bit CC. The selection is tracked for every stream so the two never
+    // collide: a device's genuine (N)RPN work - an MPE Configuration Message, a
+    // Pitch Bend Sensitivity declaration - can pass through or convert as (N)RPN
+    // while its bare CC 6/38 stream converts as a 14-bit controller.
+    if (cc >= 98 && cc <= 101)
+    {
+        state.trackSelect(ch, cc, msg.getControllerValue());
+        if (hasRpnRule(rules))
+        {
+            convertRpnSet(rules, state, msg, output);
+            return;
+        }
+        // no (N)RPN rules: the selects fall through below like any other CC
+    }
+    else if (cc == 6 || cc == 38 || cc == 96 || cc == 97)
+    {
+        if (state.selectionActive(ch))
+        {
+            if (hasRpnRule(rules))
+            {
+                convertRpnSet(rules, state, msg, output);
+                return;
+            }
+            // (N)RPN data for downstream: the cc rules must not eat it
+            output.add(msg);
+            return;
+        }
+        // no selection active: a plain (14-bit) controller, handled below
+    }
+
+    if (convertCc(rules, state, msg, output))
+        return;
+
+    output.add(msg);   // not managed by any conversion rule: forward unchanged
+}
+
 } // namespace conversion

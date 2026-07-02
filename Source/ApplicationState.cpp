@@ -1109,7 +1109,7 @@ void ApplicationState::sendPanic(Route& route)
     {
         input->latch.clear();
         input->mono.reset();
-        input->pressureCollapse.reset();
+        input->conv.pressure.reset();
     }
 }
 
@@ -1135,7 +1135,7 @@ void ApplicationState::sendZoneReset(Route& route)
     {
         input->latch.clear();
         input->mono.reset();
-        input->pressureCollapse.reset();
+        input->conv.pressure.reset();
     }
 }
 
@@ -2127,257 +2127,6 @@ void ApplicationState::applyMpeOp(const ApplicationCommand& cmd, RouteInput& inp
 }
 
 //==============================================================================
-// The converter stage, driven by conversion::Rule values compiled once from the
-// route's string rules (see rebuildConvertRules). Split into the three source
-// families it handles: single-message types, the RPN/NRPN controller set, and
-// plain 7/14-bit CC.
-
-// whether the route converts or transforms any RPN/NRPN parameter
-static bool hasRpnRule(const Array<conversion::Rule>& rules)
-{
-    for (const auto& r : rules)
-        if (r.isTransform || r.src == conversion::Rpn || r.src == conversion::Nrpn)
-            return true;
-    return false;
-}
-
-// pb, cp, pc and pp sources, each carrying one value per message. Poly pressure
-// with an "any note" source (srcNum -1) is collapsed to the maximum held pressure
-// (matching how MPE combines channel pressure) before conversion.
-static void convertNonController(const Array<conversion::Rule>& rules, RouteInput& input,
-                                 const MidiMessage& msg, Array<MidiMessage>& output)
-{
-    using namespace conversion;
-    const int ch = msg.getChannel();
-    const double ts = msg.getTimeStamp();
-
-    if (msg.isNoteOnOrOff() || msg.isAftertouch())
-    {
-        bool anyNotePP = false;
-        for (const auto& r : rules)
-            if (! r.isTransform && r.src == Pp && r.srcNum == -1) { anyNotePP = true; break; }
-
-        if (anyNotePP)
-        {
-            const int note = msg.getNoteNumber();
-            if      (msg.isNoteOn())  input.pressureCollapse.noteOn(ch, note);
-            else if (msg.isNoteOff()) input.pressureCollapse.noteOff(ch, note);
-            else                      input.pressureCollapse.set(ch, note, msg.getAfterTouchValue());
-
-            // a note-on only adds a note at zero pressure, which never raises the
-            // maximum, so only poly pressure and note-offs need to re-emit
-            if (! msg.isNoteOn())
-            {
-                const int maxP = input.pressureCollapse.maxPressure(ch);
-                if (input.pressureCollapse.changed(ch, maxP))
-                    for (const auto& r : rules)
-                        if (! r.isTransform && r.src == Pp && r.srcNum == -1)
-                            emit(output, ch, maxP, 7, r.dst, r.dstNum, r.method, ts);
-            }
-
-            if (msg.isAftertouch())
-                return;   // the poly pressure is consumed by the collapse
-            // note-ons and note-offs fall through to pass the note message onward
-        }
-    }
-
-    for (const auto& r : rules)
-    {
-        if (r.isTransform) continue;
-
-        int srcValue = -1;
-        if      (r.src == Pb && msg.isPitchWheel())        srcValue = msg.getPitchWheelValue();
-        else if (r.src == Cp && msg.isChannelPressure())   srcValue = msg.getChannelPressureValue();
-        else if (r.src == Pc && msg.isProgramChange())     srcValue = msg.getProgramChangeNumber();
-        else if (r.src == Pp && msg.isAftertouch() && r.srcNum != -1
-                 && msg.getNoteNumber() == r.srcNum)       srcValue = msg.getAfterTouchValue();
-
-        if (srcValue >= 0)
-        {
-            emit(output, ch, srcValue, r.srcBits, r.dst, r.dstNum, r.method, ts);
-            return;
-        }
-    }
-
-    output.add(msg);
-}
-
-// the RPN/NRPN controller set (6, 38, 98-101). A parameter targeted by a rule is
-// intercepted - its constituent CCs, and the null that closes it, are consumed and
-// replaced by the converted or transformed result - while every other parameter
-// passes through verbatim.
-static void convertRpnSet(const Array<conversion::Rule>& rules, RouteInput& input,
-                          const MidiMessage& msg, Array<MidiMessage>& output)
-{
-    using namespace conversion;
-    const int ch = msg.getChannel();
-    const double ts = msg.getTimeStamp();
-    const int cc = msg.getControllerNumber();
-    const int val = msg.getControllerValue();
-
-    // whether any convert or transform rule targets this parameter as a source
-    auto paramIntercepted = [&](int param, bool isNRPN) -> bool
-    {
-        for (const auto& r : rules)
-        {
-            if (! r.isTransform && ((r.src == Rpn && ! isNRPN) || (r.src == Nrpn && isNRPN))
-                && r.srcNum == param)
-                return true;
-            if (r.isTransform && r.nrpn == isNRPN && r.param == param)
-                return true;
-        }
-        return false;
-    };
-    auto flushSelects = [&]()
-    {
-        for (int i = 0; i < input.rpnSelBufLen[ch - 1]; ++i)
-            output.add(input.rpnSelBuf[ch - 1][i]);
-        input.rpnSelBufLen[ch - 1] = 0;
-    };
-
-    // keep the detector's per-channel state current for the data entry below
-    auto parsed = input.rpnDetector.tryParse(ch, cc, val);
-
-    // parameter select (98/99 = NRPN, 100/101 = RPN) or null: buffer the CC and,
-    // once the MSB+LSB pair is complete, either drop it (its parameter is
-    // intercepted, so the constituents disappear into the conversion) or forward
-    // the buffered CCs verbatim (an untargeted parameter). The null (MSB+LSB both
-    // 127) that closes a parameter is dropped along with it when that parameter was
-    // intercepted, even if the device closes with the universal RPN null (100/101)
-    // after selecting with NRPN (98/99), as the LinnStrument does.
-    if (cc != 6 && cc != 38)
-    {
-        const bool nrpnSel = (cc == 98 || cc == 99);
-        if (input.rpnSelBufLen[ch - 1] >= 4)   // shouldn't happen; drain as a safety valve
-            flushSelects();
-        input.rpnSelBuf[ch - 1][input.rpnSelBufLen[ch - 1]++] = msg;
-        if (cc == 99 || cc == 101) input.rpnSelMSB[ch - 1] = val;
-        else                       input.rpnSelLSB[ch - 1] = val;
-
-        if (input.rpnSelMSB[ch - 1] >= 0 && input.rpnSelLSB[ch - 1] >= 0)
-        {
-            const int param = (input.rpnSelMSB[ch - 1] << 7) | input.rpnSelLSB[ch - 1];
-            const bool isNull = (param == 0x3fff);
-            const bool drop = isNull ? input.rpnSelIntercepted[ch - 1]
-                                     : paramIntercepted(param, nrpnSel);
-            if (drop)
-                input.rpnSelBufLen[ch - 1] = 0;   // replaced by the conversion output
-            else
-                flushSelects();                   // pass through unchanged
-            // a real select updates which parameter is active; a null deselects
-            input.rpnSelIntercepted[ch - 1] = isNull ? false : drop;
-            input.rpnSelMSB[ch - 1] = -1;
-            input.rpnSelLSB[ch - 1] = -1;
-        }
-        return;
-    }
-
-    // data entry (6/38): the detector has assembled a value for the parameter
-    if (parsed.has_value())
-    {
-        const auto& rpn = *parsed;
-        const int srcBits = rpn.is14BitValue ? 14 : 7;
-
-        for (const auto& r : rules)
-        {
-            if (r.isTransform) continue;
-            if (((r.src == Rpn && ! rpn.isNRPN) || (r.src == Nrpn && rpn.isNRPN))
-                && r.srcNum == rpn.parameterNumber)
-            {
-                input.rpnSelBufLen[ch - 1] = 0;   // drop any dangling selects
-                emit(output, ch, rpn.value, srcBits, r.dst, r.dstNum, r.method, ts);
-                return;
-            }
-        }
-
-        // value transform (add/scale/curve) on this parameter: apply and regenerate
-        // the (N)RPN with the modified value
-        bool transformed = false;
-        int newValue = rpn.value;
-        const int maxValue = rpn.is14BitValue ? 16383 : 127;
-        for (const auto& r : rules)
-        {
-            if (! r.isTransform || r.nrpn != rpn.isNRPN || r.param != rpn.parameterNumber)
-                continue;
-            transformed = true;
-            switch (r.op)
-            {
-                case NRPN_ADD:
-                case RPN_ADD:
-                    newValue = jlimit(0, maxValue, newValue + r.addAmount);
-                    break;
-                case NRPN_SCALE:
-                case RPN_SCALE:
-                    newValue = jlimit(0, maxValue, roundToInt(newValue * (float) r.factor));
-                    break;
-                case NRPN_CURVE:
-                case RPN_CURVE:
-                    newValue = gammaCurve(newValue, maxValue, r.gamma);
-                    break;
-                default:
-                    break;
-            }
-        }
-
-        if (transformed)
-        {
-            // regenerate the whole (N)RPN, selects and closing null included, so a
-            // transformed parameter is framed exactly like a converted one
-            input.rpnSelBufLen[ch - 1] = 0;
-            conversion::emitRpn(output, rpn.channel, rpn.parameterNumber, newValue,
-                                rpn.isNRPN, rpn.is14BitValue, ts);
-            return;
-        }
-    }
-
-    // untargeted: forward any buffered selects and this data entry verbatim
-    flushSelects();
-    output.add(msg);
-}
-
-// plain CC sources: 14-bit (MSB on controller N in 0-31, LSB on N+32) then 7-bit.
-// Returns whether a rule claimed the message.
-static bool convertCc(const Array<conversion::Rule>& rules, RouteInput& input,
-                      const MidiMessage& msg, Array<MidiMessage>& output)
-{
-    using namespace conversion;
-    const int ch = msg.getChannel();
-    const double ts = msg.getTimeStamp();
-    const int cc = msg.getControllerNumber();
-    const int val = msg.getControllerValue();
-
-    for (const auto& r : rules)
-    {
-        if (r.isTransform || r.src != Cc14) continue;
-        const int n = r.srcNum & 0x1f;
-        if (cc == n)
-        {
-            input.ccMsb[ch - 1][n] = val;
-            input.ccMsbValid[ch - 1][n] = true;
-            emit(output, ch, val, 7, r.dst, r.dstNum, r.method, ts);
-            return true;
-        }
-        if (cc == n + 32)
-        {
-            const int msb = input.ccMsbValid[ch - 1][n] ? input.ccMsb[ch - 1][n] : 0;
-            emit(output, ch, (msb << 7) | val, 14, r.dst, r.dstNum, r.method, ts);
-            return true;
-        }
-    }
-
-    for (const auto& r : rules)
-    {
-        if (r.isTransform || r.src != Cc7) continue;
-        if (cc == r.srcNum)
-        {
-            emit(output, ch, val, 7, r.dst, r.dstNum, r.method, ts);
-            return true;
-        }
-    }
-
-    return false;
-}
-
 // compile the route's string convert/transform commands to conversion::Rule
 // numbers, so the real-time path never parses option strings. Numbers are decoded
 // with the current hex/octave settings, matching the previous per-message behaviour.
@@ -2422,26 +2171,7 @@ void ApplicationState::processConverters(Route& route, RouteInput& input, const 
     if (route.convertRules.size() != route.converters.size())
         rebuildConvertRules(route);
 
-    const auto& rules = route.convertRules;
-
-    if (! msg.isController())
-    {
-        convertNonController(rules, input, msg, output);
-        return;
-    }
-
-    const int cc = msg.getControllerNumber();
-    const bool isRpnCC = (cc == 6 || cc == 38 || cc == 98 || cc == 99 || cc == 100 || cc == 101);
-    if (isRpnCC && hasRpnRule(rules))
-    {
-        convertRpnSet(rules, input, msg, output);
-        return;
-    }
-
-    if (convertCc(rules, input, msg, output))
-        return;
-
-    output.add(msg);   // not managed by any conversion rule: forward unchanged
+    conversion::processMessage(route.convertRules, input.conv, msg, output);
 }
 
 String ApplicationState::messageToText(const MidiMessage& msg) const

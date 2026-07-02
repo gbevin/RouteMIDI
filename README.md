@@ -398,14 +398,16 @@ routemidi in "Pad"    convert cp      pp C3     out "Sampler"     # channel pres
 routemidi in "Grid"   convert pp 60   cc 74     out "Synth"       # one pad's pressure -> CC 74
 ```
 
-Several conversions can be configured on one route; only the matching messages are converted, everything else passes through untouched.
+Several conversions can be configured on one route; only the matching messages are converted, everything else passes through untouched. When several rules share the same source, each one emits, so a single source can fan out to several destinations.
 
 Notable details:
 
 * **Bit scaling** by default uses a **Min-Center-Max** method, which preserves minimum, center and maximum across resolutions and round-trips losslessly: widening a 7-bit value to 14-bit and narrowing it back yields the original. So a 7-bit value of 127 becomes the 14-bit maximum 16383, 64 becomes the center 8192, and 0 stays 0.
 * For **RPNs whose parameter LSB is 0-31** (the classic absolute MIDI 1.0 RPNs such as pitch-bend sensitivity, tuning and the MPE Configuration Message), the **Zero-Extension with Rounding** method is used instead, for exact backward compatibility. Upscaling pads with zeros (7-bit 127 becomes 16256, not the full 16383) and downscaling rounds to the nearest value. NRPNs and all CCs always use Min-Center-Max.
 * Conversions to `rpn`/`nrpn` append the **RPN/NRPN null** (CC 101/100 = 127 or CC 99/98 = 127) to deselect the parameter afterwards.
-* When a route converts any `rpn` or `nrpn`, the converter takes over the whole RPN controller set (CC 6, 38, 98, 99, 100, 101) on that route to reassemble every (N)RPN: targeted parameters are converted and any other (N)RPN is regenerated and passed through. Avoid filtering out those CCs on a converting route.
+* When a route converts any `rpn` or `nrpn`, the converter reassembles every (N)RPN from the RPN controller set (CC 6, 38, 96-101) on that route: targeted parameters are converted (their constituent CCs, data increments and closing null are consumed) and any other (N)RPN passes through untouched. Avoid filtering out those CCs on a converting route.
+* **CC 6 and 38 do double duty** in MIDI: inside an (N)RPN parameter selection they are data entry, outside one they are the halves of a plain 14-bit CC. The converter tracks the selection, so a device's genuine (N)RPN work (a Pitch Bend Sensitivity declaration, an MPE Configuration Message) is never hijacked by a `cc14 6` rule, and bare CC 6/38 pairs still convert even when the same route also has `rpn`/`nrpn` rules.
+* A device streaming **MSB+LSB pairs** (a 14-bit CC, or 14-bit (N)RPN data) converts to exactly **one destination value per pair** once its pairing has been observed; a sender that only ever transmits the MSB keeps converting on every MSB.
 
 ### Transforming RPN and NRPN values
 
@@ -417,7 +419,7 @@ routemidi in "Synth" rpnadd 0 -2048 out "Synth"       # lower RPN 0 (bend range)
 routemidi in "Synth" nrpncurve 74 2.0 out "Synth"     # finer control low down
 ```
 
-Like the conversions, these transforms take over the whole RPN controller set on the route, so avoid filtering out CC 6, 38 and 98-101 on the same route.
+Like the conversions, these transforms take over the whole RPN controller set on the route, so avoid filtering out CC 6, 38 and 96-101 on the same route.
 
 ## MPE
 
