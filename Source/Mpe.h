@@ -257,4 +257,45 @@ namespace mpe
 
         ExpressionState expr;          // Manager/Member expression cache for combining
     };
+
+    //==========================================================================
+    // The MPE stream operations behind the RouteMIDI commands. Each processes
+    // one message against its per-input state, appending the resulting messages
+    // (none, one or several) to the output.
+
+    // "mpe": remap every channel of the source zone onto the destination zone,
+    // master -> master and member index i -> destination member i; when the
+    // destination has fewer members, colliding notes fold last-note-wins
+    void relocate(Relocator& rel, const Zone& src, const Zone& dst,
+                  const MidiMessage& msg, Array<MidiMessage>& output);
+
+    // "mpemono": fold every channel of the source zone onto a single channel for
+    // a non-MPE synth, combining Manager and Member expression the way an MPE
+    // receiver would (spec sections 2.2.6-2.2.8)
+    void collapse(Collapser& col, const Zone& src, int target,
+                  const MidiMessage& msg, Array<MidiMessage>& output);
+
+    // "mpexp": spread the notes arriving on a single channel across an MPE
+    // zone's member channels, sending zone-wide messages to the master channel
+    void expand(Allocator& alloc, int srcChannel, const Zone& dst,
+                const MidiMessage& msg, Array<MidiMessage>& output);
+
+    // "mpebend": rescale member-channel pitch bend from a source semitone range
+    // to a destination range so a controller and a synth whose member-channel
+    // bend range differs play in tune (spec section 2.2.5)
+    void rescaleBend(const Zone& zone, double from, double to,
+                     const MidiMessage& msg, Array<MidiMessage>& output);
+
+    // "mpesens": declare a member-channel Pitch Bend Sensitivity (RPN 0) for a
+    // synth that honours it, re-declaring after each MPE Configuration Message
+    // (spec section 2.2.5)
+    void declareSensitivity(SensitivityDeclarer& sd, const Zone& zone, int semitones,
+                            const MidiMessage& msg, Array<MidiMessage>& output);
+
+    // "outsplit": distribute an MPE zone across a route's output ports, treating
+    // each output as one monophonic voice on the target channel; fills parallel
+    // arrays where outPorts[i] is the destination port for outMsgs[i] (-1 means
+    // broadcast to every output)
+    void split(Splitter& sp, const Zone& zone, int targetCh, int ports,
+               const MidiMessage& msg, Array<MidiMessage>& outMsgs, Array<int>& outPorts);
 }
