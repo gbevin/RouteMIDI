@@ -176,16 +176,17 @@ MPE routing:
 
   -h  or  --help       Print Help (this message) and exit
   --version            Print version information and exit
-  --schema json        Print machine-readable command JSON and exit
-  --mcp                Run a stdio MCP server
+  --schema json        Print machine-readable command JSON and exit [experimental]
+  --mcp                Run a stdio MCP server [experimental]
   --                   Read commands from standard input until it's closed
 ```
 
 Use `--schema json` for command metadata for scripts, MCP servers and
-AI agents.
-Use `--mcp` to let MCP clients control RouteMIDI over stdio.
+AI agents. Use `--mcp` to let MCP clients control RouteMIDI over stdio.
+These two features are experimental and fast-moving: their JSON and the MCP
+tools may change between releases. See AI.md for details.
 
-For driving RouteMIDI from scripts and AI assistants, see **[AI.md](AI.md)**: the `--schema json` command metadata and the `--mcp` MCP server, its tools, the generation contract and the security model. That integration is experimental and fast-moving.
+For driving RouteMIDI from scripts and AI assistants, see **[AI.md](AI.md)**: the `--schema json` command metadata and the `--mcp` MCP server, its tools, the generation contract and the security model. **This integration is experimental and fast-moving**, and unlike the command-line interface its JSON shapes, tool names and protocol version may change between releases.
 
 Alternatively, you can use the following long versions of the commands:
 ```

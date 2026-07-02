@@ -175,6 +175,9 @@ String commandsJson(const Array<ApplicationCommand>& commands, int defaultOctave
     auto root = new DynamicObject();
     root->setProperty("schema", "https://github.com/gbevin/RouteMIDI/schema/commands-v1");
     root->setProperty("tool", ProjectInfo::projectName);
+    // this metadata and the MCP tools are experimental: their shapes and names
+    // may change between releases, unlike the command-line interface
+    root->setProperty("experimental", true);
     root->setProperty("version", ProjectInfo::versionString);
     root->setProperty("defaultOctaveMiddleC", defaultOctaveMiddleC);
     root->setProperty("defaultNumberBase", "decimal");

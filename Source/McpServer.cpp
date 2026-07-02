@@ -777,7 +777,9 @@ var McpServer::handleRequest(const var& message)
                             "RouteMIDI is controlled through these MCP tools: "
                             "get_schema inspects commands, list_midi_ports "
                             "discovers ports and start_route starts live MIDI "
-                            "routes from explicit command tokens.");
+                            "routes from explicit command tokens. This MCP "
+                            "interface is experimental and may change between "
+                            "RouteMIDI releases.");
         return var(newMcpResponse(id, result));
     }
 

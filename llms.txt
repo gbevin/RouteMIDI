@@ -10,9 +10,11 @@
 
 Rules for generating correct RouteMIDI command lines.
 
-**Machine discovery**
+**Machine discovery** (experimental and fast-moving: the JSON shapes, MCP tool
+names and protocol version may change between RouteMIDI releases)
 
 - `routemidi --schema json` prints machine-readable command metadata and exits.
+  The document includes `"experimental": true`.
 - `routemidi --mcp` runs a stdio MCP server. MCP clients must be configured to
   launch this command; normal live routing commands do not advertise or expose
   an MCP endpoint.

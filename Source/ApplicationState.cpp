@@ -1707,13 +1707,14 @@ void ApplicationState::printUsage()
     std::cout << std::endl;
     std::cout << "  -h  or  --help       Print Help (this message) and exit" << std::endl;
     std::cout << "  --version            Print version information and exit" << std::endl;
-    std::cout << "  --schema json        Print machine-readable command JSON and exit" << std::endl;
-    std::cout << "  --mcp                Run a stdio MCP server" << std::endl;
+    std::cout << "  --schema json        Print machine-readable command JSON and exit [experimental]" << std::endl;
+    std::cout << "  --mcp                Run a stdio MCP server [experimental]" << std::endl;
     std::cout << "  --                   Read commands from standard input until it's closed" << std::endl;
     std::cout << std::endl;
     std::cout << "Use \"--schema json\" for command metadata for scripts, MCP servers and" << std::endl
-              << "AI agents." << std::endl;
-    std::cout << "Use \"--mcp\" to let MCP clients control RouteMIDI over stdio." << std::endl;
+              << "AI agents. Use \"--mcp\" to let MCP clients control RouteMIDI over stdio." << std::endl;
+    std::cout << "These two features are experimental and fast-moving: their JSON and the MCP" << std::endl
+              << "tools may change between releases. See AI.md for details." << std::endl;
     std::cout << std::endl;
     std::cout << "Alternatively, you can use the following long versions of the commands:" << std::endl;
     String line = " ";
