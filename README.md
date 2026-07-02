@@ -23,7 +23,15 @@ https://github.com/gbevin/ShowMIDI
 
 ## Download
 
-Since RouteMIDI is free and open-source, you can easily build it yourself. Just take a look into the Builds directory when you download the sources.
+You can download pre-built binaries from the release section:
+https://github.com/gbevin/RouteMIDI/releases
+
+Since RouteMIDI is free and open-source, you can also easily build it yourself. Just take a look into the Builds directory when you download the sources.
+
+If you're using the macOS Homebrew package manager, you can install RouteMIDI with:
+```
+brew install gbevin/tools/routemidi
+```
 
 ## Usage
 
