@@ -688,10 +688,23 @@ routemidi [settings] in|vin <port> [commands ...] out|vout <port> [out ...] [in 
 
 **Semantics to respect**
 
-* No filters means everything passes. One or more positive filters form a whitelist (a message must match at least one); `not <filter>` blocks matching messages; both combine.
+* No filters means everything passes. One or more positive filters form a whitelist (a message must match at least one); `not <filter>` blocks matching messages and negates only the next filter; both combine.
 * Transforms that would push a note out of 0-127 drop the message; value transforms clamp instead.
 * `latch`, `mono`, the MPE operations and the conversions keep running per-input state (held notes, RPN selections, 14-bit pairings), so each input should carry one device's continuous stream.
 * The stages always run filters, then transforms, then MPE operations, then conversions, regardless of command order (see [Routes](#routes)).
+* Every route must start with `in` or `vin`; filter/transform commands before the first `in` are ignored with a warning.
+
+**Argument parsing traps**
+
+* **Optional** arguments (the `on`/`off`/`pp`/`cc`/`cc14`/`pc` selectors, `latch` mode, `mono` priority, `vin`/`vout` names, `mpesplit` channel) end at the first token that spells a RouteMIDI command name: `on clock` is a note-on filter with *no* note plus a `clock` filter, not "note-on for a note called clock". Never place a value or port name that spells a command word in an optional position.
+* **Fixed** arguments are the opposite: they are taken literally even when they spell a command name, so `in cc` names a port "cc" and `convert`'s type words parse fine.
+* `convert` is variable-length (`srctype [num] dsttype [num]`): `cc`, `cc14`, `rpn` and `nrpn` need a number, `pb`, `cp` and `pc` take none, and `pp` needs a note as a destination but may omit it as a source (meaning "any note").
+
+**Safe live use**
+
+* Add `panic` to live-performance routes: it sends all-notes-off when an input disconnects, when RouteMIDI exits, and when an MPE zone is reconfigured, preventing stuck notes.
+* Positive filters are whitelists: `note` alone silently drops clock, transport and everything else. If the destination needs clock, include `sr` or `clock` in the whitelist; and when merging several inputs, keep clock from only one of them (route the others through `not sr`) or the tempo messages double up.
+* `js` scripts run synchronously on the routing path for every message: keep them short, never call `Util.sleep` in a live route, and remember that `MIDI.send*()` emits immediately and script global state persists across messages.
 
 **Verifying generated commands without MIDI hardware**
 

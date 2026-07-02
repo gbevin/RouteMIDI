@@ -6,24 +6,87 @@
 > tools alongside SendMIDI (send) and ReceiveMIDI (receive/monitor), and all
 > three share the same text MIDI format, so they compose with Unix pipes.
 
-Key facts for generating RouteMIDI command lines:
+## Generation contract
 
-- Invocation: `routemidi [settings] in <port> [commands ...] out <port> [in ... out ...]`.
-  A route is inputs, then commands, then outputs; the next `in` after an `out`
-  starts a new route. Every input of a route goes to every output.
-- Port names match case-insensitively by substring. `-` as a port name means
-  text MIDI on stdin/stdout, so pipelines can be tested without MIDI hardware:
-  `printf 'channel 1 note-on 60 100\n' | routemidi in - transp 12 out -`
-- Messages flow through fixed stages regardless of command order: filters,
-  then transforms (in written order), then MPE operations (in written order),
-  then conversions, then the outputs.
-- Filters whitelist (`ch`, `note`, `cc`, `noterange`, `velrange`, `inscale`, ...),
-  `not` blacklists. Transforms cover channels, transpose, scale quantize,
-  chords, latch, mono, velocity shaping and type changes. `convert` maps
-  between cc, cc14, rpn, nrpn, pb, cp, pc and pp. MPE operations relocate,
-  collapse, expand, split and adapt MPE zones. `js` runs JavaScript per message.
-- Numbers are decimal by default; notes accept names (`C3`, `F#2`); channels
-  are 1-16; selectors accept `lo..hi` ranges; MPE zones are `lower`/`upper[:n]`.
+Rules for generating correct RouteMIDI command lines.
+
+**Route-start rules**
+
+- Invocation: `routemidi [settings] in <port> [commands ...] out <port> [in ... out ...]`
+- Every route must start with `in` or `vin`; filter/transform/MPE/convert
+  commands given before any `in` are ignored with a warning.
+- More `in` commands before an `out` add inputs (merge); more `out` commands
+  add outputs (split). The first `in` after an `out` starts a new, independent
+  route. Every input of a route is forwarded to every output of that route.
+- Port names match case-insensitively by substring; quote names with spaces.
+  `-` as a port name is a text stream on stdin/stdout.
+- Settings (`dec`, `hex`, `omc`, `mon`, `ts`, `nn`, `src`, `panic`) may appear
+  anywhere.
+
+**Command ordering rules**
+
+- Messages flow through fixed stages regardless of where commands are written:
+  1 filters, 2 transforms (in written order), 3 MPE operations (in written
+  order), 4 conversions, 5 outputs. A `transp` always runs before an `mpemono`,
+  even when written after it.
+- Within the transform stage order matters and composes: `chord 4 7 scale C
+  major` stacks a triad then snaps it into the key.
+- Filters: none = everything passes; one or more positive filters form a
+  whitelist; `not <filter>` blocks matches and negates only the next filter.
+
+**Optional argument traps**
+
+- Optional arguments (`on`/`off`/`pp`/`cc`/`cc14`/`pc` selectors, `latch` mode,
+  `mono` priority, `vin`/`vout` names, `mpesplit` channel) end at the first
+  token that spells a RouteMIDI command name: `on clock` is a note-on filter
+  with NO note plus a clock filter, not "note-on for a note called clock".
+  Never rely on a value or port name that spells a command word in an optional
+  position.
+- Fixed arguments are the opposite: they are taken literally even when they
+  spell a command name (`in cc` names a port "cc").
+- `convert` is variable-length (`srctype [num] dsttype [num]`): `cc`, `cc14`,
+  `rpn`, `nrpn` need a number; `pb`, `cp`, `pc` take none; `pp` needs a note as
+  a destination but may omit it as a source (meaning "any note", collapsed
+  with the maximum of the held notes).
+- Ranges are written `lo..hi` (never `lo-hi`, which clashes with note names
+  like `C-2`). Numbers are decimal by default; a `H`/`M` suffix forces
+  hex/decimal per number. Channels are 1-16, notes 0-127 or names `C-2`..`G8`
+  (middle C = `C3`), MPE zones `lower`/`upper[:members]`.
+
+**Text MIDI examples**
+
+One message per line, an optional `channel <1-16>` prefix, then the type:
+
+```
+channel 1 note-on C3 100
+channel 1 note-off 60 0
+channel 2 control-change 74 64
+channel 1 pitch-bend 8192
+channel 1 poly-pressure C3 90
+midi-clock
+system-exclusive hex 7E 7F 06 01
+```
+
+Any pipeline can be verified without MIDI hardware:
+
+```
+$ printf 'channel 1 note-on 60 100\n' | routemidi in - transp 12 out -
+channel  1   note-on           C4 100
+```
+
+**Safe live use**
+
+- Add `panic` to live-performance routes: it sends all-notes-off when an input
+  disconnects, when RouteMIDI exits, and when an MPE zone is reconfigured,
+  preventing stuck notes.
+- Positive filters are whitelists: `note` alone silently drops clock, transport
+  and everything else. If the destination needs clock, include `sr` or `clock`
+  in the whitelist. When merging several inputs, keep clock from only one of
+  them (route the others through `not sr`) or the tempo messages double up.
+- `js` scripts run synchronously on the routing path for every message: keep
+  them short, never call `Util.sleep` in a live route, and remember that
+  `MIDI.send*()` emits immediately and script global state persists across
+  messages.
 
 ## Docs
 
