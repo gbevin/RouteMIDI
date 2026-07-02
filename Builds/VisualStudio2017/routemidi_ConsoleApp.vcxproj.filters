@@ -229,6 +229,12 @@
     <ClCompile Include="..\..\Source\Main.cpp">
       <Filter>routemidi\Source</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Source\McpServer.cpp">
+      <Filter>routemidi\Source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Schema.cpp">
+      <Filter>routemidi\Source</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Source\Mpe.cpp">
       <Filter>routemidi\Source</Filter>
     </ClCompile>
@@ -1228,6 +1234,12 @@
       <Filter>routemidi\Source</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Source\Mono.h">
+      <Filter>routemidi\Source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\McpServer.h">
+      <Filter>routemidi\Source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Schema.h">
       <Filter>routemidi\Source</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Source\Mpe.h">

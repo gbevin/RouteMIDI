@@ -108,6 +108,33 @@ channel  1   note-off          E3   0
 channel  1   note-off          C3   0'
 run "mpemono collapse" in - mpemono lower 1 out -
 
+# --- the MCP server speaks newline-delimited JSON-RPC over stdio -----------------
+# a real MCP client sends one compact JSON message per line; the handshake, the
+# tool listing and a route lifecycle (start, list, edit, stop) must all come back
+# as single-line JSON responses
+MCP_OUT="$(printf '%s\n%s\n%s\n%s\n%s\n%s\n' \
+    '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"pipe-test","version":"1"}}}' \
+    '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' \
+    '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"start_route","arguments":{"commands":["in","PipeTestIn","transp","12","out","PipeTestOut"]}}}' \
+    '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"replace_command","arguments":{"route":1,"stage":"transforms","index":0,"commands":["transp","-12"]}}}' \
+    '{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"stop_route","arguments":{"route":1}}}' \
+    '{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"list_routes","arguments":{}}}' \
+    | "$BIN" --mcp 2>/dev/null | tr -d '\r')"
+if [ "$(printf '%s\n' "$MCP_OUT" | wc -l | tr -d ' ')" = "6" ] \
+    && printf '%s\n' "$MCP_OUT" | sed -n 1p | grep -q '"serverInfo".*"routemidi"' \
+    && printf '%s\n' "$MCP_OUT" | sed -n 2p | grep -q '"list_routes"' \
+    && printf '%s\n' "$MCP_OUT" | sed -n 3p | grep -q '"id": 1' \
+    && printf '%s\n' "$MCP_OUT" | sed -n 4p | grep -q '\-12' \
+    && printf '%s\n' "$MCP_OUT" | sed -n 5p | grep -q '"stopped": 1' \
+    && printf '%s\n' "$MCP_OUT" | sed -n 6p | grep -q '"routes": \[\]'; then
+    echo "ok   mcp handshake and route lifecycle"
+else
+    echo "FAIL mcp handshake and route lifecycle"
+    echo "--- actual ---------"; printf '%s\n' "$MCP_OUT"
+    echo "--------------------"
+    failures=$((failures+1))
+fi
+
 if [ "$failures" -ne 0 ]; then
     echo "$failures pipe test(s) FAILED"
     exit 1

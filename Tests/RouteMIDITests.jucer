@@ -41,6 +41,10 @@
             file="../Source/ScriptUtilClass.cpp"/>
       <FILE id="src012" name="ScriptUtilClass.h" compile="0" resource="0"
             file="../Source/ScriptUtilClass.h"/>
+      <FILE id="scp019" name="McpServer.cpp" compile="1" resource="0" file="../Source/McpServer.cpp"/>
+      <FILE id="src019" name="McpServer.h" compile="0" resource="0" file="../Source/McpServer.h"/>
+      <FILE id="scp020" name="Schema.cpp" compile="1" resource="0" file="../Source/Schema.cpp"/>
+      <FILE id="src020" name="Schema.h" compile="0" resource="0" file="../Source/Schema.h"/>
       <FILE id="scp018" name="TextMidi.cpp" compile="1" resource="0" file="../Source/TextMidi.cpp"/>
       <FILE id="src018" name="TextMidi.h" compile="0" resource="0" file="../Source/TextMidi.h"/>
     </GROUP>

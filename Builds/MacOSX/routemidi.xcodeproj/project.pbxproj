@@ -28,6 +28,7 @@
 		6902382771EAA2D95B1FC548 /* Security.framework */ = {isa = PBXBuildFile; fileRef = C9F8D0428E730A57BD28709B; };
 		733F39336A3BA81575DD317E /* ScriptMidiMessageClass.cpp */ = {isa = PBXBuildFile; fileRef = 3973848B1FB155637755C9F9; };
 		74E75096858F409D9620368B /* AudioToolbox.framework */ = {isa = PBXBuildFile; fileRef = 5D3F4C219DB9D465708B6231; };
+		775AC60B580F0E0B1F5A59E7 /* Schema.cpp */ = {isa = PBXBuildFile; fileRef = 38630DFA0030BF212C9E9B60; };
 		8C315CE0BB161E8F64351690 /* Foundation.framework */ = {isa = PBXBuildFile; fileRef = 07349D8481B1ED49EE53EB64; };
 		8CC96C84E9919543939AB516 /* Latch.cpp */ = {isa = PBXBuildFile; fileRef = 5133E6DBD03BB2F966578F3E; };
 		8E8410A6B527CB8A75830C3C /* Cocoa.framework */ = {isa = PBXBuildFile; fileRef = 8C841A693EA83A57B62FDF16; };
@@ -36,6 +37,7 @@
 		9DB8D2B082E32EA9895ADB84 /* Conversion.cpp */ = {isa = PBXBuildFile; fileRef = 19D3AD7C7842CCE8C5C3C578; };
 		A03F1373B6076C5E5685E241 /* Route.cpp */ = {isa = PBXBuildFile; fileRef = 5F6526C961F6F88C95A67C56; };
 		AADC62C5B9CB859326A74332 /* include_juce_events.mm */ = {isa = PBXBuildFile; fileRef = F0AC19E3023CA8E85D590A1B; };
+		B61C2506A473A9D6519ADFDF /* McpServer.cpp */ = {isa = PBXBuildFile; fileRef = 2BAFC07253691C1A03FC73D9; };
 		DEC01D2856CBEABC6569DE16 /* include_juce_midi_ci.cpp */ = {isa = PBXBuildFile; fileRef = 3B899882E9F48AFC64E535EF; };
 		F00D5676A75100DF5C848DF8 /* include_juce_audio_basics.mm */ = {isa = PBXBuildFile; fileRef = BC898F0BA43B56118F3015D2; };
 /* End PBXBuildFile section */
@@ -52,13 +54,16 @@
 		24749B444222A65B40FE5D2E /* JuceHeader.h */ /* JuceHeader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = JuceHeader.h; path = ../../JuceLibraryCode/JuceHeader.h; sourceTree = SOURCE_ROOT; };
 		27131189176A2D0C2E910C11 /* ChannelBucket.h */ /* ChannelBucket.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ChannelBucket.h; path = ../../Source/ChannelBucket.h; sourceTree = SOURCE_ROOT; };
 		28F1F23438CA15D2AF8C89C3 /* ApplicationState.cpp */ /* ApplicationState.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = ApplicationState.cpp; path = ../../Source/ApplicationState.cpp; sourceTree = SOURCE_ROOT; };
+		2BAFC07253691C1A03FC73D9 /* McpServer.cpp */ /* McpServer.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = McpServer.cpp; path = ../../Source/McpServer.cpp; sourceTree = SOURCE_ROOT; };
 		368C712F41AD8C0DC5E4A389 /* juce_osc */ /* juce_osc */ = {isa = PBXFileReference; lastKnownFileType = folder; name = juce_osc; path = ../../JuceLibraryCode/modules/juce_osc; sourceTree = SOURCE_ROOT; };
 		369E04E0314D26B628F08040 /* Mono.cpp */ /* Mono.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Mono.cpp; path = ../../Source/Mono.cpp; sourceTree = SOURCE_ROOT; };
+		38630DFA0030BF212C9E9B60 /* Schema.cpp */ /* Schema.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Schema.cpp; path = ../../Source/Schema.cpp; sourceTree = SOURCE_ROOT; };
 		3973848B1FB155637755C9F9 /* ScriptMidiMessageClass.cpp */ /* ScriptMidiMessageClass.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = ScriptMidiMessageClass.cpp; path = ../../Source/ScriptMidiMessageClass.cpp; sourceTree = SOURCE_ROOT; };
 		39BBB61E6B2796DB8C72B46D /* CoreAudio.framework */ /* CoreAudio.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreAudio.framework; path = System/Library/Frameworks/CoreAudio.framework; sourceTree = SDKROOT; };
 		3B899882E9F48AFC64E535EF /* include_juce_midi_ci.cpp */ /* include_juce_midi_ci.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = include_juce_midi_ci.cpp; path = ../../JuceLibraryCode/include_juce_midi_ci.cpp; sourceTree = SOURCE_ROOT; };
 		5133E6DBD03BB2F966578F3E /* Latch.cpp */ /* Latch.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Latch.cpp; path = ../../Source/Latch.cpp; sourceTree = SOURCE_ROOT; };
 		52AE88A364FFF2111D8EF313 /* include_juce_osc.cpp */ /* include_juce_osc.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = include_juce_osc.cpp; path = ../../JuceLibraryCode/include_juce_osc.cpp; sourceTree = SOURCE_ROOT; };
+		55BBBA41C247C883C31B9DA4 /* Schema.h */ /* Schema.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Schema.h; path = ../../Source/Schema.h; sourceTree = SOURCE_ROOT; };
 		5D3F4C219DB9D465708B6231 /* AudioToolbox.framework */ /* AudioToolbox.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AudioToolbox.framework; path = System/Library/Frameworks/AudioToolbox.framework; sourceTree = SDKROOT; };
 		5F6526C961F6F88C95A67C56 /* Route.cpp */ /* Route.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Route.cpp; path = ../../Source/Route.cpp; sourceTree = SOURCE_ROOT; };
 		7113DF850C738FF287669BA9 /* ScriptOscClass.cpp */ /* ScriptOscClass.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = ScriptOscClass.cpp; path = ../../Source/ScriptOscClass.cpp; sourceTree = SOURCE_ROOT; };
@@ -68,6 +73,7 @@
 		7DD493C8E6F3B7C63C78F6DE /* include_juce_core.mm */ /* include_juce_core.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = include_juce_core.mm; path = ../../JuceLibraryCode/include_juce_core.mm; sourceTree = SOURCE_ROOT; };
 		8A5BABA1DEBF1BBC38C35A84 /* AppConfig.h */ /* AppConfig.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = AppConfig.h; path = ../../JuceLibraryCode/AppConfig.h; sourceTree = SOURCE_ROOT; };
 		8C841A693EA83A57B62FDF16 /* Cocoa.framework */ /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = System/Library/Frameworks/Cocoa.framework; sourceTree = SDKROOT; };
+		8FF3E27E707D2D5F6D83FDEE /* McpServer.h */ /* McpServer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = McpServer.h; path = ../../Source/McpServer.h; sourceTree = SOURCE_ROOT; };
 		92335890AFA077CA46856B96 /* ConsoleApp */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = routemidi; sourceTree = BUILT_PRODUCTS_DIR; };
 		984B89DA298818FDB2DF5FC5 /* Latch.h */ /* Latch.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Latch.h; path = ../../Source/Latch.h; sourceTree = SOURCE_ROOT; };
 		9CD2954B59A33B0796DD0778 /* ScriptOscClass.h */ /* ScriptOscClass.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ScriptOscClass.h; path = ../../Source/ScriptOscClass.h; sourceTree = SOURCE_ROOT; };
@@ -187,6 +193,10 @@
 				369E04E0314D26B628F08040,
 				23E31207938832D19BD7AA17,
 				B2451D1DBA700503A8FEDC18,
+				2BAFC07253691C1A03FC73D9,
+				8FF3E27E707D2D5F6D83FDEE,
+				38630DFA0030BF212C9E9B60,
+				55BBBA41C247C883C31B9DA4,
 				22704F653400656D46C6CF31,
 				C824511B9526921A9B1CD762,
 				5F6526C961F6F88C95A67C56,
@@ -302,6 +312,8 @@
 				8CC96C84E9919543939AB516,
 				1486D3BF838F2ED0BF49213C,
 				2BA07F2CF2B004870E08CD28,
+				B61C2506A473A9D6519ADFDF,
+				775AC60B580F0E0B1F5A59E7,
 				247F98C66BBBEFD9C652B644,
 				A03F1373B6076C5E5685E241,
 				733F39336A3BA81575DD317E,

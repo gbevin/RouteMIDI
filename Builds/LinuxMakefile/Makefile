@@ -80,6 +80,8 @@ OBJECTS_CONSOLEAPP := \
   $(JUCE_OBJDIR)/Latch_2e80cba5.o \
   $(JUCE_OBJDIR)/Mono_7e1955ec.o \
   $(JUCE_OBJDIR)/Main_90ebc5c2.o \
+  $(JUCE_OBJDIR)/McpServer_3f7b345e.o \
+  $(JUCE_OBJDIR)/Schema_ea09caa.o \
   $(JUCE_OBJDIR)/Mpe_60014c83.o \
   $(JUCE_OBJDIR)/Route_a82a312a.o \
   $(JUCE_OBJDIR)/ScriptMidiMessageClass_6b9b1366.o \
@@ -145,6 +147,16 @@ $(JUCE_OBJDIR)/Mono_7e1955ec.o: ../../Source/Mono.cpp
 $(JUCE_OBJDIR)/Main_90ebc5c2.o: ../../Source/Main.cpp
 	-$(V_AT)mkdir -p $(@D)
 	@echo "Compiling Main.cpp"
+	$(V_AT)$(CXX) $(JUCE_CXXFLAGS) $(JUCE_CPPFLAGS_CONSOLEAPP) $(JUCE_CFLAGS_CONSOLEAPP) -o "$@" -c "$<"
+
+$(JUCE_OBJDIR)/McpServer_3f7b345e.o: ../../Source/McpServer.cpp
+	-$(V_AT)mkdir -p $(@D)
+	@echo "Compiling McpServer.cpp"
+	$(V_AT)$(CXX) $(JUCE_CXXFLAGS) $(JUCE_CPPFLAGS_CONSOLEAPP) $(JUCE_CFLAGS_CONSOLEAPP) -o "$@" -c "$<"
+
+$(JUCE_OBJDIR)/Schema_ea09caa.o: ../../Source/Schema.cpp
+	-$(V_AT)mkdir -p $(@D)
+	@echo "Compiling Schema.cpp"
 	$(V_AT)$(CXX) $(JUCE_CXXFLAGS) $(JUCE_CPPFLAGS_CONSOLEAPP) $(JUCE_CFLAGS_CONSOLEAPP) -o "$@" -c "$<"
 
 $(JUCE_OBJDIR)/Mpe_60014c83.o: ../../Source/Mpe.cpp

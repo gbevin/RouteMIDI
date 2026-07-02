@@ -244,6 +244,12 @@
     <ClCompile Include="..\..\..\Source\ScriptUtilClass.cpp">
       <Filter>RouteMIDITests\Source</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\Source\McpServer.cpp">
+      <Filter>RouteMIDITests\Source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Source\Schema.cpp">
+      <Filter>RouteMIDITests\Source</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\Source\TextMidi.cpp">
       <Filter>RouteMIDITests\Source</Filter>
     </ClCompile>
@@ -1270,6 +1276,12 @@
       <Filter>RouteMIDITests\Source</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\Source\ScriptUtilClass.h">
+      <Filter>RouteMIDITests\Source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Source\McpServer.h">
+      <Filter>RouteMIDITests\Source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Source\Schema.h">
       <Filter>RouteMIDITests\Source</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\Source\TextMidi.h">

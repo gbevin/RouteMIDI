@@ -1,4 +1,5 @@
 Builds/*/build
+Builds/*/DerivedData
 Builds/MacOSX/*.xcodeproj/xcuserdata
 Builds/MacOSX/routemidi.xcodeproj/project.xcworkspace/xcuserdata
 /.vs
@@ -7,6 +8,7 @@ Builds/MacOSX/routemidi.xcodeproj/project.xcworkspace/xcuserdata
 /Builds/VisualStudio2017/routemidi_ConsoleApp.vcxproj.user
 Installers
 Tests/Builds/*/build
+Tests/Builds/*/DerivedData
 Tests/Builds/MacOSX/*.xcodeproj/xcuserdata
 Tests/Builds/MacOSX/*.xcodeproj/project.xcworkspace/xcuserdata
 Tests/Builds/VisualStudio2017/.vs

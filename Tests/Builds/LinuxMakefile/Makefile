@@ -84,6 +84,8 @@ OBJECTS_CONSOLEAPP := \
   $(JUCE_OBJDIR)/ScriptMidiMessageClass_3119217.o \
   $(JUCE_OBJDIR)/ScriptOscClass_3ed124de.o \
   $(JUCE_OBJDIR)/ScriptUtilClass_da719b5b.o \
+  $(JUCE_OBJDIR)/McpServer_7747aa0d.o \
+  $(JUCE_OBJDIR)/Schema_68a49d5b.o \
   $(JUCE_OBJDIR)/TextMidi_ff6fa9e8.o \
   $(JUCE_OBJDIR)/TestRunner_6696edd7.o \
   $(JUCE_OBJDIR)/ScalingTests_c076264f.o \
@@ -173,6 +175,16 @@ $(JUCE_OBJDIR)/ScriptOscClass_3ed124de.o: ../../../Source/ScriptOscClass.cpp
 $(JUCE_OBJDIR)/ScriptUtilClass_da719b5b.o: ../../../Source/ScriptUtilClass.cpp
 	-$(V_AT)mkdir -p $(@D)
 	@echo "Compiling ScriptUtilClass.cpp"
+	$(V_AT)$(CXX) $(JUCE_CXXFLAGS) $(JUCE_CPPFLAGS_CONSOLEAPP) $(JUCE_CFLAGS_CONSOLEAPP) -o "$@" -c "$<"
+
+$(JUCE_OBJDIR)/McpServer_7747aa0d.o: ../../../Source/McpServer.cpp
+	-$(V_AT)mkdir -p $(@D)
+	@echo "Compiling McpServer.cpp"
+	$(V_AT)$(CXX) $(JUCE_CXXFLAGS) $(JUCE_CPPFLAGS_CONSOLEAPP) $(JUCE_CFLAGS_CONSOLEAPP) -o "$@" -c "$<"
+
+$(JUCE_OBJDIR)/Schema_68a49d5b.o: ../../../Source/Schema.cpp
+	-$(V_AT)mkdir -p $(@D)
+	@echo "Compiling Schema.cpp"
 	$(V_AT)$(CXX) $(JUCE_CXXFLAGS) $(JUCE_CPPFLAGS_CONSOLEAPP) $(JUCE_CFLAGS_CONSOLEAPP) -o "$@" -c "$<"
 
 $(JUCE_OBJDIR)/TextMidi_ff6fa9e8.o: ../../../Source/TextMidi.cpp

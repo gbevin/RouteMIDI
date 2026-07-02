@@ -68,6 +68,10 @@ struct OutputDest
 // to several outputs, or both.
 struct Route
 {
+    int id { 0 };                         // stable identifier, assigned at creation;
+                                          // unlike an index it survives the removal
+                                          // of other routes (used by the MCP tools)
+
     OwnedArray<RouteInput> inputs;
     OwnedArray<OutputDest> outputs;
 

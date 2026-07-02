@@ -244,6 +244,128 @@ public:
                 }
             }
         }
+
+        beginTest("MCP start_route and stop_route stay safe under a live MIDI stream");
+        {
+            // a background thread floods a connected route through the real MIDI
+            // callback path while routes are started and stopped over MCP. This
+            // exercises the teardown ordering of stop_route (unlink, panic, drain,
+            // delete: a message arriving mid-teardown must never leave a dangling
+            // output pointer in the send queue) and the lock-free device opens of
+            // start_route against live callbacks. It is a concurrency stress, not
+            // a deterministic race reproducer: a regression shows up as a crash or
+            // a stalled stream, most reliably under a sanitizer.
+            const String inName  = "RouteMIDI LiveIn "  + Uuid().toString();
+            const String outName = "RouteMIDI LiveOut " + Uuid().toString();
+
+            CaptureMidiCallback capture;
+            auto virtualDest   = MidiInput::createNewDevice(outName, &capture);
+            auto virtualSource = MidiOutput::createNewDevice(inName);
+            if (virtualDest == nullptr || virtualSource == nullptr)
+            {
+                logMessage("  skipped: virtual MIDI not available on this system");
+                return;
+            }
+            virtualDest->start();
+            if (! waitForPort([] { return MidiInput::getAvailableDevices();  }, inName,  true, 3000) ||
+                ! waitForPort([] { return MidiOutput::getAvailableDevices(); }, outName, true, 3000))
+            {
+                logMessage("  skipped: virtual ports never appeared in the device lists");
+                return;
+            }
+
+            ApplicationState state;
+            state.startOutputSenderForTest();
+
+            auto mcp = [&state](const String& json)
+            {
+                auto* previous = std::cerr.rdbuf(nullptr);
+                const String response = state.handleMcpJsonForTest(json);
+                std::cerr.rdbuf(previous);
+                return JSON::parse(response);
+            };
+            auto receivedCount = [&capture]
+            {
+                const ScopedLock sl(capture.lock);
+                return capture.received.size();
+            };
+            auto waitForMoreThan = [&receivedCount](int count, int timeoutMs)
+            {
+                const uint32 start = Time::getMillisecondCounter();
+                while (receivedCount() <= count)
+                {
+                    if ((int) (Time::getMillisecondCounter() - start) > timeoutMs)
+                    {
+                        return false;
+                    }
+                    Thread::sleep(10);
+                }
+                return true;
+            };
+
+            // a live route from the virtual source to the virtual destination
+            mcp(String(R"({"jsonrpc":"2.0","id":1,"method":"tools/call","params":)")
+                + R"({"name":"start_route","arguments":{"commands":["in",")" + inName
+                + R"(","out",")" + outName + R"("]}}})");
+            expectEquals(state.getRoutes().size(), 1);
+            const int liveId = state.getRoutes()[0]->id;
+
+            // flood the route from a background thread, as a controller would
+            std::atomic<bool> stopFlood { false };
+            std::thread flood([&stopFlood, &virtualSource]
+            {
+                int note = 0;
+                while (!stopFlood.load())
+                {
+                    virtualSource->sendMessageNow(MidiMessage::noteOn(1, 1 + (note % 100), (uint8) 100));
+                    virtualSource->sendMessageNow(MidiMessage::noteOff(1, 1 + (note % 100), (uint8) 0));
+                    ++note;
+                    if ((note & 63) == 0)
+                    {
+                        Thread::sleep(1);   // brief yields keep the flood fast but fair
+                    }
+                }
+            });
+
+            const bool flowing = waitForMoreThan(20, 3000);
+            expect(flowing);
+            if (flowing)
+            {
+                // churn side routes over MCP while the stream keeps running
+                for (int i = 0; i < 3; ++i)
+                {
+                    const var started = mcp(R"({"jsonrpc":"2.0","id":2,"method":"tools/call","params":)"
+                                            R"({"name":"start_route","arguments":{"commands":)"
+                                            R"(["in","LiveNoSuchIn","out","LiveNoSuchOut"]}}})");
+                    auto structured = started.getProperty("result", var()).getProperty("structuredContent", var());
+                    auto* routes = structured.getProperty("routes", var()).getArray();
+                    expect(routes != nullptr && routes->size() == 1);
+                    const int sideId = (routes != nullptr && routes->size() == 1)
+                                           ? (int) routes->getReference(0).getProperty("id", var()) : -1;
+
+                    const var stopped = mcp(String(R"({"jsonrpc":"2.0","id":3,"method":"tools/call","params":)")
+                                            + R"({"name":"stop_route","arguments":{"route":)"
+                                            + String(sideId) + "}}}");
+                    expect(! stopped.getProperty("result", var()).getProperty("isError", var()));
+                }
+                expectEquals(state.getRoutes().size(), 1);   // only the live route remains
+
+                // the live stream survived the churn and is still flowing
+                expect(waitForMoreThan(receivedCount(), 3000));
+
+                // finally stop the live route itself mid-stream: its outputs are
+                // being enqueued at this very moment, the exact teardown race
+                const var stopLive = mcp(String(R"({"jsonrpc":"2.0","id":4,"method":"tools/call","params":)")
+                                         + R"({"name":"stop_route","arguments":{"route":)"
+                                         + String(liveId) + "}}}");
+                expect(! stopLive.getProperty("result", var()).getProperty("isError", var()));
+                expectEquals(state.getRoutes().size(), 0);
+            }
+
+            stopFlood = true;
+            flood.join();
+            state.stopOutputSenderForTest();
+        }
     }
 };
 

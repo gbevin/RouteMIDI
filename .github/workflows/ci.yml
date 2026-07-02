@@ -47,6 +47,10 @@ jobs:
         if: runner.os == 'macOS'
         run: ./Scripts/pipe-test.sh ./Builds/MacOSX/build/Release/routemidi
 
+      - name: Use-case test (macOS)
+        if: runner.os == 'macOS'
+        run: ./Scripts/use-case-test.sh ./Builds/MacOSX/build/Release/routemidi
+
       # ---------------------------------------------------------------- Linux
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
@@ -65,6 +69,10 @@ jobs:
       - name: Pipe smoke test (Linux)
         if: runner.os == 'Linux'
         run: ./Scripts/pipe-test.sh ./Builds/LinuxMakefile/build/routemidi
+
+      - name: Use-case test (Linux)
+        if: runner.os == 'Linux'
+        run: ./Scripts/use-case-test.sh ./Builds/LinuxMakefile/build/routemidi
 
       # -------------------------------------------------------------- Windows
       - name: Add MSBuild to PATH
@@ -87,3 +95,8 @@ jobs:
         if: runner.os == 'Windows'
         shell: bash
         run: ./Scripts/pipe-test.sh ./Builds/VisualStudio2017/x64/Release/ConsoleApp/routemidi.exe
+
+      - name: Use-case test (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: ./Scripts/use-case-test.sh ./Builds/VisualStudio2017/x64/Release/ConsoleApp/routemidi.exe

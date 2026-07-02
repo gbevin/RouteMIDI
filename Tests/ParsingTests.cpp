@@ -38,6 +38,39 @@ namespace
         state.parseParameters(params);
         std::cerr.rdbuf(previous);
     }
+
+    var mcp(ApplicationState& state, const String& requestJson, bool quiet = false)
+    {
+        std::streambuf* previous = nullptr;
+        if (quiet)
+        {
+            previous = std::cerr.rdbuf(nullptr);
+        }
+
+        const String responseJson = state.handleMcpJsonForTest(requestJson);
+
+        if (quiet)
+        {
+            std::cerr.rdbuf(previous);
+        }
+
+        return responseJson.isEmpty() ? var() : JSON::parse(responseJson);
+    }
+
+    String mcpText(const var& response)
+    {
+        if (auto* result = response.getProperty("result", var()).getDynamicObject())
+        {
+            if (auto* content = result->getProperty("content").getArray())
+            {
+                if (!content->isEmpty())
+                {
+                    return content->getReference(0).getProperty("text", var()).toString();
+                }
+            }
+        }
+        return {};
+    }
 }
 
 class ParsingTests : public UnitTest
@@ -322,6 +355,696 @@ public:
             ApplicationState state;
             parse(state, "omc 4");
             expectEquals((int)state.asNoteNumber("C4"), 60);
+        }
+
+        beginTest("Command schema is valid JSON and describes command arity");
+        {
+            ApplicationState state;
+            const var schema = JSON::parse(state.schemaJson());
+            auto* root = schema.getDynamicObject();
+            expect(root != nullptr);
+            if (root != nullptr)
+            {
+                expect(root->getProperty("tool").toString() == ProjectInfo::projectName);
+                expectEquals((int)root->getProperty("defaultOctaveMiddleC"), 3);
+
+                const auto& commands = *root->getProperty("commands").getArray();
+                expect(commands.size() > 0);
+
+                auto findCommand = [&commands](const String& name) -> DynamicObject*
+                {
+                    for (const auto& command : commands)
+                    {
+                        if (auto* object = command.getDynamicObject())
+                        {
+                            if (object->getProperty("name").toString() == name)
+                            {
+                                return object;
+                            }
+                        }
+                    }
+                    return nullptr;
+                };
+
+                auto* transp = findCommand("transp");
+                expect(transp != nullptr);
+                if (transp != nullptr)
+                {
+                    expect(transp->getProperty("alias").toString() == "transpose");
+                    expect(transp->getProperty("stage").toString() == "transforms");
+                    expect(transp->getProperty("arity").toString() == "fixed");
+                    expectEquals((int)transp->getProperty("minArgs"), 1);
+                    expectEquals((int)transp->getProperty("maxArgs"), 1);
+                }
+
+                auto* convert = findCommand("convert");
+                expect(convert != nullptr);
+                if (convert != nullptr)
+                {
+                    expect(convert->getProperty("stage").toString() == "conversions");
+                    expectEquals((int)convert->getProperty("minArgs"), 4);
+                    expectEquals((int)convert->getProperty("maxArgs"), 4);
+                }
+
+                // the stage names double as the stage argument of the MCP
+                // route-editing tools, including the two commands whose stage
+                // differs from their help grouping
+                auto* nrpnadd = findCommand("nrpnadd");
+                expect(nrpnadd != nullptr);
+                if (nrpnadd != nullptr)
+                {
+                    expect(nrpnadd->getProperty("stage").toString() == "conversions");
+                }
+                auto* mpesplit = findCommand("mpesplit");
+                expect(mpesplit != nullptr);
+                if (mpesplit != nullptr)
+                {
+                    expect(mpesplit->getProperty("stage").toString() == "split");
+                }
+
+                auto* chord = findCommand("chord");
+                expect(chord != nullptr);
+                if (chord != nullptr)
+                {
+                    expect(chord->getProperty("arity").toString() == "variable");
+                    expect(chord->getProperty("maxArgs").isVoid());
+                }
+            }
+        }
+
+        beginTest("MCP initialize advertises RouteMIDI tools");
+        {
+            ApplicationState state;
+            const var response = mcp(state, R"json({
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "initialize",
+                "params": {
+                    "protocolVersion": "2025-06-18",
+                    "capabilities": {},
+                    "clientInfo": { "name": "test", "version": "1" }
+                }
+            })json");
+
+            auto* result = response.getProperty("result", var()).getDynamicObject();
+            expect(result != nullptr);
+            if (result != nullptr)
+            {
+                expect(result->getProperty("protocolVersion").toString() == "2025-06-18");
+                expect(result->getProperty("serverInfo").getProperty("name", var()).toString()
+                       == ProjectInfo::projectName);
+                expect(result->getProperty("capabilities").getProperty("tools", var()).isObject());
+            }
+        }
+
+        beginTest("MCP tools/list exposes schema, ports and routing tools");
+        {
+            ApplicationState state;
+            const var response = mcp(state, R"json({
+                "jsonrpc": "2.0",
+                "id": 2,
+                "method": "tools/list"
+            })json");
+
+            auto* tools = response.getProperty("result", var()).getProperty("tools", var()).getArray();
+            expect(tools != nullptr);
+            if (tools != nullptr)
+            {
+                StringArray names;
+                for (auto&& tool : *tools)
+                {
+                    names.add(tool.getProperty("name", var()).toString());
+                }
+
+                expect(names.contains("get_schema"));
+                expect(names.contains("list_midi_ports"));
+                expect(names.contains("start_route"));
+            }
+        }
+
+        beginTest("MCP get_schema returns structured command metadata");
+        {
+            ApplicationState state;
+            const var response = mcp(state, R"json({
+                "jsonrpc": "2.0",
+                "id": 3,
+                "method": "tools/call",
+                "params": {
+                    "name": "get_schema",
+                    "arguments": {}
+                }
+            })json");
+
+            auto schema = response.getProperty("result", var()).getProperty("structuredContent", var());
+            expect(schema.getProperty("tool", var()).toString() == ProjectInfo::projectName);
+            auto* commands = schema.getProperty("commands", var()).getArray();
+            expect(commands != nullptr);
+            if (commands != nullptr)
+            {
+                expect(commands->size() > 0);
+            }
+            expect(JSON::parse(mcpText(response)).isObject());
+        }
+
+        beginTest("MCP list_midi_ports returns structured input and output arrays");
+        {
+            ApplicationState state;
+            const var response = mcp(state, R"json({
+                "jsonrpc": "2.0",
+                "id": 4,
+                "method": "tools/call",
+                "params": {
+                    "name": "list_midi_ports",
+                    "arguments": {}
+                }
+            })json", true);
+
+            auto ports = response.getProperty("result", var()).getProperty("structuredContent", var());
+            expect(ports.getProperty("inputs", var()).isArray());
+            expect(ports.getProperty("outputs", var()).isArray());
+        }
+
+        beginTest("MCP start_route rejects stdio routes that would corrupt protocol output");
+        {
+            ApplicationState state;
+            const var response = mcp(state, R"json({
+                "jsonrpc": "2.0",
+                "id": 5,
+                "method": "tools/call",
+                "params": {
+                    "name": "start_route",
+                    "arguments": {
+                        "commands": ["in", "-", "out", "Output"]
+                    }
+                }
+            })json");
+
+            expect(response.getProperty("result", var()).getProperty("isError", var()));
+            expect(mcpText(response).contains("stdin/stdout"));
+            expectEquals(state.getRoutes().size(), 0);
+        }
+
+        beginTest("MCP start_route starts a live route from command tokens");
+        {
+            ApplicationState state;
+            const var response = mcp(state, R"json({
+                "jsonrpc": "2.0",
+                "id": 6,
+                "method": "tools/call",
+                "params": {
+                    "name": "start_route",
+                    "arguments": {
+                        "commands": [
+                            "in", "NoSuchInput",
+                            "transp", "12",
+                            "out", "NoSuchOutput"
+                        ]
+                    }
+                }
+            })json", true);
+
+            auto structured = response.getProperty("result", var()).getProperty("structuredContent", var());
+            expectEquals((int)structured.getProperty("routesBefore", var()), 0);
+            expectEquals((int)structured.getProperty("routesAfter", var()), 1);
+            expect(structured.getProperty("running", var()));
+            expectEquals(state.getRoutes().size(), 1);
+            expectEquals(state.getRoutes()[0]->transforms.size(), 1);
+            expect(state.getRoutes()[0]->transforms[0].command_ == TRANSPOSE);
+
+            // the result reports how each port of the new route resolved, so a
+            // client can tell a running route from one waiting for its ports
+            auto* routeStatus = structured.getProperty("routes", var()).getArray();
+            expect(routeStatus != nullptr && routeStatus->size() == 1);
+            if (routeStatus != nullptr && routeStatus->size() == 1)
+            {
+                const var route = routeStatus->getReference(0);
+                auto* inputs = route.getProperty("inputs", var()).getArray();
+                expect(inputs != nullptr && inputs->size() == 1);
+                if (inputs != nullptr && inputs->size() == 1)
+                {
+                    expect(inputs->getReference(0).getProperty("name", var()).toString() == "NoSuchInput");
+                    expect(! inputs->getReference(0).getProperty("connected", var()));
+                }
+            }
+        }
+
+        beginTest("MCP start_route rejects incomplete commands atomically");
+        {
+            // a trailing half-finished command must not leave the parser waiting
+            // for arguments, where it would swallow the first tokens of the next
+            // tool call (previously ["in"] then ["out","X"] silently created a
+            // route with an input named "out")
+            ApplicationState state;
+            const var first = mcp(state, R"json({
+                "jsonrpc": "2.0",
+                "id": 7,
+                "method": "tools/call",
+                "params": {
+                    "name": "start_route",
+                    "arguments": { "commands": ["in"] }
+                }
+            })json", true);
+            expect(first.getProperty("result", var()).getProperty("isError", var()));
+            expect(mcpText(first).contains("Incomplete command"));
+            expectEquals(state.getRoutes().size(), 0);
+
+            // the next call starts from a clean parser state
+            const var second = mcp(state, R"json({
+                "jsonrpc": "2.0",
+                "id": 8,
+                "method": "tools/call",
+                "params": {
+                    "name": "start_route",
+                    "arguments": { "commands": ["in", "SomeInput", "out", "SomeOutput"] }
+                }
+            })json", true);
+            auto structured = second.getProperty("result", var()).getProperty("structuredContent", var());
+            expectEquals((int)structured.getProperty("routesAfter", var()), 1);
+            expectEquals(state.getRoutes().size(), 1);
+            expect(state.getRoutes()[0]->inputs[0]->inName == "SomeInput");
+        }
+
+        beginTest("MCP start_route rejects semantic parse failures atomically");
+        {
+            // token-shape validation cannot catch everything: an invalid MPE zone
+            // has the right arity but fails when the command is added. Such
+            // failures must reject the whole call instead of splicing a partial
+            // route into the live set with "running": true
+            ApplicationState state;
+            const var badZone = mcp(state, R"json({
+                "jsonrpc": "2.0", "id": 30, "method": "tools/call",
+                "params": { "name": "start_route", "arguments": {
+                    "commands": ["in", "A", "mpemono", "middle", "1", "out", "B"] } }
+            })json", true);
+            expect(badZone.getProperty("result", var()).getProperty("isError", var()));
+            expect(mcpText(badZone).contains("Invalid MPE zone"));
+            expectEquals(state.getRoutes().size(), 0);
+
+            // a processing command before the first "in" would silently vanish;
+            // over MCP that is a mistake the agent needs to hear about
+            const var early = mcp(state, R"json({
+                "jsonrpc": "2.0", "id": 31, "method": "tools/call",
+                "params": { "name": "start_route", "arguments": {
+                    "commands": ["transp", "12", "in", "A", "out", "B"] } }
+            })json", true);
+            expect(early.getProperty("result", var()).getProperty("isError", var()));
+            expect(mcpText(early).contains("no input route was started yet"));
+            expectEquals(state.getRoutes().size(), 0);
+
+            // configuration-only tokens create nothing and must not report success
+            const var configOnly = mcp(state, R"json({
+                "jsonrpc": "2.0", "id": 32, "method": "tools/call",
+                "params": { "name": "start_route", "arguments": {
+                    "commands": ["hex"] } }
+            })json", true);
+            expect(configOnly.getProperty("result", var()).getProperty("isError", var()));
+            expect(mcpText(configOnly).contains("did not create a route"));
+            expectEquals(state.getRoutes().size(), 0);
+
+            // a valid call afterwards still succeeds
+            const var good = mcp(state, R"json({
+                "jsonrpc": "2.0", "id": 33, "method": "tools/call",
+                "params": { "name": "start_route", "arguments": {
+                    "commands": ["in", "A", "mpemono", "lower", "1", "out", "B"] } }
+            })json", true);
+            expect(! good.getProperty("result", var()).getProperty("isError", var()));
+            expectEquals(state.getRoutes().size(), 1);
+            expectEquals(state.getRoutes()[0]->mpeOps.size(), 1);
+        }
+
+        beginTest("MCP start_route restores session settings when a call is rejected");
+        {
+            ApplicationState state;
+
+            // a rejected config-only call must not leave hex mode behind
+            mcp(state, R"json({
+                "jsonrpc": "2.0", "id": 40, "method": "tools/call",
+                "params": { "name": "start_route", "arguments": { "commands": ["hex"] } }
+            })json", true);
+            const var route = mcp(state, R"json({
+                "jsonrpc": "2.0", "id": 41, "method": "tools/call",
+                "params": { "name": "start_route", "arguments": {
+                    "commands": ["in", "A", "transp", "12", "out", "B"] } }
+            })json", true);
+            expect(! route.getProperty("result", var()).getProperty("isError", var()));
+            {
+                // "12" still parses as decimal: 60 + 12 = 72 (hex leakage would give 78)
+                Array<MidiMessage> out = state.applyTransforms(*state.getRoutes()[0],
+                                                               *state.getRoutes()[0]->inputs[0],
+                                                               MidiMessage::noteOn(1, 60, (uint8) 100));
+                expectEquals(out[0].getNoteNumber(), 72);
+            }
+
+            // settings inside a larger rejected call are rolled back too
+            mcp(state, R"json({
+                "jsonrpc": "2.0", "id": 42, "method": "tools/call",
+                "params": { "name": "start_route", "arguments": {
+                    "commands": ["omc", "5", "in", "C", "mpemono", "middle", "1", "out", "D"] } }
+            })json", true);
+            expectEquals((int) state.asNoteNumber("C3"), 60);   // omc 5 would make this 36
+
+            // a successful call keeps its settings, as on the command line
+            const var hexRoute = mcp(state, R"json({
+                "jsonrpc": "2.0", "id": 43, "method": "tools/call",
+                "params": { "name": "start_route", "arguments": {
+                    "commands": ["hex", "in", "E", "transp", "12", "out", "F"] } }
+            })json", true);
+            expect(! hexRoute.getProperty("result", var()).getProperty("isError", var()));
+            {
+                // "12" now parses as hexadecimal: 60 + 0x12 = 78
+                Array<MidiMessage> out = state.applyTransforms(*state.getRoutes()[1],
+                                                               *state.getRoutes()[1]->inputs[0],
+                                                               MidiMessage::noteOn(1, 60, (uint8) 100));
+                expectEquals(out[0].getNoteNumber(), 78);
+            }
+        }
+
+        beginTest("MCP start_route does not leak a trailing 'not' into the next call");
+        {
+            ApplicationState state;
+            mcp(state, R"json({
+                "jsonrpc": "2.0", "id": 44, "method": "tools/call",
+                "params": { "name": "start_route", "arguments": {
+                    "commands": ["in", "A", "out", "B", "not"] } }
+            })json", true);
+            mcp(state, R"json({
+                "jsonrpc": "2.0", "id": 45, "method": "tools/call",
+                "params": { "name": "start_route", "arguments": {
+                    "commands": ["in", "C", "clock", "out", "D"] } }
+            })json", true);
+            expectEquals(state.getRoutes().size(), 2);
+            expectEquals(state.getRoutes()[1]->filters.size(), 1);
+            expect(! state.getRoutes()[1]->filters[0].negate_);   // the stray "not" did not attach
+        }
+
+        beginTest("MCP start_route rejects stdout monitoring and file capture");
+        {
+            ApplicationState state;
+
+            // "src" enables monitoring just like "mon" and would corrupt the
+            // JSON-RPC framing on stdout with every routed message
+            const var src = mcp(state, R"json({
+                "jsonrpc": "2.0", "id": 50, "method": "tools/call",
+                "params": { "name": "start_route", "arguments": {
+                    "commands": ["in", "A", "src", "out", "B"] } }
+            })json", true);
+            expect(src.getProperty("result", var()).getProperty("isError", var()));
+            expect(mcpText(src).contains("stdout"));
+            expectEquals(state.getRoutes().size(), 0);
+
+            const var srcLong = mcp(state, R"json({
+                "jsonrpc": "2.0", "id": 51, "method": "tools/call",
+                "params": { "name": "start_route", "arguments": {
+                    "commands": ["in", "A", "monitor-source", "out", "B"] } }
+            })json", true);
+            expect(srcLong.getProperty("result", var()).getProperty("isError", var()));
+
+            // "syf" deletes and recreates its target file while parsing, which a
+            // rejected call could never undo, so it is rejected up front and a
+            // pre-existing capture file survives the attempt untouched
+            File sentinel = File::getSpecialLocation(File::tempDirectory)
+                                .getChildFile("routemidi-mcp-syf-test.syx");
+            sentinel.replaceWithText("precious");
+
+            const var syf = mcp(state, String(R"json({
+                "jsonrpc": "2.0", "id": 52, "method": "tools/call",
+                "params": { "name": "start_route", "arguments": {
+                    "commands": ["in", "A", "syx", "out", "B", "syf", ")json")
+                + sentinel.getFullPathName().replace("\\", "\\\\") + R"json("] } } })json", true);
+            expect(syf.getProperty("result", var()).getProperty("isError", var()));
+            expect(mcpText(syf).contains("SysEx"));
+            expectEquals(state.getRoutes().size(), 0);
+            expect(sentinel.existsAsFile());
+            expect(sentinel.loadFileAsString() == "precious");
+            sentinel.deleteFile();
+        }
+
+        beginTest("MCP command availability is an allow-list at the command level");
+        {
+            ApplicationState state;
+
+            // commands outside the allow-list are rejected with a reason, even
+            // ones that were never in the old deny-list (nn/ts formatting)
+            const var nn = mcp(state, R"json({
+                "jsonrpc": "2.0", "id": 60, "method": "tools/call",
+                "params": { "name": "start_route", "arguments": {
+                    "commands": ["in", "A", "nn", "out", "B"] } }
+            })json", true);
+            expect(nn.getProperty("result", var()).getProperty("isError", var()));
+            expect(mcpText(nn).contains("not available in MCP mode"));
+
+            const var list = mcp(state, R"json({
+                "jsonrpc": "2.0", "id": 61, "method": "tools/call",
+                "params": { "name": "start_route", "arguments": { "commands": ["list"] } }
+            })json", true);
+            expect(list.getProperty("result", var()).getProperty("isError", var()));
+            expect(mcpText(list).contains("list_midi_ports"));
+
+            // the check works at the command level, not the token level: a port
+            // that happens to be NAMED like a forbidden command is a fixed
+            // argument and passes (the old token scan wrongly rejected this)
+            const var portNamedMon = mcp(state, R"json({
+                "jsonrpc": "2.0", "id": 62, "method": "tools/call",
+                "params": { "name": "start_route", "arguments": {
+                    "commands": ["in", "mon", "out", "syf"] } }
+            })json", true);
+            expect(! portNamedMon.getProperty("result", var()).getProperty("isError", var()));
+            expectEquals(state.getRoutes().size(), 1);
+            expect(state.getRoutes()[0]->inputs[0]->inName == "mon");
+            expect(state.getRoutes()[0]->outputs[0]->name == "syf");
+        }
+
+        beginTest("MCP rejects jsf so local file contents cannot leak into responses");
+        {
+            // jsf reads an arbitrary local file into the command's options at
+            // parse time, and route reporting echoes options verbatim, so over
+            // MCP it would let a client read any file
+            ApplicationState state;
+            File secretFile = File::getSpecialLocation(File::tempDirectory)
+                                  .getChildFile("routemidi-mcp-jsf-test.js");
+            const String secret = "SECRET-FILE-CONTENT-1f2e3d";
+            secretFile.replaceWithText(secret);
+            const String path = secretFile.getFullPathName().replace("\\", "\\\\");
+
+            const var started = mcp(state, String(R"json({
+                "jsonrpc": "2.0", "id": 70, "method": "tools/call",
+                "params": { "name": "start_route", "arguments": {
+                    "commands": ["in", "A", "jsf", ")json")
+                + path + R"json(", "out", "B"] } } })json", true);
+            expect(started.getProperty("result", var()).getProperty("isError", var()));
+            expect(mcpText(started).contains("JavaScript"));
+            expect(! JSON::toString(started, true).contains(secret));
+            expectEquals(state.getRoutes().size(), 0);
+
+            // the same protection holds when editing a running route
+            mcp(state, R"json({
+                "jsonrpc": "2.0", "id": 71, "method": "tools/call",
+                "params": { "name": "start_route", "arguments": {
+                    "commands": ["in", "A", "out", "B"] } }
+            })json", true);
+            const var added = mcp(state, String(R"json({
+                "jsonrpc": "2.0", "id": 72, "method": "tools/call",
+                "params": { "name": "add_commands", "arguments": {
+                    "route": 1, "commands": ["jsf", ")json")
+                + path + R"json("] } } })json", true);
+            expect(added.getProperty("result", var()).getProperty("isError", var()));
+            expect(! JSON::toString(added, true).contains(secret));
+            expectEquals(state.getRoutes()[0]->transforms.size(), 0);
+
+            secretFile.deleteFile();
+        }
+
+        beginTest("MCP blocks inline js so scripting cannot run shell or network from a client");
+        {
+            // Util.command runs a shell, OSC opens sockets and Util.print writes
+            // to stdout, so inline js is a code-execution and exfiltration surface
+            // and must be rejected over MCP just like jsf; it stays on the CLI
+            ApplicationState state;
+            const var started = mcp(state, R"json({
+                "jsonrpc": "2.0", "id": 74, "method": "tools/call",
+                "params": { "name": "start_route", "arguments": {
+                    "commands": ["in", "A", "js", "Util.command('id');", "out", "B"] } }
+            })json", true);
+            expect(started.getProperty("result", var()).getProperty("isError", var()));
+            expect(mcpText(started).contains("JavaScript"));
+            expectEquals(state.getRoutes().size(), 0);
+
+            // and on a running route
+            mcp(state, R"json({
+                "jsonrpc": "2.0", "id": 75, "method": "tools/call",
+                "params": { "name": "start_route", "arguments": {
+                    "commands": ["in", "A", "out", "B"] } }
+            })json", true);
+            const var added = mcp(state, R"json({
+                "jsonrpc": "2.0", "id": 76, "method": "tools/call",
+                "params": { "name": "add_commands", "arguments": {
+                    "route": 1, "commands": ["js", "MIDI.setVelocity(100);"] } }
+            })json", true);
+            expect(added.getProperty("result", var()).getProperty("isError", var()));
+            expectEquals(state.getRoutes()[0]->transforms.size(), 0);
+        }
+
+        beginTest("MCP rejected calls do not poison the process exit code");
+        {
+            // a rejected tool call is a recovered session error: the server keeps
+            // serving, so it must not mark the process for a non-zero exit
+            JUCEApplicationBase::getInstance()->setApplicationReturnValue(0);
+
+            ApplicationState state;
+            mcp(state, R"json({
+                "jsonrpc": "2.0", "id": 80, "method": "tools/call",
+                "params": { "name": "start_route", "arguments": {
+                    "commands": ["in", "A", "mpemono", "middle", "1", "out", "B"] } }
+            })json", true);
+            expectEquals(JUCEApplicationBase::getInstance()->getApplicationReturnValue(), 0);
+        }
+
+        beginTest("MCP start_route rejects unknown tokens instead of loading files");
+        {
+            // an unrecognized bare token would be tried as a command-file path by
+            // the command-line parser; over MCP that must be rejected outright
+            ApplicationState state;
+            const var response = mcp(state, R"json({
+                "jsonrpc": "2.0",
+                "id": 9,
+                "method": "tools/call",
+                "params": {
+                    "name": "start_route",
+                    "arguments": { "commands": ["/etc/hosts"] }
+                }
+            })json", true);
+            expect(response.getProperty("result", var()).getProperty("isError", var()));
+            expect(mcpText(response).contains("Unknown command"));
+            expectEquals(state.getRoutes().size(), 0);
+        }
+
+        beginTest("MCP route lifecycle: list, edit and stop a running route");
+        {
+            ApplicationState state;
+            mcp(state, R"json({
+                "jsonrpc": "2.0", "id": 10, "method": "tools/call",
+                "params": { "name": "start_route", "arguments": {
+                    "commands": ["in", "LifecycleIn", "transp", "12", "out", "LifecycleOut"] } }
+            })json", true);
+
+            // list_routes reports the stable id and the staged commands
+            const var listed = mcp(state, R"json({
+                "jsonrpc": "2.0", "id": 11, "method": "tools/call",
+                "params": { "name": "list_routes", "arguments": {} }
+            })json");
+            auto* routes = listed.getProperty("result", var()).getProperty("structuredContent", var())
+                                 .getProperty("routes", var()).getArray();
+            expect(routes != nullptr && routes->size() == 1);
+            int routeId = -1;
+            if (routes != nullptr && routes->size() == 1)
+            {
+                const var route = routes->getReference(0);
+                routeId = (int) route.getProperty("id", var());
+                auto* transforms = route.getProperty("transforms", var()).getArray();
+                expect(transforms != nullptr && transforms->size() == 1);
+                if (transforms != nullptr && transforms->size() == 1)
+                {
+                    expect(transforms->getReference(0).getProperty("command", var()).toString() == "transp");
+                }
+            }
+            expect(routeId >= 1);
+
+            // add a scale quantizer behind the transpose and verify the behavior
+            mcp(state, String(R"json({
+                "jsonrpc": "2.0", "id": 12, "method": "tools/call",
+                "params": { "name": "add_commands", "arguments": {
+                    "route": )json") + String(routeId) + R"json(,
+                    "commands": ["scale", "C", "major"] } } })json", true);
+            expectEquals(state.getRoutes()[0]->transforms.size(), 2);
+            {
+                // 61 transposes to 73 (C#4), which C major snaps down to 72
+                Array<MidiMessage> out = state.applyTransforms(*state.getRoutes()[0],
+                                                               *state.getRoutes()[0]->inputs[0],
+                                                               MidiMessage::noteOn(1, 61, (uint8) 100));
+                expectEquals(out.size(), 1);
+                expectEquals(out[0].getNoteNumber(), 72);
+            }
+
+            // replace the scale in place, keeping its position after the transpose
+            const var replaced = mcp(state, String(R"json({
+                "jsonrpc": "2.0", "id": 13, "method": "tools/call",
+                "params": { "name": "replace_command", "arguments": {
+                    "route": )json") + String(routeId) + R"json(,
+                    "stage": "transforms", "index": 1,
+                    "commands": ["scale", "D", "minor"] } } })json", true);
+            expect(! replaced.getProperty("result", var()).getProperty("isError", var()));
+            expectEquals(state.getRoutes()[0]->transforms.size(), 2);
+            expect(state.getRoutes()[0]->transforms[1].opts_[0] == "D");
+
+            // remove the transpose; only the D minor quantizer remains
+            mcp(state, String(R"json({
+                "jsonrpc": "2.0", "id": 14, "method": "tools/call",
+                "params": { "name": "remove_command", "arguments": {
+                    "route": )json") + String(routeId) + R"json(,
+                    "stage": "transforms", "index": 0 } } })json", true);
+            expectEquals(state.getRoutes()[0]->transforms.size(), 1);
+            {
+                // 61 (C#) is not in D minor and snaps down to 60 (C)
+                Array<MidiMessage> out = state.applyTransforms(*state.getRoutes()[0],
+                                                               *state.getRoutes()[0]->inputs[0],
+                                                               MidiMessage::noteOn(1, 61, (uint8) 100));
+                expectEquals(out.size(), 1);
+                expectEquals(out[0].getNoteNumber(), 60);
+            }
+
+            // panic then stop; the route disappears
+            const var panicked = mcp(state, String(R"json({
+                "jsonrpc": "2.0", "id": 15, "method": "tools/call",
+                "params": { "name": "panic_route", "arguments": { "route": )json")
+                + String(routeId) + "} } }", true);
+            expect(! panicked.getProperty("result", var()).getProperty("isError", var()));
+
+            const var stopped = mcp(state, String(R"json({
+                "jsonrpc": "2.0", "id": 16, "method": "tools/call",
+                "params": { "name": "stop_route", "arguments": { "route": )json")
+                + String(routeId) + "} } }", true);
+            expect(! stopped.getProperty("result", var()).getProperty("isError", var()));
+            expectEquals(state.getRoutes().size(), 0);
+        }
+
+        beginTest("MCP route editing rejects invalid edits");
+        {
+            ApplicationState state;
+            mcp(state, R"json({
+                "jsonrpc": "2.0", "id": 20, "method": "tools/call",
+                "params": { "name": "start_route", "arguments": {
+                    "commands": ["in", "EditIn", "transp", "12", "out", "EditOut"] } }
+            })json", true);
+
+            // topology commands cannot be added to a running route
+            const var addPort = mcp(state, R"json({
+                "jsonrpc": "2.0", "id": 21, "method": "tools/call",
+                "params": { "name": "add_commands", "arguments": {
+                    "route": 1, "commands": ["out", "Elsewhere"] } }
+            })json", true);
+            expect(addPort.getProperty("result", var()).getProperty("isError", var()));
+            expect(mcpText(addPort).contains("cannot be added"));
+
+            // a replacement must belong to the stage being replaced
+            const var wrongStage = mcp(state, R"json({
+                "jsonrpc": "2.0", "id": 22, "method": "tools/call",
+                "params": { "name": "replace_command", "arguments": {
+                    "route": 1, "stage": "transforms", "index": 0,
+                    "commands": ["ch", "1"] } }
+            })json", true);
+            expect(wrongStage.getProperty("result", var()).getProperty("isError", var()));
+
+            // unknown route ids are reported
+            const var missing = mcp(state, R"json({
+                "jsonrpc": "2.0", "id": 23, "method": "tools/call",
+                "params": { "name": "stop_route", "arguments": { "route": 99 } }
+            })json", true);
+            expect(missing.getProperty("result", var()).getProperty("isError", var()));
+            expect(mcpText(missing).contains("No route with id"));
+
+            // the failed edits left the route untouched
+            expectEquals(state.getRoutes().size(), 1);
+            expectEquals(state.getRoutes()[0]->transforms.size(), 1);
         }
 
         beginTest("Text MIDI codec round-trips through messageToText/parseTextMidi");

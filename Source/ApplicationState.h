@@ -26,10 +26,13 @@
 #include "TextMidi.h"
 
 #include <atomic>
+#include <memory>
 #include <condition_variable>
 #include <deque>
 #include <mutex>
 #include <thread>
+
+class McpServer;
 
 class ApplicationState : public MidiInputCallback, public Timer
 {
@@ -55,6 +58,11 @@ public:
     // entry points also used by the test suite (Tests/) to drive the parser,
     // the filter stage and the converter stage without real MIDI hardware
     void parseParameters(StringArray& parameters);
+    // like parseParameters, but newly created routes land in the given staging
+    // list instead of routes_ (see the MCP start_route tool)
+    void parseParametersInto(OwnedArray<Route>& target, StringArray& parameters);
+    String schemaJson() const;
+    String handleMcpJsonForTest(const String& requestJson);
     bool passesFilters(Route& route, const MidiMessage& msg);
     Array<MidiMessage> applyTransforms(Route& route, RouteInput& input, const MidiMessage& msg);
     void processMpe(Route& route, RouteInput& input, const MidiMessage& msg, Array<MidiMessage>& output);
@@ -98,6 +106,13 @@ private:
 
     Route* currentRoute();
     Route* routeForNewInput();
+    // prints a parse-time error and records it in parseErrors_, so the MCP
+    // start_route tool can reject a call whose commands only partially applied
+    void reportParseError(const String& message);
+    // adds a processing command (filter, transform, MPE operation, conversion or
+    // split) to the route, with the same normalization and validation as the
+    // command-line parser; returns an error message, or an empty string on success
+    String addProcessingCommand(Route& route, ApplicationCommand cmd, bool negate);
     void openInput(RouteInput& input);
     bool tryToConnectInput(RouteInput& input);
     void createVirtualInput(RouteInput& input, const String& name);
@@ -132,12 +147,19 @@ private:
     void printMonitor(const String& inName, const MidiMessage& msg);
 
     void printVersion();
+    void printSchemaJson();
     void printUsage();
+    void initialiseScripting();
 
     Array<ApplicationCommand> commands_;
     ApplicationCommand currentCommand_;
 
     OwnedArray<Route> routes_;
+    int nextRouteId_ { 1 };
+    OwnedArray<Route>* parseTarget_ { nullptr };   // non-null while parsing into a
+                                                   // staging list instead of routes_
+    StringArray parseErrors_;                      // semantic errors of the last
+                                                   // parseParametersInto run
 
     bool pendingNegate_;
 
@@ -151,6 +173,11 @@ private:
     JavascriptEngine scriptEngine_;
     ScriptMidiMessageClass* scriptMidiMessage_;
     bool hasScript_;
+
+    // the MCP stdio server (McpServer.cpp), created by "--mcp" and by the test
+    // hook; it drives routes_ and the processing commands, so it is a friend
+    friend class McpServer;
+    std::unique_ptr<McpServer> mcpServer_;
 
     CriticalSection midiCallbackLock_;
 };

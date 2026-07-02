@@ -10,6 +10,33 @@
 
 Rules for generating correct RouteMIDI command lines.
 
+**Machine discovery**
+
+- `routemidi --schema json` prints machine-readable command metadata and exits.
+- `routemidi --mcp` runs a stdio MCP server. MCP clients must be configured to
+  launch this command; normal live routing commands do not advertise or expose
+  an MCP endpoint.
+- Once launched with `--mcp`, discover tools through MCP `initialize` and
+  `tools/list`. The server exposes `get_schema`, `list_midi_ports`,
+  `start_route`, `list_routes`, `add_commands`, `replace_command`,
+  `remove_command`, `panic_route` and `stop_route`.
+- `start_route` and `add_commands` take the same command tokens as the command
+  line, minus the executable name, as a JSON array (one token per element). A
+  good workflow: verify tokens with a one-shot `in - ... out -` text pipe, then
+  start the identical tokens live. MCP mode allows routing (`in`, `out`,
+  `vin`, `vout`, `panic`), number settings (`dec`, `hex`, `omc`) and every
+  processing command; everything else is rejected: `-` routes and monitoring
+  because MCP owns stdout for JSON-RPC framing, and scripting (`js`, `jsf`),
+  file capture (`syf`) and program files (`file`) because they run code or
+  touch the local file system. Invalid or
+  partial commands reject atomically: on error nothing is started and session
+  settings are rolled back.
+- Routes have stable ids. `list_routes` reports each route's ports and staged
+  commands with per-stage indexes; `add_commands`/`replace_command`/
+  `remove_command` edit a running route live (e.g. change a scale or remap a
+  curve), and `panic_route` releases anything left sounding after editing
+  stateful commands such as latch, mono or the MPE operations.
+
 **Route-start rules**
 
 - Invocation: `routemidi [settings] in <port> [commands ...] out <port> [in ... out ...]`
@@ -90,7 +117,8 @@ channel  1   note-on           C4 100
 
 ## Docs
 
-- [README](https://raw.githubusercontent.com/gbevin/RouteMIDI/master/README.md): the full manual: every command, filter semantics, transforms, conversions, MPE routing, text MIDI format, and a section written for AI assistants with a recipe table
+- [README](https://raw.githubusercontent.com/gbevin/RouteMIDI/master/README.md): the full manual: every command, filter semantics, transforms, conversions, MPE routing and the text MIDI format
+- [AI.md](https://raw.githubusercontent.com/gbevin/RouteMIDI/master/AI.md): driving RouteMIDI from AI tools and scripts: the generation contract, the `--schema json` metadata, the `--mcp` MCP server and its security model (experimental and fast-moving)
 - [JAVASCRIPT.md](https://raw.githubusercontent.com/gbevin/RouteMIDI/master/JAVASCRIPT.md): the per-message JavaScript API (accessors, send functions, OSC, persistent state)
 
 ## Related

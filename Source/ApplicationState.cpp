@@ -18,6 +18,9 @@
 
 #include "ApplicationState.h"
 
+#include "McpServer.h"
+#include "Schema.h"
+
 #include "BitScaling.h"
 #include "Conversion.h"
 #include "ScriptOscClass.h"
@@ -218,12 +221,29 @@ void ApplicationState::initialise(JUCEApplicationBase& app)
         app.systemRequestedQuit();
         return;
     }
+    else if (cmdLineParams.size() == 2
+             && cmdLineParams[0] == "--schema"
+             && cmdLineParams[1].equalsIgnoreCase("json"))
+    {
+        printSchemaJson();
+        app.systemRequestedQuit();
+        return;
+    }
+    else if (cmdLineParams.size() == 1 && cmdLineParams[0] == "--mcp")
+    {
+        initialiseScripting();
+        // routes can be started at any time over MCP, so the sender and the
+        // reconnect timer run for the whole session; requests are read on a
+        // background thread so the message loop (and with it the timer) keeps
+        // running, and each request is handled on the message thread
+        startOutputSender();
+        startTimer(200);
+        mcpServer_ = std::make_unique<McpServer>(*this);
+        mcpServer_->start();
+        return;
+    }
 
-    scriptEngine_.maximumExecutionTime = RelativeTime::days(365);
-    scriptMidiMessage_ = new ScriptMidiMessageClass(*this);
-    scriptEngine_.registerNativeObject("MIDI", scriptMidiMessage_);
-    scriptEngine_.registerNativeObject("OSC",  new ScriptOscClass());
-    scriptEngine_.registerNativeObject("Util", new ScriptUtilClass());
+    initialiseScripting();
 
     parseParameters(cmdLineParams);
 
@@ -286,6 +306,9 @@ void ApplicationState::shutdown()
     }
 
     stopOutputSender();   // drains the queue (including any panic) before returning
+
+    mcpServer_.reset();   // joins the reader thread, which has already finished:
+                          // quitting happens when the MCP client closes stdin
 }
 
 bool ApplicationState::hasStdinInput() const
@@ -338,7 +361,8 @@ void ApplicationState::readStdinMidi()
 
 Route* ApplicationState::currentRoute()
 {
-    return routes_.isEmpty() ? nullptr : routes_.getLast();
+    OwnedArray<Route>& target = parseTarget_ != nullptr ? *parseTarget_ : routes_;
+    return target.isEmpty() ? nullptr : target.getLast();
 }
 
 Route* ApplicationState::routeForNewInput()
@@ -349,9 +373,29 @@ Route* ApplicationState::routeForNewInput()
     if (route == nullptr || !route->outputs.isEmpty())
     {
         route = new Route();
-        routes_.add(route);
+        route->id = nextRouteId_++;
+        (parseTarget_ != nullptr ? *parseTarget_ : routes_).add(route);
     }
     return route;
+}
+
+void ApplicationState::parseParametersInto(OwnedArray<Route>& target, StringArray& parameters)
+{
+    // routes created while parsing land in the staging list instead of routes_,
+    // so live routing is never touched while the new routes open their devices;
+    // the caller splices them into routes_ under the callback lock afterwards,
+    // or discards them when parseErrors_ reports semantic failures
+    parseErrors_.clearQuick();
+    parseTarget_ = &target;
+    parseParameters(parameters);
+    parseTarget_ = nullptr;
+    pendingNegate_ = false;   // a trailing "not" must not negate the next call's first filter
+}
+
+void ApplicationState::reportParseError(const String& message)
+{
+    std::cerr << message << std::endl;
+    parseErrors_.add(message);
 }
 
 void ApplicationState::timerCallback()
@@ -695,7 +739,7 @@ void ApplicationState::executeCommand(ApplicationCommand& cmd)
             }
             else
             {
-                std::cerr << "Ignoring \"out\" because no input route was started yet (use \"in\" first)" << std::endl;
+                reportParseError("Ignoring \"out\" because no input route was started yet (use \"in\" first)");
             }
             break;
         }
@@ -711,7 +755,7 @@ void ApplicationState::executeCommand(ApplicationCommand& cmd)
             }
             else
             {
-                std::cerr << "Ignoring \"vout\" because no input route was started yet (use \"in\" first)" << std::endl;
+                reportParseError("Ignoring \"vout\" because no input route was started yet (use \"in\" first)");
             }
             break;
         }
@@ -763,7 +807,7 @@ void ApplicationState::executeCommand(ApplicationCommand& cmd)
                 dest->syxFile = file.createOutputStream();
                 if (dest->syxFile == nullptr)
                 {
-                    std::cerr << "Couldn't create file \"" << path << "\"" << std::endl;
+                    reportParseError("Couldn't create file \"" + path + "\"");
                     JUCEApplicationBase::getInstance()->setApplicationReturnValue(EXIT_FAILURE);
                     delete dest;
                 }
@@ -774,7 +818,7 @@ void ApplicationState::executeCommand(ApplicationCommand& cmd)
             }
             else
             {
-                std::cerr << "Ignoring \"syf\" because no input route was started yet (use \"in\" first)" << std::endl;
+                reportParseError("Ignoring \"syf\" because no input route was started yet (use \"in\" first)");
             }
             break;
         }
@@ -785,36 +829,50 @@ void ApplicationState::executeCommand(ApplicationCommand& cmd)
             }
             else
             {
-                std::cerr << "Ignoring \"panic\" because no input route was started yet (use \"in\" first)" << std::endl;
+                reportParseError("Ignoring \"panic\" because no input route was started yet (use \"in\" first)");
             }
             break;
         case NOT:
             pendingNegate_ = true;
             return;
+        default:
+            // everything else is a processing command (filter, transform, MPE
+            // operation, conversion or split) belonging to the current route
+            if (auto* route = currentRoute())
+            {
+                const String error = addProcessingCommand(*route, cmd, negate);
+                if (error.isNotEmpty())
+                {
+                    reportParseError(error);
+                    JUCEApplicationBase::getInstance()->setApplicationReturnValue(EXIT_FAILURE);
+                }
+            }
+            else
+            {
+                reportParseError("Ignoring \"" + cmd.param_ + "\" because no input route was started yet (use \"in\" first)");
+            }
+            break;
+    }
+
+    pendingNegate_ = false;
+}
+
+String ApplicationState::addProcessingCommand(Route& route, ApplicationCommand cmd, bool negate)
+{
+    switch (cmd.command_)
+    {
         case JAVASCRIPT_FILE:
         {
             String path(cmd.opts_[0]);
             File file = File::getCurrentWorkingDirectory().getChildFile(path);
-            if (file.existsAsFile())
+            if (!file.existsAsFile())
             {
-                cmd.opts_.set(0, file.loadFileAsString());
+                return "Couldn't find file \"" + path + "\"";
             }
-            else
-            {
-                std::cerr << "Couldn't find file \"" << path << "\"" << std::endl;
-                JUCEApplicationBase::getInstance()->setApplicationReturnValue(EXIT_FAILURE);
-                break;
-            }
-            if (auto* route = currentRoute())
-            {
-                route->transforms.add(cmd);
-                hasScript_ = true;
-            }
-            else
-            {
-                std::cerr << "Ignoring transform \"" << cmd.param_ << "\" because no input route was started yet (use \"in\" first)" << std::endl;
-            }
-            break;
+            cmd.opts_.set(0, file.loadFileAsString());
+            route.transforms.add(cmd);
+            hasScript_ = true;
+            return {};
         }
         case CONVERT:
         {
@@ -822,28 +880,19 @@ void ApplicationState::executeCommand(ApplicationCommand& cmd)
             // [num]"); normalize them to a fixed [srctype, srcnum, dsttype, dstnum]
             // form (with "0" where a type takes no number) for the converter
             String srcType, srcNum, dstType, dstNum;
-            const bool ok = conversion::parseSpec(cmd.opts_, srcType, srcNum, dstType, dstNum) >= 0;
-
-            if (!ok)
+            if (conversion::parseSpec(cmd.opts_, srcType, srcNum, dstType, dstNum) < 0)
             {
-                std::cerr << "Invalid convert specification, expected \"<srctype> [number] <dsttype> [number]\""
-                          << " with types cc, cc14, rpn, nrpn, pb, cp, pc or pp" << std::endl;
-                JUCEApplicationBase::getInstance()->setApplicationReturnValue(EXIT_FAILURE);
+                return "Invalid convert specification, expected \"<srctype> [number] <dsttype> [number]\""
+                       " with types cc, cc14, rpn, nrpn, pb, cp, pc or pp";
             }
-            else if (auto* route = currentRoute())
-            {
-                cmd.opts_.clearQuick();
-                cmd.opts_.add(srcType);
-                cmd.opts_.add(srcNum);
-                cmd.opts_.add(dstType);
-                cmd.opts_.add(dstNum);
-                route->converters.add(cmd);
-            }
-            else
-            {
-                std::cerr << "Ignoring \"convert\" because no input route was started yet (use \"in\" first)" << std::endl;
-            }
-            break;
+            cmd.opts_.clearQuick();
+            cmd.opts_.add(srcType);
+            cmd.opts_.add(srcNum);
+            cmd.opts_.add(dstType);
+            cmd.opts_.add(dstNum);
+            route.converters.add(cmd);
+            route.convertRules.clearQuick();   // recompiled on the next message
+            return {};
         }
         case MPE_RELOCATE:
         case MPE_COLLAPSE:
@@ -851,8 +900,8 @@ void ApplicationState::executeCommand(ApplicationCommand& cmd)
         case MPE_BEND:
         case MPE_SENS:
         {
-            // validate the zone tokens up front so mistakes are reported during
-            // parsing rather than silently doing nothing at routing time
+            // validate the zone tokens up front so mistakes are reported when the
+            // command is added rather than silently doing nothing at routing time
             mpe::Zone zone;
             const String& zoneToken = (cmd.command_ == MPE_EXPAND) ? cmd.opts_[1] : cmd.opts_[0];
             bool ok = mpe::parseZone(zoneToken, zone);
@@ -861,22 +910,13 @@ void ApplicationState::executeCommand(ApplicationCommand& cmd)
                 mpe::Zone dst;
                 ok = ok && mpe::parseZone(cmd.opts_[1], dst);
             }
-
             if (!ok)
             {
-                std::cerr << "Invalid MPE zone, expected \"lower\" or \"upper\" with an optional"
-                          << " \":<members>\" count (for example \"lower:7\")" << std::endl;
-                JUCEApplicationBase::getInstance()->setApplicationReturnValue(EXIT_FAILURE);
+                return "Invalid MPE zone, expected \"lower\" or \"upper\" with an optional"
+                       " \":<members>\" count (for example \"lower:7\")";
             }
-            else if (auto* route = currentRoute())
-            {
-                route->mpeOps.add(cmd);
-            }
-            else
-            {
-                std::cerr << "Ignoring \"" << cmd.param_ << "\" because no input route was started yet (use \"in\" first)" << std::endl;
-            }
-            break;
+            route.mpeOps.add(cmd);
+            return {};
         }
         case NRPN_ADD:
         case NRPN_SCALE:
@@ -886,67 +926,39 @@ void ApplicationState::executeCommand(ApplicationCommand& cmd)
         case RPN_CURVE:
             // RPN/NRPN value transforms are assembled and regenerated in the
             // converter stage, so they live alongside the convert rules
-            if (auto* route = currentRoute())
-            {
-                route->converters.add(cmd);
-            }
-            else
-            {
-                std::cerr << "Ignoring \"" << cmd.param_ << "\" because no input route was started yet (use \"in\" first)" << std::endl;
-            }
-            break;
+            route.converters.add(cmd);
+            route.convertRules.clearQuick();   // recompiled on the next message
+            return {};
         case MPE_SPLIT:
         {
             mpe::Zone zone;
             if (cmd.opts_.isEmpty() || !mpe::parseZone(cmd.opts_[0], zone))
             {
-                std::cerr << "Invalid \"mpesplit\" zone, expected \"lower\" or \"upper\" with an optional"
-                          << " \":<members>\" count (for example \"lower:7\")" << std::endl;
-                JUCEApplicationBase::getInstance()->setApplicationReturnValue(EXIT_FAILURE);
+                return "Invalid \"mpesplit\" zone, expected \"lower\" or \"upper\" with an optional"
+                       " \":<members>\" count (for example \"lower:7\")";
             }
-            else if (auto* route = currentRoute())
-            {
-                route->outputSplit.clearQuick();
-                route->outputSplit.add(cmd);
-            }
-            else
-            {
-                std::cerr << "Ignoring \"mpesplit\" because no input route was started yet (use \"in\" first)" << std::endl;
-            }
-            break;
+            route.outputSplit.clearQuick();
+            route.outputSplit.add(cmd);
+            return {};
         }
         default:
             if (cmd.isFilter())
             {
-                if (auto* route = currentRoute())
-                {
-                    cmd.negate_ = negate;
-                    route->filters.add(cmd);
-                }
-                else
-                {
-                    std::cerr << "Ignoring filter \"" << cmd.param_ << "\" because no input route was started yet (use \"in\" first)" << std::endl;
-                }
+                cmd.negate_ = negate;
+                route.filters.add(cmd);
+                return {};
             }
-            else if (cmd.isTransform())
+            if (cmd.isTransform())
             {
-                if (auto* route = currentRoute())
+                route.transforms.add(cmd);
+                if (cmd.command_ == JAVASCRIPT)
                 {
-                    route->transforms.add(cmd);
-                    if (cmd.command_ == JAVASCRIPT)
-                    {
-                        hasScript_ = true;
-                    }
+                    hasScript_ = true;
                 }
-                else
-                {
-                    std::cerr << "Ignoring transform \"" << cmd.param_ << "\" because no input route was started yet (use \"in\" first)" << std::endl;
-                }
+                return {};
             }
-            break;
+            return "\"" + cmd.param_ + "\" is not a route processing command";
     }
-
-    pendingNegate_ = false;
 }
 
 void ApplicationState::openInput(RouteInput& input)
@@ -1004,7 +1016,7 @@ void ApplicationState::createVirtualInput(RouteInput& input, const String& name)
     input.midiIn = MidiInput::createNewDevice(name, this);
     if (input.midiIn == nullptr)
     {
-        std::cerr << "Couldn't create virtual MIDI input port \"" << name << "\"" << std::endl;
+        reportParseError("Couldn't create virtual MIDI input port \"" + name + "\"");
         JUCEApplicationBase::getInstance()->setApplicationReturnValue(EXIT_FAILURE);
     }
     else
@@ -1066,7 +1078,7 @@ OutputDest* ApplicationState::createVirtualOutput(const String& name)
     dest->out = MidiOutput::createNewDevice(name);
     if (dest->out == nullptr)
     {
-        std::cerr << "Couldn't create virtual MIDI output port \"" << name << "\"" << std::endl;
+        reportParseError("Couldn't create virtual MIDI output port \"" + name + "\"");
         JUCEApplicationBase::getInstance()->setApplicationReturnValue(EXIT_FAILURE);
         return nullptr;
     }
@@ -1564,6 +1576,34 @@ void ApplicationState::printVersion()
     std::cout << "https://github.com/gbevin/RouteMIDI" << std::endl;
 }
 
+String ApplicationState::schemaJson() const
+{
+    return schema::commandsJson(commands_, DEFAULT_OCTAVE_MIDDLE_C);
+}
+
+String ApplicationState::handleMcpJsonForTest(const String& requestJson)
+{
+    if (mcpServer_ == nullptr)
+    {
+        mcpServer_ = std::make_unique<McpServer>(*this);
+    }
+    return mcpServer_->handleJsonForTest(requestJson);
+}
+
+void ApplicationState::printSchemaJson()
+{
+    std::cout << schemaJson() << std::endl;
+}
+
+void ApplicationState::initialiseScripting()
+{
+    scriptEngine_.maximumExecutionTime = RelativeTime::days(365);
+    scriptMidiMessage_ = new ScriptMidiMessageClass(*this);
+    scriptEngine_.registerNativeObject("MIDI", scriptMidiMessage_);
+    scriptEngine_.registerNativeObject("OSC",  new ScriptOscClass());
+    scriptEngine_.registerNativeObject("Util", new ScriptUtilClass());
+}
+
 // word-wraps text into lines no wider than the given number of characters
 static StringArray wrapText(const String& text, int width)
 {
@@ -1667,7 +1707,13 @@ void ApplicationState::printUsage()
     std::cout << std::endl;
     std::cout << "  -h  or  --help       Print Help (this message) and exit" << std::endl;
     std::cout << "  --version            Print version information and exit" << std::endl;
+    std::cout << "  --schema json        Print machine-readable command JSON and exit" << std::endl;
+    std::cout << "  --mcp                Run a stdio MCP server" << std::endl;
     std::cout << "  --                   Read commands from standard input until it's closed" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Use \"--schema json\" for command metadata for scripts, MCP servers and" << std::endl
+              << "AI agents." << std::endl;
+    std::cout << "Use \"--mcp\" to let MCP clients control RouteMIDI over stdio." << std::endl;
     std::cout << std::endl;
     std::cout << "Alternatively, you can use the following long versions of the commands:" << std::endl;
     String line = " ";
