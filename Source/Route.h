@@ -35,14 +35,7 @@ struct PressureCollapse
 {
     PressureCollapse() { reset(); }
 
-    void reset()
-    {
-        for (int c = 0; c < 16; ++c)
-        {
-            lastMax[c] = -1;
-            for (int n = 0; n < 128; ++n) pressure[c][n] = -1;
-        }
-    }
+    void reset();
 
     void noteOn(int channel, int note)         { int& p = pressure[channel - 1][note]; if (p < 0) p = 0; }
     void noteOff(int channel, int note)        { pressure[channel - 1][note] = -1; }
@@ -50,21 +43,11 @@ struct PressureCollapse
 
     // the highest pressure among the notes currently held on the channel, or 0
     // when none are held
-    int maxPressure(int channel) const
-    {
-        int m = -1;
-        for (int n = 0; n < 128; ++n) m = jmax(m, pressure[channel - 1][n]);
-        return jmax(0, m);
-    }
+    int maxPressure(int channel) const;
 
     // returns true (updating the cache) when the channel's combined value differs
     // from the last one emitted, so unchanged values aren't resent
-    bool changed(int channel, int value)
-    {
-        if (lastMax[channel - 1] == value) return false;
-        lastMax[channel - 1] = value;
-        return true;
-    }
+    bool changed(int channel, int value);
 
     int pressure[16][128];  // held-note pressures per channel, -1 = note not held
     int lastMax[16];        // last combined value emitted per channel, -1 = none yet
@@ -97,7 +80,7 @@ struct RouteInput
                                           // converter target, so its closing null
                                           // (in either RPN or NRPN form) is consumed too
 
-    RouteInput() { for (int c = 0; c < 16; ++c) { rpnSelMSB[c] = -1; rpnSelLSB[c] = -1; } }
+    RouteInput();
 
     // per-zone state (indexed [0] = Lower, [1] = Upper) so a Lower-zone and an
     // Upper-zone operation can run on the same input without sharing state

@@ -15,13 +15,20 @@
             file="Source/ApplicationState.cpp"/>
       <FILE id="GBoGkP" name="ApplicationState.h" compile="0" resource="0"
             file="Source/ApplicationState.h"/>
+      <FILE id="bsc002" name="BitScaling.cpp" compile="1" resource="0" file="Source/BitScaling.cpp"/>
       <FILE id="bbj9mA" name="BitScaling.h" compile="0" resource="0" file="Source/BitScaling.h"/>
+      <FILE id="cbk002" name="ChannelBucket.cpp" compile="1" resource="0" file="Source/ChannelBucket.cpp"/>
       <FILE id="cbk001" name="ChannelBucket.h" compile="0" resource="0" file="Source/ChannelBucket.h"/>
+      <FILE id="cnv002" name="Conversion.cpp" compile="1" resource="0" file="Source/Conversion.cpp"/>
       <FILE id="cnv001" name="Conversion.h" compile="0" resource="0" file="Source/Conversion.h"/>
+      <FILE id="ltc002" name="Latch.cpp" compile="1" resource="0" file="Source/Latch.cpp"/>
       <FILE id="ltc001" name="Latch.h" compile="0" resource="0" file="Source/Latch.h"/>
+      <FILE id="mno002" name="Mono.cpp" compile="1" resource="0" file="Source/Mono.cpp"/>
       <FILE id="mno001" name="Mono.h" compile="0" resource="0" file="Source/Mono.h"/>
       <FILE id="hGRRus" name="Main.cpp" compile="1" resource="0" file="Source/Main.cpp"/>
+      <FILE id="mpe002" name="Mpe.cpp" compile="1" resource="0" file="Source/Mpe.cpp"/>
       <FILE id="mpe001" name="Mpe.h" compile="0" resource="0" file="Source/Mpe.h"/>
+      <FILE id="rte002" name="Route.cpp" compile="1" resource="0" file="Source/Route.cpp"/>
       <FILE id="lNEBkp" name="Route.h" compile="0" resource="0" file="Source/Route.h"/>
       <FILE id="M3By28" name="ScriptMidiMessageClass.cpp" compile="1" resource="0"
             file="Source/ScriptMidiMessageClass.cpp"/>

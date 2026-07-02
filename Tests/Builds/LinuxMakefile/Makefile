@@ -74,6 +74,13 @@ endif
 OBJECTS_CONSOLEAPP := \
   $(JUCE_OBJDIR)/ApplicationCommand_76f77315.o \
   $(JUCE_OBJDIR)/ApplicationState_c736e69b.o \
+  $(JUCE_OBJDIR)/BitScaling_72e52674.o \
+  $(JUCE_OBJDIR)/ChannelBucket_429cdbdd.o \
+  $(JUCE_OBJDIR)/Conversion_b34d9fd0.o \
+  $(JUCE_OBJDIR)/Latch_d69170d4.o \
+  $(JUCE_OBJDIR)/Mono_cdd7cedd.o \
+  $(JUCE_OBJDIR)/Mpe_31077172.o \
+  $(JUCE_OBJDIR)/Route_503ad659.o \
   $(JUCE_OBJDIR)/ScriptMidiMessageClass_3119217.o \
   $(JUCE_OBJDIR)/ScriptOscClass_3ed124de.o \
   $(JUCE_OBJDIR)/ScriptUtilClass_da719b5b.o \
@@ -115,6 +122,41 @@ $(JUCE_OBJDIR)/ApplicationCommand_76f77315.o: ../../../Source/ApplicationCommand
 $(JUCE_OBJDIR)/ApplicationState_c736e69b.o: ../../../Source/ApplicationState.cpp
 	-$(V_AT)mkdir -p $(@D)
 	@echo "Compiling ApplicationState.cpp"
+	$(V_AT)$(CXX) $(JUCE_CXXFLAGS) $(JUCE_CPPFLAGS_CONSOLEAPP) $(JUCE_CFLAGS_CONSOLEAPP) -o "$@" -c "$<"
+
+$(JUCE_OBJDIR)/BitScaling_72e52674.o: ../../../Source/BitScaling.cpp
+	-$(V_AT)mkdir -p $(@D)
+	@echo "Compiling BitScaling.cpp"
+	$(V_AT)$(CXX) $(JUCE_CXXFLAGS) $(JUCE_CPPFLAGS_CONSOLEAPP) $(JUCE_CFLAGS_CONSOLEAPP) -o "$@" -c "$<"
+
+$(JUCE_OBJDIR)/ChannelBucket_429cdbdd.o: ../../../Source/ChannelBucket.cpp
+	-$(V_AT)mkdir -p $(@D)
+	@echo "Compiling ChannelBucket.cpp"
+	$(V_AT)$(CXX) $(JUCE_CXXFLAGS) $(JUCE_CPPFLAGS_CONSOLEAPP) $(JUCE_CFLAGS_CONSOLEAPP) -o "$@" -c "$<"
+
+$(JUCE_OBJDIR)/Conversion_b34d9fd0.o: ../../../Source/Conversion.cpp
+	-$(V_AT)mkdir -p $(@D)
+	@echo "Compiling Conversion.cpp"
+	$(V_AT)$(CXX) $(JUCE_CXXFLAGS) $(JUCE_CPPFLAGS_CONSOLEAPP) $(JUCE_CFLAGS_CONSOLEAPP) -o "$@" -c "$<"
+
+$(JUCE_OBJDIR)/Latch_d69170d4.o: ../../../Source/Latch.cpp
+	-$(V_AT)mkdir -p $(@D)
+	@echo "Compiling Latch.cpp"
+	$(V_AT)$(CXX) $(JUCE_CXXFLAGS) $(JUCE_CPPFLAGS_CONSOLEAPP) $(JUCE_CFLAGS_CONSOLEAPP) -o "$@" -c "$<"
+
+$(JUCE_OBJDIR)/Mono_cdd7cedd.o: ../../../Source/Mono.cpp
+	-$(V_AT)mkdir -p $(@D)
+	@echo "Compiling Mono.cpp"
+	$(V_AT)$(CXX) $(JUCE_CXXFLAGS) $(JUCE_CPPFLAGS_CONSOLEAPP) $(JUCE_CFLAGS_CONSOLEAPP) -o "$@" -c "$<"
+
+$(JUCE_OBJDIR)/Mpe_31077172.o: ../../../Source/Mpe.cpp
+	-$(V_AT)mkdir -p $(@D)
+	@echo "Compiling Mpe.cpp"
+	$(V_AT)$(CXX) $(JUCE_CXXFLAGS) $(JUCE_CPPFLAGS_CONSOLEAPP) $(JUCE_CFLAGS_CONSOLEAPP) -o "$@" -c "$<"
+
+$(JUCE_OBJDIR)/Route_503ad659.o: ../../../Source/Route.cpp
+	-$(V_AT)mkdir -p $(@D)
+	@echo "Compiling Route.cpp"
 	$(V_AT)$(CXX) $(JUCE_CXXFLAGS) $(JUCE_CPPFLAGS_CONSOLEAPP) $(JUCE_CFLAGS_CONSOLEAPP) -o "$@" -c "$<"
 
 $(JUCE_OBJDIR)/ScriptMidiMessageClass_3119217.o: ../../../Source/ScriptMidiMessageClass.cpp

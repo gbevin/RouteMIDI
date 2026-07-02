@@ -30,99 +30,17 @@ class LatchState
 public:
     // processes one message, appending its result to output (none, one or several
     // messages); hold selects hold mode, otherwise toggle mode is used
-    void process(bool hold, const MidiMessage& msg, Array<MidiMessage>& output)
-    {
-        const int channel = msg.getChannel();
-
-        if (msg.isNoteOn())
-        {
-            const int note = msg.getNoteNumber();
-            if (hold)
-            {
-                // the first key of a new gesture replaces the held chord
-                if (heldCount_ == 0)
-                {
-                    releaseLatched(output, msg.getTimeStamp());
-                }
-                if (!held_[channel - 1][note])
-                {
-                    held_[channel - 1][note] = true;
-                    ++heldCount_;
-                }
-                latched_[channel - 1][note] = true;
-                output.add(msg);
-            }
-            else if (latched_[channel - 1][note])
-            {
-                // toggle off: release the sounding note
-                latched_[channel - 1][note] = false;
-                MidiMessage off = MidiMessage::noteOff(channel, note);
-                off.setTimeStamp(msg.getTimeStamp());
-                output.add(off);
-            }
-            else
-            {
-                // toggle on: let the note through and remember it
-                latched_[channel - 1][note] = true;
-                output.add(msg);
-            }
-        }
-        else if (msg.isNoteOff())
-        {
-            // swallow the note-off so the note stays latched; in hold mode the key
-            // is no longer physically down
-            const int note = msg.getNoteNumber();
-            if (hold && held_[channel - 1][note])
-            {
-                held_[channel - 1][note] = false;
-                --heldCount_;
-            }
-        }
-        else
-        {
-            output.add(msg);
-        }
-    }
+    void process(bool hold, const MidiMessage& msg, Array<MidiMessage>& output);
 
     // releases every latched note (used by the panic safety net); appends the
     // note-offs to output and forgets all state
-    void reset(Array<MidiMessage>& output, double timestamp)
-    {
-        releaseLatched(output, timestamp);
-        clear();
-    }
+    void reset(Array<MidiMessage>& output, double timestamp);
 
     // forgets all latched and held notes without emitting anything
-    void clear()
-    {
-        for (int c = 0; c < 16; ++c)
-        {
-            for (int n = 0; n < 128; ++n)
-            {
-                latched_[c][n] = false;
-                held_[c][n] = false;
-            }
-        }
-        heldCount_ = 0;
-    }
+    void clear();
 
 private:
-    void releaseLatched(Array<MidiMessage>& output, double timestamp)
-    {
-        for (int c = 0; c < 16; ++c)
-        {
-            for (int n = 0; n < 128; ++n)
-            {
-                if (latched_[c][n])
-                {
-                    latched_[c][n] = false;
-                    MidiMessage off = MidiMessage::noteOff(c + 1, n);
-                    off.setTimeStamp(timestamp);
-                    output.add(off);
-                }
-            }
-        }
-    }
+    void releaseLatched(Array<MidiMessage>& output, double timestamp);
 
     bool latched_[16][128] {};  // notes currently sounding, per channel and note
     bool held_[16][128] {};     // keys currently physically down, for hold mode

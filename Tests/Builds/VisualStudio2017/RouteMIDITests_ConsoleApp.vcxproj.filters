@@ -214,6 +214,27 @@
     <ClCompile Include="..\..\..\Source\ApplicationState.cpp">
       <Filter>RouteMIDITests\Source</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\Source\BitScaling.cpp">
+      <Filter>RouteMIDITests\Source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Source\ChannelBucket.cpp">
+      <Filter>RouteMIDITests\Source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Source\Conversion.cpp">
+      <Filter>RouteMIDITests\Source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Source\Latch.cpp">
+      <Filter>RouteMIDITests\Source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Source\Mono.cpp">
+      <Filter>RouteMIDITests\Source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Source\Mpe.cpp">
+      <Filter>RouteMIDITests\Source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Source\Route.cpp">
+      <Filter>RouteMIDITests\Source</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\Source\ScriptMidiMessageClass.cpp">
       <Filter>RouteMIDITests\Source</Filter>
     </ClCompile>

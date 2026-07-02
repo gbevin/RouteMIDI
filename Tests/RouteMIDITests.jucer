@@ -15,12 +15,19 @@
             file="../Source/ApplicationState.cpp"/>
       <FILE id="src004" name="ApplicationState.h" compile="0" resource="0"
             file="../Source/ApplicationState.h"/>
+      <FILE id="scp005" name="BitScaling.cpp" compile="1" resource="0" file="../Source/BitScaling.cpp"/>
       <FILE id="src005" name="BitScaling.h" compile="0" resource="0" file="../Source/BitScaling.h"/>
+      <FILE id="scp014" name="ChannelBucket.cpp" compile="1" resource="0" file="../Source/ChannelBucket.cpp"/>
       <FILE id="src014" name="ChannelBucket.h" compile="0" resource="0" file="../Source/ChannelBucket.h"/>
+      <FILE id="scp017" name="Conversion.cpp" compile="1" resource="0" file="../Source/Conversion.cpp"/>
       <FILE id="src017" name="Conversion.h" compile="0" resource="0" file="../Source/Conversion.h"/>
+      <FILE id="scp015" name="Latch.cpp" compile="1" resource="0" file="../Source/Latch.cpp"/>
       <FILE id="src015" name="Latch.h" compile="0" resource="0" file="../Source/Latch.h"/>
+      <FILE id="scp016" name="Mono.cpp" compile="1" resource="0" file="../Source/Mono.cpp"/>
       <FILE id="src016" name="Mono.h" compile="0" resource="0" file="../Source/Mono.h"/>
+      <FILE id="scp013" name="Mpe.cpp" compile="1" resource="0" file="../Source/Mpe.cpp"/>
       <FILE id="src013" name="Mpe.h" compile="0" resource="0" file="../Source/Mpe.h"/>
+      <FILE id="scp006" name="Route.cpp" compile="1" resource="0" file="../Source/Route.cpp"/>
       <FILE id="src006" name="Route.h" compile="0" resource="0" file="../Source/Route.h"/>
       <FILE id="src007" name="ScriptMidiMessageClass.cpp" compile="1" resource="0"
             file="../Source/ScriptMidiMessageClass.cpp"/>

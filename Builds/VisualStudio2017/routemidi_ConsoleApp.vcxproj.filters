@@ -211,7 +211,28 @@
     <ClCompile Include="..\..\Source\ApplicationState.cpp">
       <Filter>routemidi\Source</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Source\BitScaling.cpp">
+      <Filter>routemidi\Source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\ChannelBucket.cpp">
+      <Filter>routemidi\Source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Conversion.cpp">
+      <Filter>routemidi\Source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Latch.cpp">
+      <Filter>routemidi\Source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Mono.cpp">
+      <Filter>routemidi\Source</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Source\Main.cpp">
+      <Filter>routemidi\Source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Mpe.cpp">
+      <Filter>routemidi\Source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Route.cpp">
       <Filter>routemidi\Source</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Source\ScriptMidiMessageClass.cpp">

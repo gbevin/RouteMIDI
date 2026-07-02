@@ -30,66 +30,8 @@ namespace bitscaling
     // section 3.3: Min-Center-Max upscaling. Preserves minimum, center and
     // maximum across resolutions and round-trips losslessly with the section
     // 3.4 downscale.
-    inline int scaleUpMinCenterMax(int srcVal, int srcBits, int dstBits)
-    {
-        const int scaleBits = dstBits - srcBits;
-        int bitShiftedValue = srcVal << scaleBits;
-
-        const int srcCenter = 1 << (srcBits - 1);
-        if (srcVal <= srcCenter)
-        {
-            return bitShiftedValue;
-        }
-
-        // expanded bit-repeat scheme for the range from center to maximum
-        const int repeatBits = srcBits - 1;
-        const int repeatMask = (1 << repeatBits) - 1;
-        int repeatValue = srcVal & repeatMask;
-        if (scaleBits > repeatBits)
-        {
-            repeatValue <<= (scaleBits - repeatBits);
-        }
-        else
-        {
-            repeatValue >>= (repeatBits - scaleBits);
-        }
-        while (repeatValue != 0)
-        {
-            bitShiftedValue |= repeatValue;
-            repeatValue >>= repeatBits;
-        }
-        return bitShiftedValue;
-    }
+    int scaleUpMinCenterMax(int srcVal, int srcBits, int dstBits);
 
     // scales value between bit resolutions using the requested method
-    inline int scaleValue(int value, int srcBits, int dstBits, ScaleMethod method)
-    {
-        if (srcBits == dstBits)
-        {
-            return value;
-        }
-
-        const int scaleBits = (dstBits > srcBits) ? (dstBits - srcBits) : (srcBits - dstBits);
-
-        if (dstBits > srcBits)
-        {
-            // section 4.3: Zero-Extension upscaling is a plain left shift (zero fill)
-            if (method == ZeroExtension)
-            {
-                return value << scaleBits;
-            }
-            return scaleUpMinCenterMax(value, srcBits, dstBits);
-        }
-
-        // section 4.4: Zero-Extension downscaling rounds and clamps
-        if (method == ZeroExtension)
-        {
-            const int halfScaleRange = 1 << (scaleBits - 1);
-            const int shifted = (value + halfScaleRange) >> scaleBits;
-            const int maxValue = (1 << dstBits) - 1;
-            return shifted < maxValue ? shifted : maxValue;
-        }
-        // section 3.4: Min-Center-Max downscaling is a simple bit shift
-        return value >> scaleBits;
-    }
+    int scaleValue(int value, int srcBits, int dstBits, ScaleMethod method);
 }

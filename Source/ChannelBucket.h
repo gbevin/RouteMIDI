@@ -35,132 +35,25 @@ public:
 
     // adds a MIDI channel (1-16) to the bucket, just after the bottom-most
     // released channel; channels already present or out of range are ignored
-    void add(int channel)
-    {
-        if (channel < 1 || channel > 16) return;
-        channel -= 1;                       // 0-based index
-
-        if (next_[channel] != -1) return;   // already in the bucket
-
-        if (top_ == -1)
-        {
-            top_ = channel;
-            previous_[channel] = channel;
-            next_[channel] = channel;
-            taken_[channel] = 0;
-            bottomReleased_ = channel;
-        }
-        else
-        {
-            previous_[channel] = bottomReleased_;
-            previous_[next_[bottomReleased_]] = channel;
-
-            next_[channel] = next_[bottomReleased_];
-            next_[bottomReleased_] = channel;
-
-            taken_[channel] = 0;
-            bottomReleased_ = channel;
-        }
-    }
+    void add(int channel);
 
     // hands out the top (least recently used) channel as a 1-16 value, or 0
     // when the bucket is empty; the channel sinks to the bottom of the taken
     // section so it is reused as late as possible
-    int take()
-    {
-        if (top_ == -1) return 0;
-
-        int channel = top_;
-        top_ = next_[channel];
-        taken_[channel]++;
-        if (channel == bottomReleased_)
-        {
-            bottomReleased_ = -1;
-        }
-        return channel + 1;
-    }
+    int take();
 
     // releases one use of a channel (1-16); if the channel is still in use by
     // another note it moves to the bottom of the taken section, otherwise it
     // moves to the bottom of the released section
-    void release(int channel)
-    {
-        if (channel < 1 || channel > 16 || top_ == -1 || next_[channel - 1] == -1) return;
-        channel -= 1;
+    void release(int channel);
 
-        taken_[channel]--;
-
-        if (taken_[channel] > 0)
-        {
-            extremize(channel);
-            top_ = next_[channel];
-        }
-        else
-        {
-            if (bottomReleased_ == -1)
-            {
-                extremize(channel);
-                top_ = channel;
-            }
-            else if (next_[bottomReleased_] != channel)
-            {
-                const int releasedEdge = bottomReleased_;
-                const int takenEdge = next_[bottomReleased_];
-
-                extract(channel);
-
-                previous_[channel] = releasedEdge;
-                next_[releasedEdge] = channel;
-
-                previous_[takenEdge] = channel;
-                next_[channel] = takenEdge;
-            }
-            bottomReleased_ = channel;
-        }
-    }
-
-    void clear()
-    {
-        top_ = -1;
-        bottomReleased_ = -1;
-        for (int ch = 0; ch < 16; ++ch)
-        {
-            previous_[ch] = -1;
-            next_[ch] = -1;
-            taken_[ch] = 0;
-        }
-    }
+    void clear();
 
     bool isEmpty() const { return top_ == -1; }
 
 private:
-    void extract(int channel)
-    {
-        if (next_[channel] != -1)
-        {
-            next_[previous_[channel]] = next_[channel];
-            previous_[next_[channel]] = previous_[channel];
-
-            previous_[channel] = -1;
-            next_[channel] = -1;
-        }
-    }
-
-    void extremize(int channel)
-    {
-        int bottom = previous_[top_];
-        if (bottom == channel) bottom = previous_[channel];
-        int top = top_;
-        if (top == channel) top = next_[channel];
-
-        extract(channel);
-
-        previous_[channel] = bottom;
-        next_[bottom] = channel;
-
-        previous_[top] = channel;
-        next_[channel] = top;
-    }
+    void extract(int channel);
+    void extremize(int channel);
 
     int top_;            // channel index of the top of the bucket, -1 when empty
     int previous_[16];   // previous channel index in the ring for each channel

@@ -143,6 +143,13 @@
   <ItemGroup>
     <ClCompile Include="..\..\..\Source\ApplicationCommand.cpp"/>
     <ClCompile Include="..\..\..\Source\ApplicationState.cpp"/>
+    <ClCompile Include="..\..\..\Source\BitScaling.cpp"/>
+    <ClCompile Include="..\..\..\Source\ChannelBucket.cpp"/>
+    <ClCompile Include="..\..\..\Source\Conversion.cpp"/>
+    <ClCompile Include="..\..\..\Source\Latch.cpp"/>
+    <ClCompile Include="..\..\..\Source\Mono.cpp"/>
+    <ClCompile Include="..\..\..\Source\Mpe.cpp"/>
+    <ClCompile Include="..\..\..\Source\Route.cpp"/>
     <ClCompile Include="..\..\..\Source\ScriptMidiMessageClass.cpp"/>
     <ClCompile Include="..\..\..\Source\ScriptOscClass.cpp"/>
     <ClCompile Include="..\..\..\Source\ScriptUtilClass.cpp"/>
