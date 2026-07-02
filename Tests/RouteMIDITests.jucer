@@ -41,6 +41,8 @@
             file="../Source/ScriptUtilClass.cpp"/>
       <FILE id="src012" name="ScriptUtilClass.h" compile="0" resource="0"
             file="../Source/ScriptUtilClass.h"/>
+      <FILE id="scp018" name="TextMidi.cpp" compile="1" resource="0" file="../Source/TextMidi.cpp"/>
+      <FILE id="src018" name="TextMidi.h" compile="0" resource="0" file="../Source/TextMidi.h"/>
     </GROUP>
     <GROUP id="{A0000000-0000-0000-0000-000000000002}" name="Tests">
       <FILE id="tst001" name="TestRunner.cpp" compile="1" resource="0" file="TestRunner.cpp"/>

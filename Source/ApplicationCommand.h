@@ -20,6 +20,8 @@
 
 #include "JuceHeader.h"
 
+#include "Mpe.h"
+
 enum CommandIndex
 {
     NONE,
@@ -142,6 +144,28 @@ enum CommandIndex
 
 class ApplicationState;
 
+// One option token pre-parsed into every interpretation the filters and
+// transforms may need, so the real-time path reads numbers instead of parsing
+// option strings for every message. Compiled lazily on first use, when the
+// complete command line has been processed and the hex and octave settings are
+// final (matching the previous per-message parse, which also saw those final
+// settings).
+struct CompiledOption
+{
+    int    intValue { 0 };                    // dec/hex integer
+    int    value7 { 0 };                      // dec/hex 7-bit value
+    int    note { 0 };                        // note name or number
+    int    selNoteLo { 0 }, selNoteHi { 0 };  // "lo..hi" selector parsed as notes
+    int    sel7Lo { 0 },    sel7Hi { 0 };     // selector parsed as 7-bit values
+    int    selIntLo { 0 },  selIntHi { 0 };   // selector parsed as plain integers
+    double number { 0.0 };                    // floating point value
+    uint16 scaleMask { 0 };                   // scale name or degree list, 0 = none
+    int    pitchClass { 0 };                  // scale root (0-11)
+    mpe::Zone zone;                           // MPE zone token
+    bool   zoneValid { false };
+    int    keyword { 0 };                     // 1 = hold, 2 = low, 3 = high
+};
+
 struct ApplicationCommand
 {
     static ApplicationCommand Dummy();
@@ -153,16 +177,21 @@ struct ApplicationCommand
     // true when this command modifies the messages flowing through a route
     bool isTransform() const;
 
+    // compiles opts_ to copts_ if that hasn't happened yet; called automatically
+    // by matches() and transform(), and explicitly by the stages that read
+    // copts_ directly (chord/latch/mono, the channel filter, the MPE operations)
+    void ensureCompiled(const ApplicationState& state) const;
+
     // returns whether the message matches this filter (channel-aware for voice
     // messages); only meaningful when isFilter() is true and command_ != CHANNEL.
     // The channel context can be a single channel or an inclusive range; a low
     // of 0 means "any channel".
-    bool matches(ApplicationState& state, const MidiMessage& msg, int channel) const;
-    bool matches(ApplicationState& state, const MidiMessage& msg, int channelLow, int channelHigh) const;
+    bool matches(const ApplicationState& state, const MidiMessage& msg, int channel) const;
+    bool matches(const ApplicationState& state, const MidiMessage& msg, int channelLow, int channelHigh) const;
 
     // applies this transform to the message in place; returns false when the
     // message should be dropped (for instance a transpose out of the 0-127 range)
-    bool transform(ApplicationState& state, MidiMessage& msg) const;
+    bool transform(const ApplicationState& state, MidiMessage& msg) const;
 
     static bool checkChannel(const MidiMessage& msg, int channelLow, int channelHigh);
 
@@ -175,4 +204,23 @@ struct ApplicationCommand
     String section_;                    // when set, a help header printed before this command
     StringArray opts_;
     bool negate_ { false };
+
+    // options compiled to numbers once (see ensureCompiled); mutable because the
+    // lazy compilation happens from the const matches()/transform() entry points
+    mutable Array<CompiledOption> copts_;
+    mutable bool compiled_ { false };
+
+private:
+    void compileOpts(const ApplicationState& state) const;
+
+    // selector matching against a compiled option: a single value compiles to
+    // lo == hi, a "lo..hi" range to its (swapped if needed) bounds
+    bool selNote(int optIndex, int value) const
+    {
+        return value >= copts_[optIndex].selNoteLo && value <= copts_[optIndex].selNoteHi;
+    }
+    bool sel7(int optIndex, int value) const
+    {
+        return value >= copts_[optIndex].sel7Lo && value <= copts_[optIndex].sel7Hi;
+    }
 };

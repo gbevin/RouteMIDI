@@ -244,6 +244,9 @@
     <ClCompile Include="..\..\Source\ScriptUtilClass.cpp">
       <Filter>routemidi\Source</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Source\TextMidi.cpp">
+      <Filter>routemidi\Source</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\JuceLibraryCode\modules\juce_audio_basics\audio_play_head\juce_AudioPlayHead.cpp">
       <Filter>JUCE Modules\juce_audio_basics\audio_play_head</Filter>
     </ClCompile>
@@ -1240,6 +1243,9 @@
       <Filter>routemidi\Source</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Source\ScriptUtilClass.h">
+      <Filter>routemidi\Source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\TextMidi.h">
       <Filter>routemidi\Source</Filter>
     </ClInclude>
     <ClInclude Include="..\..\JuceLibraryCode\modules\juce_audio_basics\audio_play_head\juce_AudioPlayHead.h">

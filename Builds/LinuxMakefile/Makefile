@@ -85,6 +85,7 @@ OBJECTS_CONSOLEAPP := \
   $(JUCE_OBJDIR)/ScriptMidiMessageClass_6b9b1366.o \
   $(JUCE_OBJDIR)/ScriptOscClass_a57c652d.o \
   $(JUCE_OBJDIR)/ScriptUtilClass_492e64ec.o \
+  $(JUCE_OBJDIR)/TextMidi_16691177.o \
   $(JUCE_OBJDIR)/include_juce_audio_basics_8a4e984a.o \
   $(JUCE_OBJDIR)/include_juce_audio_devices_63111d02.o \
   $(JUCE_OBJDIR)/include_juce_core_f26d17db.o \
@@ -169,6 +170,11 @@ $(JUCE_OBJDIR)/ScriptOscClass_a57c652d.o: ../../Source/ScriptOscClass.cpp
 $(JUCE_OBJDIR)/ScriptUtilClass_492e64ec.o: ../../Source/ScriptUtilClass.cpp
 	-$(V_AT)mkdir -p $(@D)
 	@echo "Compiling ScriptUtilClass.cpp"
+	$(V_AT)$(CXX) $(JUCE_CXXFLAGS) $(JUCE_CPPFLAGS_CONSOLEAPP) $(JUCE_CFLAGS_CONSOLEAPP) -o "$@" -c "$<"
+
+$(JUCE_OBJDIR)/TextMidi_16691177.o: ../../Source/TextMidi.cpp
+	-$(V_AT)mkdir -p $(@D)
+	@echo "Compiling TextMidi.cpp"
 	$(V_AT)$(CXX) $(JUCE_CXXFLAGS) $(JUCE_CPPFLAGS_CONSOLEAPP) $(JUCE_CFLAGS_CONSOLEAPP) -o "$@" -c "$<"
 
 $(JUCE_OBJDIR)/include_juce_audio_basics_8a4e984a.o: ../../JuceLibraryCode/include_juce_audio_basics.cpp

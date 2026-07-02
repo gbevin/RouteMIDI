@@ -34,7 +34,7 @@ static int applyGammaCurve(int value, int maxValue, double gamma)
 
 // parses a pitch class (0-11) from a note name (C, C#, Db, ... with an optional
 // octave that is ignored) or a plain number (interpreted modulo 12)
-static int parsePitchClass(ApplicationState& state, const String& value)
+static int parsePitchClass(const ApplicationState& state, const String& value)
 {
     const String v = value.toUpperCase();
     if (v.isNotEmpty() && String("CDEFGABH").containsChar(v[0]))
@@ -196,6 +196,66 @@ void ApplicationCommand::clear()
     commandDescriptions_ = StringArray({""});
     opts_.clear();
     negate_ = false;
+    copts_.clear();
+    compiled_ = false;
+}
+
+void ApplicationCommand::ensureCompiled(const ApplicationState& state) const
+{
+    if (!compiled_)
+    {
+        compileOpts(state);
+    }
+}
+
+void ApplicationCommand::compileOpts(const ApplicationState& state) const
+{
+    copts_.clearQuick();
+
+    // parses a selector token ("value" or "lo..hi") with the given value parser,
+    // normalizing a single value to lo == hi and swapping reversed ranges
+    auto parseSelector = [](const String& token, const std::function<int(const String&)>& parse,
+                            int& lo, int& hi)
+    {
+        const int sep = token.indexOf("..");
+        if (sep < 0)
+        {
+            lo = hi = parse(token);
+        }
+        else
+        {
+            lo = parse(token.substring(0, sep));
+            hi = parse(token.substring(sep + 2));
+            if (lo > hi)
+            {
+                std::swap(lo, hi);
+            }
+        }
+    };
+
+    for (const auto& opt : opts_)
+    {
+        CompiledOption c;
+        c.intValue = state.asDecOrHexIntValue(opt);
+        c.value7   = state.asDecOrHex7BitValue(opt);
+        c.note     = state.asNoteNumber(opt);
+        parseSelector(opt, [&](const String& s) { return (int) state.asNoteNumber(s); },
+                      c.selNoteLo, c.selNoteHi);
+        parseSelector(opt, [&](const String& s) { return (int) state.asDecOrHex7BitValue(s); },
+                      c.sel7Lo, c.sel7Hi);
+        parseSelector(opt, [&](const String& s) { return state.asDecOrHexIntValue(s); },
+                      c.selIntLo, c.selIntHi);
+        c.number     = opt.getDoubleValue();
+        c.scaleMask  = scaleMask(opt);
+        c.pitchClass = parsePitchClass(state, opt);
+        c.zoneValid  = mpe::parseZone(opt, c.zone);
+        if      (opt.equalsIgnoreCase("hold")) { c.keyword = 1; }
+        else if (opt.equalsIgnoreCase("low"))  { c.keyword = 2; }
+        else if (opt.equalsIgnoreCase("high")) { c.keyword = 3; }
+        copts_.add(c);
+    }
+
+    compiled_ = true;
 }
 
 bool ApplicationCommand::isFilter() const
@@ -290,13 +350,15 @@ bool ApplicationCommand::checkChannel(const MidiMessage& msg, int channelLow, in
     return channelLow == 0 || (msg.getChannel() >= channelLow && msg.getChannel() <= channelHigh);
 }
 
-bool ApplicationCommand::matches(ApplicationState& state, const MidiMessage& msg, int channel) const
+bool ApplicationCommand::matches(const ApplicationState& state, const MidiMessage& msg, int channel) const
 {
     return matches(state, msg, channel, channel);
 }
 
-bool ApplicationCommand::matches(ApplicationState& state, const MidiMessage& msg, int channelLow, int channelHigh) const
+bool ApplicationCommand::matches(const ApplicationState& state, const MidiMessage& msg, int channelLow, int channelHigh) const
 {
+    ensureCompiled(state);
+
     switch (command_)
     {
         case VOICE:
@@ -307,16 +369,16 @@ bool ApplicationCommand::matches(ApplicationState& state, const MidiMessage& msg
             return checkChannel(msg, channelLow, channelHigh) && msg.isNoteOnOrOff();
         case NOTE_ON:
             return checkChannel(msg, channelLow, channelHigh) && msg.isNoteOn() &&
-                (opts_.isEmpty() || state.selectorMatches(opts_[0], msg.getNoteNumber(), true));
+                (opts_.isEmpty() || selNote(0, msg.getNoteNumber()));
         case NOTE_OFF:
             return checkChannel(msg, channelLow, channelHigh) && msg.isNoteOff() &&
-                (opts_.isEmpty() || state.selectorMatches(opts_[0], msg.getNoteNumber(), true));
+                (opts_.isEmpty() || selNote(0, msg.getNoteNumber()));
         case POLY_PRESSURE:
             return checkChannel(msg, channelLow, channelHigh) && msg.isAftertouch() &&
-                (opts_.isEmpty() || state.selectorMatches(opts_[0], msg.getNoteNumber(), true));
+                (opts_.isEmpty() || selNote(0, msg.getNoteNumber()));
         case CONTROL_CHANGE:
             return checkChannel(msg, channelLow, channelHigh) && msg.isController() &&
-                (opts_.isEmpty() || state.selectorMatches(opts_[0], msg.getControllerNumber(), false));
+                (opts_.isEmpty() || sel7(0, msg.getControllerNumber()));
         case CONTROL_CHANGE_14BIT:
             // a 14-bit CC is an MSB controller (0-31) paired with its LSB (32-63)
             if (!checkChannel(msg, channelLow, channelHigh) || !msg.isController())
@@ -332,7 +394,7 @@ bool ApplicationCommand::matches(ApplicationState& state, const MidiMessage& msg
                 // match the MSB controller or its LSB partner against the selector
                 const int cc = msg.getControllerNumber();
                 const int msbIndex = (cc < 32) ? cc : (cc < 64 ? cc - 32 : -1);
-                return msbIndex >= 0 && state.selectorMatches(opts_[0], msbIndex, false);
+                return msbIndex >= 0 && sel7(0, msbIndex);
             }
         case NRPN:
             // the NRPN parameter-select (98/99) and data-entry (6/38) controllers
@@ -346,7 +408,7 @@ bool ApplicationCommand::matches(ApplicationState& state, const MidiMessage& msg
                  msg.getControllerNumber() == 6   || msg.getControllerNumber() == 38);
         case PROGRAM_CHANGE:
             return checkChannel(msg, channelLow, channelHigh) && msg.isProgramChange() &&
-                (opts_.isEmpty() || state.selectorMatches(opts_[0], msg.getProgramChangeNumber(), false));
+                (opts_.isEmpty() || sel7(0, msg.getProgramChangeNumber()));
         case CHANNEL_PRESSURE:
             return checkChannel(msg, channelLow, channelHigh) && msg.isChannelPressure();
         case PITCH_BEND:
@@ -385,8 +447,8 @@ bool ApplicationCommand::matches(ApplicationState& state, const MidiMessage& msg
 
         case NOTE_RANGE:
             return checkChannel(msg, channelLow, channelHigh) && (msg.isNoteOnOrOff() || msg.isAftertouch()) &&
-                msg.getNoteNumber() >= state.asNoteNumber(opts_[0]) &&
-                msg.getNoteNumber() <= state.asNoteNumber(opts_[1]);
+                msg.getNoteNumber() >= copts_[0].note &&
+                msg.getNoteNumber() <= copts_[1].note;
         case VELOCITY_RANGE:
             if (!checkChannel(msg, channelLow, channelHigh))
             {
@@ -398,13 +460,13 @@ bool ApplicationCommand::matches(ApplicationState& state, const MidiMessage& msg
                 return true;
             }
             return msg.isNoteOn() &&
-                msg.getVelocity() >= state.asDecOrHex7BitValue(opts_[0]) &&
-                msg.getVelocity() <= state.asDecOrHex7BitValue(opts_[1]);
+                msg.getVelocity() >= copts_[0].value7 &&
+                msg.getVelocity() <= copts_[1].value7;
         case CONTROL_CHANGE_RANGE:
             return checkChannel(msg, channelLow, channelHigh) && msg.isController() &&
-                msg.getControllerNumber() == state.asDecOrHex7BitValue(opts_[0]) &&
-                msg.getControllerValue() >= state.asDecOrHex7BitValue(opts_[1]) &&
-                msg.getControllerValue() <= state.asDecOrHex7BitValue(opts_[2]);
+                msg.getControllerNumber() == copts_[0].value7 &&
+                msg.getControllerValue() >= copts_[1].value7 &&
+                msg.getControllerValue() <= copts_[2].value7;
         case IN_SCALE:
         {
             // pass note messages whose note belongs to the given key and scale
@@ -412,58 +474,50 @@ bool ApplicationCommand::matches(ApplicationState& state, const MidiMessage& msg
             {
                 return false;
             }
-            const uint16 mask = scaleMask(opts_[1]);
-            const int pc = (((msg.getNoteNumber() - parsePitchClass(state, opts_[0])) % 12) + 12) % 12;
-            return (mask >> pc) & 1;
+            const int pc = (((msg.getNoteNumber() - copts_[0].pitchClass) % 12) + 12) % 12;
+            return (copts_[1].scaleMask >> pc) & 1;
         }
 
         case MPE_MASTER:
-        {
             // pass messages on the master channel of the given MPE zone
-            mpe::Zone zone;
-            return mpe::parseZone(opts_[0], zone) && msg.getChannel() == zone.masterChannel();
-        }
+            return copts_[0].zoneValid && msg.getChannel() == copts_[0].zone.masterChannel();
         case MPE_MEMBER:
-        {
             // pass messages on any member channel of the given MPE zone
-            mpe::Zone zone;
-            return mpe::parseZone(opts_[0], zone) && zone.memberIndexOf(msg.getChannel()) >= 0;
-        }
+            return copts_[0].zoneValid && copts_[0].zone.memberIndexOf(msg.getChannel()) >= 0;
         case MPE_ZONE:
-        {
             // pass a whole zone: its master channel and all its member channels
-            mpe::Zone zone;
-            return mpe::parseZone(opts_[0], zone) && zone.contains(msg.getChannel());
-        }
+            return copts_[0].zoneValid && copts_[0].zone.contains(msg.getChannel());
 
         default:
             return false;
     }
 }
 
-bool ApplicationCommand::transform(ApplicationState& state, MidiMessage& msg) const
+bool ApplicationCommand::transform(const ApplicationState& state, MidiMessage& msg) const
 {
+    ensureCompiled(state);
+
     const double timestamp = msg.getTimeStamp();
 
     switch (command_)
     {
         case CHANNEL_MAP:
             if (msg.getChannel() > 0 &&
-                msg.getChannel() == jlimit(1, 16, state.asDecOrHexIntValue(opts_[0])))
+                msg.getChannel() == jlimit(1, 16, copts_[0].intValue))
             {
-                msg.setChannel(jlimit(1, 16, state.asDecOrHexIntValue(opts_[1])));
+                msg.setChannel(jlimit(1, 16, copts_[1].intValue));
             }
             break;
         case CHANNEL_SET:
             if (msg.getChannel() > 0)
             {
-                msg.setChannel(jlimit(1, 16, state.asDecOrHexIntValue(opts_[0])));
+                msg.setChannel(jlimit(1, 16, copts_[0].intValue));
             }
             break;
         case CHANNEL_ADD:
             if (msg.getChannel() > 0)
             {
-                int offset = state.asDecOrHexIntValue(opts_[0]);
+                int offset = copts_[0].intValue;
                 int ch = ((msg.getChannel() - 1 + offset) % 16 + 16) % 16;
                 msg.setChannel(ch + 1);
             }
@@ -471,7 +525,7 @@ bool ApplicationCommand::transform(ApplicationState& state, MidiMessage& msg) co
         case TRANSPOSE:
             if (msg.isNoteOnOrOff() || msg.isAftertouch())
             {
-                int note = msg.getNoteNumber() + state.asDecOrHexIntValue(opts_[0]);
+                int note = msg.getNoteNumber() + copts_[0].intValue;
                 if (note < 0 || note > 127)
                 {
                     return false;
@@ -483,13 +537,13 @@ bool ApplicationCommand::transform(ApplicationState& state, MidiMessage& msg) co
             // transpose by scale steps within the given key instead of semitones
             if (msg.isNoteOnOrOff() || msg.isAftertouch())
             {
-                const uint16 mask = scaleMask(opts_[1]);
+                const uint16 mask = copts_[1].scaleMask;
                 if (mask == 0)
                 {
                     break;   // unrecognised scale, leave the note untouched
                 }
-                const int shifted = diatonicShift(msg.getNoteNumber(), parsePitchClass(state, opts_[0]),
-                                                  mask, state.asDecOrHexIntValue(opts_[2]));
+                const int shifted = diatonicShift(msg.getNoteNumber(), copts_[0].pitchClass,
+                                                  mask, copts_[2].intValue);
                 if (shifted < 0)
                 {
                     return false;
@@ -499,27 +553,27 @@ bool ApplicationCommand::transform(ApplicationState& state, MidiMessage& msg) co
             break;
         case NOTE_MAP:
             if ((msg.isNoteOnOrOff() || msg.isAftertouch()) &&
-                msg.getNoteNumber() == state.asNoteNumber(opts_[0]))
+                msg.getNoteNumber() == copts_[0].note)
             {
-                msg.setNoteNumber(state.asNoteNumber(opts_[1]));
+                msg.setNoteNumber(copts_[1].note);
             }
             break;
         case NOTE_TO_CC:
             // a note becomes a Control Change: note-on velocity is the value,
             // note-off sends value 0
-            if (msg.isNoteOnOrOff() && msg.getNoteNumber() == state.asNoteNumber(opts_[0]))
+            if (msg.isNoteOnOrOff() && msg.getNoteNumber() == copts_[0].note)
             {
                 const int value = msg.isNoteOn() ? msg.getVelocity() : 0;
-                msg = MidiMessage::controllerEvent(msg.getChannel(), state.asDecOrHex7BitValue(opts_[1]), value);
+                msg = MidiMessage::controllerEvent(msg.getChannel(), copts_[1].value7, value);
                 msg.setTimeStamp(timestamp);
             }
             break;
         case CC_TO_NOTE:
             // a Control Change becomes a note: a value of 64 or more triggers a
             // note-on (the value is the velocity), below 64 a note-off
-            if (msg.isController() && msg.getControllerNumber() == state.asDecOrHex7BitValue(opts_[0]))
+            if (msg.isController() && msg.getControllerNumber() == copts_[0].value7)
             {
-                const int note = state.asNoteNumber(opts_[1]);
+                const int note = copts_[1].note;
                 const int value = msg.getControllerValue();
                 msg = value >= 64 ? MidiMessage::noteOn(msg.getChannel(), note, (uint8)value)
                                   : MidiMessage::noteOff(msg.getChannel(), note, (uint8)0);
@@ -528,13 +582,13 @@ bool ApplicationCommand::transform(ApplicationState& state, MidiMessage& msg) co
             break;
         case NOTE_TO_PROGRAM:
             // a note-on becomes a Program Change; the note-off is dropped
-            if (msg.isNoteOnOrOff() && msg.getNoteNumber() == state.asNoteNumber(opts_[0]))
+            if (msg.isNoteOnOrOff() && msg.getNoteNumber() == copts_[0].note)
             {
                 if (!msg.isNoteOn())
                 {
                     return false;
                 }
-                msg = MidiMessage::programChange(msg.getChannel(), state.asDecOrHex7BitValue(opts_[1]));
+                msg = MidiMessage::programChange(msg.getChannel(), copts_[1].value7);
                 msg.setTimeStamp(timestamp);
             }
             break;
@@ -542,12 +596,12 @@ bool ApplicationCommand::transform(ApplicationState& state, MidiMessage& msg) co
             // snap the note to the nearest note of the given key and scale
             if (msg.isNoteOnOrOff() || msg.isAftertouch())
             {
-                const uint16 mask = scaleMask(opts_[1]);
+                const uint16 mask = copts_[1].scaleMask;
                 if (mask == 0)
                 {
                     break;   // unrecognised scale, leave the note untouched
                 }
-                const int snapped = snapToScale(msg.getNoteNumber(), parsePitchClass(state, opts_[0]), mask);
+                const int snapped = snapToScale(msg.getNoteNumber(), copts_[0].pitchClass, mask);
                 if (snapped < 0)
                 {
                     return false;
@@ -558,7 +612,7 @@ bool ApplicationCommand::transform(ApplicationState& state, MidiMessage& msg) co
         case VELOCITY_SCALE:
             if (msg.isNoteOn() && msg.getVelocity() > 0)
             {
-                int v = roundToInt(msg.getVelocity() * opts_[0].getFloatValue());
+                int v = roundToInt(msg.getVelocity() * (float) copts_[0].number);
                 msg = MidiMessage::noteOn(msg.getChannel(), msg.getNoteNumber(), (uint8)jlimit(1, 127, v));
                 msg.setTimeStamp(timestamp);
             }
@@ -566,7 +620,7 @@ bool ApplicationCommand::transform(ApplicationState& state, MidiMessage& msg) co
         case VELOCITY_SET:
             if (msg.isNoteOn() && msg.getVelocity() > 0)
             {
-                int v = jlimit(1, 127, state.asDecOrHexIntValue(opts_[0]));
+                int v = jlimit(1, 127, copts_[0].intValue);
                 msg = MidiMessage::noteOn(msg.getChannel(), msg.getNoteNumber(), (uint8)v);
                 msg.setTimeStamp(timestamp);
             }
@@ -574,7 +628,7 @@ bool ApplicationCommand::transform(ApplicationState& state, MidiMessage& msg) co
         case VELOCITY_ADD:
             if (msg.isNoteOn() && msg.getVelocity() > 0)
             {
-                int v = jlimit(1, 127, (int)msg.getVelocity() + state.asDecOrHexIntValue(opts_[0]));
+                int v = jlimit(1, 127, (int)msg.getVelocity() + copts_[0].intValue);
                 msg = MidiMessage::noteOn(msg.getChannel(), msg.getNoteNumber(), (uint8)v);
                 msg.setTimeStamp(timestamp);
             }
@@ -582,7 +636,7 @@ bool ApplicationCommand::transform(ApplicationState& state, MidiMessage& msg) co
         case VELOCITY_CURVE:
             if (msg.isNoteOn() && msg.getVelocity() > 0)
             {
-                int v = jlimit(1, 127, applyGammaCurve(msg.getVelocity(), 127, opts_[0].getDoubleValue()));
+                int v = jlimit(1, 127, applyGammaCurve(msg.getVelocity(), 127, copts_[0].number));
                 msg = MidiMessage::noteOn(msg.getChannel(), msg.getNoteNumber(), (uint8)v);
                 msg.setTimeStamp(timestamp);
             }
@@ -591,8 +645,8 @@ bool ApplicationCommand::transform(ApplicationState& state, MidiMessage& msg) co
             // clamp note-on velocity into a min-max window (order-independent)
             if (msg.isNoteOn() && msg.getVelocity() > 0)
             {
-                const int a = jlimit(1, 127, state.asDecOrHexIntValue(opts_[0]));
-                const int b = jlimit(1, 127, state.asDecOrHexIntValue(opts_[1]));
+                const int a = jlimit(1, 127, copts_[0].intValue);
+                const int b = jlimit(1, 127, copts_[1].intValue);
                 int v = jlimit(jmin(a, b), jmax(a, b), (int)msg.getVelocity());
                 msg = MidiMessage::noteOn(msg.getChannel(), msg.getNoteNumber(), (uint8)v);
                 msg.setTimeStamp(timestamp);
@@ -603,7 +657,7 @@ bool ApplicationCommand::transform(ApplicationState& state, MidiMessage& msg) co
             // (1 leaves it unchanged, 0 flattens everything to the centre)
             if (msg.isNoteOn() && msg.getVelocity() > 0)
             {
-                const double amount = opts_[0].getDoubleValue();
+                const double amount = copts_[0].number;
                 int v = jlimit(1, 127, roundToInt(64.0 + ((int)msg.getVelocity() - 64.0) * amount));
                 msg = MidiMessage::noteOn(msg.getChannel(), msg.getNoteNumber(), (uint8)v);
                 msg.setTimeStamp(timestamp);
@@ -611,53 +665,53 @@ bool ApplicationCommand::transform(ApplicationState& state, MidiMessage& msg) co
             break;
         case CONTROL_CHANGE_MAP:
             if (msg.isController() &&
-                msg.getControllerNumber() == state.asDecOrHex7BitValue(opts_[0]))
+                msg.getControllerNumber() == copts_[0].value7)
             {
                 msg = MidiMessage::controllerEvent(msg.getChannel(),
-                                                   state.asDecOrHex7BitValue(opts_[1]),
+                                                   copts_[1].value7,
                                                    msg.getControllerValue());
                 msg.setTimeStamp(timestamp);
             }
             break;
         case CONTROL_CHANGE_ADD:
             if (msg.isController() &&
-                msg.getControllerNumber() == state.asDecOrHex7BitValue(opts_[0]))
+                msg.getControllerNumber() == copts_[0].value7)
             {
-                int v = jlimit(0, 127, msg.getControllerValue() + state.asDecOrHexIntValue(opts_[1]));
+                int v = jlimit(0, 127, msg.getControllerValue() + copts_[1].intValue);
                 msg = MidiMessage::controllerEvent(msg.getChannel(), msg.getControllerNumber(), v);
                 msg.setTimeStamp(timestamp);
             }
             break;
         case CONTROL_CHANGE_SCALE:
             if (msg.isController() &&
-                msg.getControllerNumber() == state.asDecOrHex7BitValue(opts_[0]))
+                msg.getControllerNumber() == copts_[0].value7)
             {
-                int v = jlimit(0, 127, roundToInt(msg.getControllerValue() * opts_[1].getFloatValue()));
+                int v = jlimit(0, 127, roundToInt(msg.getControllerValue() * (float) copts_[1].number));
                 msg = MidiMessage::controllerEvent(msg.getChannel(), msg.getControllerNumber(), v);
                 msg.setTimeStamp(timestamp);
             }
             break;
         case CONTROL_CHANGE_CURVE:
             if (msg.isController() &&
-                msg.getControllerNumber() == state.asDecOrHex7BitValue(opts_[0]))
+                msg.getControllerNumber() == copts_[0].value7)
             {
-                int v = applyGammaCurve(msg.getControllerValue(), 127, opts_[1].getDoubleValue());
+                int v = applyGammaCurve(msg.getControllerValue(), 127, copts_[1].number);
                 msg = MidiMessage::controllerEvent(msg.getChannel(), msg.getControllerNumber(), v);
                 msg.setTimeStamp(timestamp);
             }
             break;
         case PROGRAM_CHANGE_MAP:
             if (msg.isProgramChange() &&
-                msg.getProgramChangeNumber() == state.asDecOrHex7BitValue(opts_[0]))
+                msg.getProgramChangeNumber() == copts_[0].value7)
             {
-                msg = MidiMessage::programChange(msg.getChannel(), state.asDecOrHex7BitValue(opts_[1]));
+                msg = MidiMessage::programChange(msg.getChannel(), copts_[1].value7);
                 msg.setTimeStamp(timestamp);
             }
             break;
         case PROGRAM_CHANGE_ADD:
             if (msg.isProgramChange())
             {
-                int p = jlimit(0, 127, msg.getProgramChangeNumber() + state.asDecOrHexIntValue(opts_[0]));
+                int p = jlimit(0, 127, msg.getProgramChangeNumber() + copts_[0].intValue);
                 msg = MidiMessage::programChange(msg.getChannel(), p);
                 msg.setTimeStamp(timestamp);
             }
@@ -665,7 +719,7 @@ bool ApplicationCommand::transform(ApplicationState& state, MidiMessage& msg) co
         case PITCH_BEND_ADD:
             if (msg.isPitchWheel())
             {
-                int pb = jlimit(0, 16383, msg.getPitchWheelValue() + state.asDecOrHexIntValue(opts_[0]));
+                int pb = jlimit(0, 16383, msg.getPitchWheelValue() + copts_[0].intValue);
                 msg = MidiMessage::pitchWheel(msg.getChannel(), pb);
                 msg.setTimeStamp(timestamp);
             }
@@ -674,7 +728,7 @@ bool ApplicationCommand::transform(ApplicationState& state, MidiMessage& msg) co
             if (msg.isPitchWheel())
             {
                 // scale the bend around the centre so the bend depth is adjusted
-                int pb = jlimit(0, 16383, roundToInt(8192 + (msg.getPitchWheelValue() - 8192) * opts_[0].getFloatValue()));
+                int pb = jlimit(0, 16383, roundToInt(8192 + (msg.getPitchWheelValue() - 8192) * (float) copts_[0].number));
                 msg = MidiMessage::pitchWheel(msg.getChannel(), pb);
                 msg.setTimeStamp(timestamp);
             }
@@ -682,7 +736,7 @@ bool ApplicationCommand::transform(ApplicationState& state, MidiMessage& msg) co
         case PITCH_BEND_SET:
             if (msg.isPitchWheel())
             {
-                int pb = jlimit(0, 16383, state.asDecOrHexIntValue(opts_[0]));
+                int pb = jlimit(0, 16383, copts_[0].intValue);
                 msg = MidiMessage::pitchWheel(msg.getChannel(), pb);
                 msg.setTimeStamp(timestamp);
             }
@@ -690,7 +744,7 @@ bool ApplicationCommand::transform(ApplicationState& state, MidiMessage& msg) co
         case CHANNEL_PRESSURE_ADD:
             if (msg.isChannelPressure())
             {
-                int v = jlimit(0, 127, msg.getChannelPressureValue() + state.asDecOrHexIntValue(opts_[0]));
+                int v = jlimit(0, 127, msg.getChannelPressureValue() + copts_[0].intValue);
                 msg = MidiMessage::channelPressureChange(msg.getChannel(), v);
                 msg.setTimeStamp(timestamp);
             }
@@ -698,7 +752,7 @@ bool ApplicationCommand::transform(ApplicationState& state, MidiMessage& msg) co
         case CHANNEL_PRESSURE_SCALE:
             if (msg.isChannelPressure())
             {
-                int v = jlimit(0, 127, roundToInt(msg.getChannelPressureValue() * opts_[0].getFloatValue()));
+                int v = jlimit(0, 127, roundToInt(msg.getChannelPressureValue() * (float) copts_[0].number));
                 msg = MidiMessage::channelPressureChange(msg.getChannel(), v);
                 msg.setTimeStamp(timestamp);
             }
@@ -706,7 +760,7 @@ bool ApplicationCommand::transform(ApplicationState& state, MidiMessage& msg) co
         case CHANNEL_PRESSURE_SET:
             if (msg.isChannelPressure())
             {
-                int v = jlimit(0, 127, state.asDecOrHexIntValue(opts_[0]));
+                int v = jlimit(0, 127, copts_[0].intValue);
                 msg = MidiMessage::channelPressureChange(msg.getChannel(), v);
                 msg.setTimeStamp(timestamp);
             }
@@ -714,7 +768,7 @@ bool ApplicationCommand::transform(ApplicationState& state, MidiMessage& msg) co
         case CHANNEL_PRESSURE_CURVE:
             if (msg.isChannelPressure())
             {
-                int v = applyGammaCurve(msg.getChannelPressureValue(), 127, opts_[0].getDoubleValue());
+                int v = applyGammaCurve(msg.getChannelPressureValue(), 127, copts_[0].number);
                 msg = MidiMessage::channelPressureChange(msg.getChannel(), v);
                 msg.setTimeStamp(timestamp);
             }

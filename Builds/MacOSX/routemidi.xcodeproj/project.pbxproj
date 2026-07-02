@@ -21,6 +21,7 @@
 		30A312F76E349E8B5ECA4D31 /* ChannelBucket.cpp */ = {isa = PBXBuildFile; fileRef = FDDB0B2F8945623844A0AA4F; };
 		39B2279B8530BBC87FA033F9 /* ScriptOscClass.cpp */ = {isa = PBXBuildFile; fileRef = 7113DF850C738FF287669BA9; };
 		4156518471DDC97ED30F7ACA /* BitScaling.cpp */ = {isa = PBXBuildFile; fileRef = FC57EEB13F7E1C528D2B6B74; };
+		54D8066932636A1D5D89E096 /* TextMidi.cpp */ = {isa = PBXBuildFile; fileRef = FD07E2770A84564DE0AE098B; };
 		5DC8BD2E0E589697B3A66001 /* CoreAudio.framework */ = {isa = PBXBuildFile; fileRef = 39BBB61E6B2796DB8C72B46D; };
 		676C45DAB727EB1C22FF8A69 /* include_juce_data_structures.mm */ = {isa = PBXBuildFile; fileRef = 08ACADE6BD3415FD33BA447B; };
 		6880B81F73F0FA7247CF39DD /* ApplicationState.cpp */ = {isa = PBXBuildFile; fileRef = 28F1F23438CA15D2AF8C89C3; };
@@ -73,6 +74,7 @@
 		AE03F584DF5EFEE8BE9C71BE /* RecentFilesMenuTemplate.nib */ /* RecentFilesMenuTemplate.nib */ = {isa = PBXFileReference; lastKnownFileType = file.nib; name = RecentFilesMenuTemplate.nib; path = RecentFilesMenuTemplate.nib; sourceTree = SOURCE_ROOT; };
 		B2451D1DBA700503A8FEDC18 /* Main.cpp */ /* Main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Main.cpp; path = ../../Source/Main.cpp; sourceTree = SOURCE_ROOT; };
 		B3F525C4B60601DCE10BD37C /* ApplicationState.h */ /* ApplicationState.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ApplicationState.h; path = ../../Source/ApplicationState.h; sourceTree = SOURCE_ROOT; };
+		B5ECD1859A16460098FC52D3 /* TextMidi.h */ /* TextMidi.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = TextMidi.h; path = ../../Source/TextMidi.h; sourceTree = SOURCE_ROOT; };
 		BA15E7A2E5D90E5340273E40 /* ApplicationCommand.cpp */ /* ApplicationCommand.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = ApplicationCommand.cpp; path = ../../Source/ApplicationCommand.cpp; sourceTree = SOURCE_ROOT; };
 		BC898F0BA43B56118F3015D2 /* include_juce_audio_basics.mm */ /* include_juce_audio_basics.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = include_juce_audio_basics.mm; path = ../../JuceLibraryCode/include_juce_audio_basics.mm; sourceTree = SOURCE_ROOT; };
 		BF812B73A42627ED8AD203EA /* CoreMIDI.framework */ /* CoreMIDI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreMIDI.framework; path = System/Library/Frameworks/CoreMIDI.framework; sourceTree = SDKROOT; };
@@ -91,6 +93,7 @@
 		E4C8EEEE325689D7C180CC52 /* juce_audio_basics */ /* juce_audio_basics */ = {isa = PBXFileReference; lastKnownFileType = folder; name = juce_audio_basics; path = ../../JuceLibraryCode/modules/juce_audio_basics; sourceTree = SOURCE_ROOT; };
 		F0AC19E3023CA8E85D590A1B /* include_juce_events.mm */ /* include_juce_events.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = include_juce_events.mm; path = ../../JuceLibraryCode/include_juce_events.mm; sourceTree = SOURCE_ROOT; };
 		FC57EEB13F7E1C528D2B6B74 /* BitScaling.cpp */ /* BitScaling.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = BitScaling.cpp; path = ../../Source/BitScaling.cpp; sourceTree = SOURCE_ROOT; };
+		FD07E2770A84564DE0AE098B /* TextMidi.cpp */ /* TextMidi.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = TextMidi.cpp; path = ../../Source/TextMidi.cpp; sourceTree = SOURCE_ROOT; };
 		FDDB0B2F8945623844A0AA4F /* ChannelBucket.cpp */ /* ChannelBucket.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = ChannelBucket.cpp; path = ../../Source/ChannelBucket.cpp; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
@@ -194,6 +197,8 @@
 				9CD2954B59A33B0796DD0778,
 				21797EC5FAA9C2DC6DD2B3EF,
 				CA2DB941303379744442D8FD,
+				FD07E2770A84564DE0AE098B,
+				B5ECD1859A16460098FC52D3,
 			);
 			name = Source;
 			sourceTree = "<group>";
@@ -302,6 +307,7 @@
 				733F39336A3BA81575DD317E,
 				39B2279B8530BBC87FA033F9,
 				141F7CB00D1F92A017A030DD,
+				54D8066932636A1D5D89E096,
 				F00D5676A75100DF5C848DF8,
 				9B0F8BACA6BC3E1F951394D8,
 				08A5E7A6A0B3F06A21DF7BC3,

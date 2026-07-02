@@ -23,6 +23,7 @@
 #include "ApplicationCommand.h"
 #include "Route.h"
 #include "ScriptMidiMessageClass.h"
+#include "TextMidi.h"
 
 #include <atomic>
 #include <condition_variable>
@@ -38,18 +39,18 @@ public:
     void initialise(JUCEApplicationBase& app);
     void shutdown();
 
-    // value parsing helpers, shared with ApplicationCommand
-    uint8 asNoteNumber(String value) const;
-    uint8 asDecOrHex7BitValue(String value) const;
-    uint16 asDecOrHex14BitValue(String value) const;
-    int asDecOrHexIntValue(String value) const;
+    // the current number/note conventions, from the hex/octave/note settings
+    textmidi::Format textFormat() const;
 
-    static uint8 limit7Bit(int value);
-    static uint16 limit14Bit(int value);
+    // value parsing helpers, shared with ApplicationCommand; thin wrappers around
+    // the textmidi helpers using the current settings
+    uint8 asNoteNumber(String value) const          { return textmidi::asNoteNumber(value, textFormat()); }
+    uint8 asDecOrHex7BitValue(String value) const   { return textmidi::asDecOrHex7BitValue(value, textFormat()); }
+    uint16 asDecOrHex14BitValue(String value) const { return textmidi::asDecOrHex14BitValue(value, textFormat()); }
+    int asDecOrHexIntValue(String value) const      { return textmidi::asDecOrHexIntValue(value, textFormat()); }
 
-    // matches a value against a selector token that is either a single value or
-    // an inclusive "lo..hi" range; asNote interprets the tokens as note names
-    bool selectorMatches(const String& token, int value, bool asNote) const;
+    static uint8 limit7Bit(int value)   { return textmidi::limit7Bit(value); }
+    static uint16 limit14Bit(int value) { return textmidi::limit14Bit(value); }
 
     // entry points also used by the test suite (Tests/) to drive the parser,
     // the filter stage and the converter stage without real MIDI hardware
@@ -72,10 +73,17 @@ public:
     void processSplit(Route& route, const MidiMessage& msg, Array<MidiMessage>& outMsgs, Array<int>& outPorts);
     const OwnedArray<Route>& getRoutes() const { return routes_; }
 
-    // text MIDI codec, also exercised by the test suite to check round-tripping
-    // against the SendMIDI/ReceiveMIDI-compatible text format
-    String messageToText(const MidiMessage& msg) const;
-    void parseTextMidi(const StringArray& tokens, Array<MidiMessage>& output) const;
+    // text MIDI codec (TextMidi.cpp) with the current settings, also exercised by
+    // the test suite to check round-tripping against the SendMIDI/ReceiveMIDI-
+    // compatible text format
+    String messageToText(const MidiMessage& msg) const
+    {
+        return textmidi::messageToText(msg, textFormat());
+    }
+    void parseTextMidi(const StringArray& tokens, Array<MidiMessage>& output) const
+    {
+        textmidi::parseTextMidi(tokens, textFormat(), output);
+    }
 
 private:
     void timerCallback() override;
@@ -122,12 +130,6 @@ private:
     void readStdinMidi();
 
     void printMonitor(const String& inName, const MidiMessage& msg);
-
-    String output7BitAsHex(int v) const;
-    String output7Bit(int v) const;
-    String output14BitAsHex(int v) const;
-    String output14Bit(int v) const;
-    String outputNote(const MidiMessage& msg) const;
 
     void printVersion();
     void printUsage();

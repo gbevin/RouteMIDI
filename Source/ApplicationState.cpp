@@ -1257,28 +1257,9 @@ void ApplicationState::sendToDest(OutputDest* dest, const MidiMessage& msg)
 void ApplicationState::processSplit(Route& route, const MidiMessage& msg, Array<MidiMessage>& outMsgs, Array<int>& outPorts)
 {
     const ApplicationCommand& cmd = route.outputSplit.getReference(0);
-    mpe::Zone zone;
-    mpe::parseZone(cmd.opts_[0], zone);
-    const int targetCh = cmd.opts_.size() > 1 ? jlimit(1, 16, asDecOrHexIntValue(cmd.opts_[1])) : 1;
-    mpe::split(route.mpeSplit, zone, targetCh, route.outputs.size(), msg, outMsgs, outPorts);
-}
-
-bool ApplicationState::selectorMatches(const String& token, int value, bool asNote) const
-{
-    const int sep = token.indexOf("..");
-    if (sep < 0)
-    {
-        const int v = asNote ? (int) asNoteNumber(token) : (int) asDecOrHex7BitValue(token);
-        return value == v;
-    }
-
-    int lo = asNote ? (int) asNoteNumber(token.substring(0, sep)) : (int) asDecOrHex7BitValue(token.substring(0, sep));
-    int hi = asNote ? (int) asNoteNumber(token.substring(sep + 2)) : (int) asDecOrHex7BitValue(token.substring(sep + 2));
-    if (lo > hi)
-    {
-        std::swap(lo, hi);
-    }
-    return value >= lo && value <= hi;
+    cmd.ensureCompiled(*this);
+    const int targetCh = cmd.copts_.size() > 1 ? jlimit(1, 16, cmd.copts_[1].intValue) : 1;
+    mpe::split(route.mpeSplit, cmd.copts_[0].zone, targetCh, route.outputs.size(), msg, outMsgs, outPorts);
 }
 
 bool ApplicationState::passesFilters(Route& route, const MidiMessage& msg)
@@ -1287,23 +1268,6 @@ bool ApplicationState::passesFilters(Route& route, const MidiMessage& msg)
     {
         return true;
     }
-
-    // the channel filter can be a single channel or an inclusive "lo..hi" range;
-    // a low of 0 means "any channel". This parses one channel selector token.
-    auto parseChannel = [this](const String& token, int& low, int& high)
-    {
-        const int sep = token.indexOf("..");
-        if (sep < 0)
-        {
-            low = high = jlimit(0, 16, asDecOrHexIntValue(token));
-        }
-        else
-        {
-            low  = jlimit(0, 16, asDecOrHexIntValue(token.substring(0, sep)));
-            high = jlimit(0, 16, asDecOrHexIntValue(token.substring(sep + 2)));
-            if (low > high) std::swap(low, high);
-        }
-    };
 
     int channelLow = 0, channelHigh = 0;   // context for type filters, 0 = any
     bool hasPositiveType = false;
@@ -1316,8 +1280,11 @@ bool ApplicationState::passesFilters(Route& route, const MidiMessage& msg)
     {
         if (cmd.command_ == CHANNEL)
         {
-            int lo, hi;
-            parseChannel(cmd.opts_[0], lo, hi);
+            // the channel filter can be a single channel or an inclusive "lo..hi"
+            // range; a low of 0 means "any channel"
+            cmd.ensureCompiled(*this);
+            const int lo = jlimit(0, 16, cmd.copts_[0].selIntLo);
+            const int hi = jlimit(0, 16, cmd.copts_[0].selIntHi);
             const bool inRange = (lo != 0 && msg.getChannel() >= lo && msg.getChannel() <= hi);
             if (cmd.negate_)
             {
@@ -1400,9 +1367,10 @@ Array<MidiMessage> ApplicationState::applyTransforms(Route& route, RouteInput& i
                     const int velocity = m.getVelocity();
                     const bool on = m.isNoteOn();
                     const double ts = m.getTimeStamp();
-                    for (const auto& interval : cmd.opts_)
+                    cmd.ensureCompiled(*this);
+                    for (const auto& interval : cmd.copts_)
                     {
-                        const int n = base + asDecOrHexIntValue(interval);
+                        const int n = base + interval.intValue;
                         if (n < 0 || n > 127) continue;   // out-of-range notes are dropped
                         MidiMessage chordNote = on ? MidiMessage::noteOn(channel, n, (uint8)velocity)
                                                    : MidiMessage::noteOff(channel, n, (uint8)velocity);
@@ -1415,17 +1383,19 @@ Array<MidiMessage> ApplicationState::applyTransforms(Route& route, RouteInput& i
             {
                 // keeps notes sounding after release; toggle flips a note per
                 // press, hold replaces the held chord when a new gesture starts
-                const bool hold = cmd.opts_.size() > 0 && cmd.opts_[0].equalsIgnoreCase("hold");
+                cmd.ensureCompiled(*this);
+                const bool hold = cmd.copts_.size() > 0 && cmd.copts_[0].keyword == 1;
                 input.latch.process(hold, m, next);
             }
             else if (cmd.command_ == MONO)
             {
                 // forces one note at a time, choosing among held notes by priority
+                cmd.ensureCompiled(*this);
                 MonoState::Priority priority = MonoState::Last;
-                if (cmd.opts_.size() > 0)
+                if (cmd.copts_.size() > 0)
                 {
-                    if      (cmd.opts_[0].equalsIgnoreCase("low"))  priority = MonoState::Low;
-                    else if (cmd.opts_[0].equalsIgnoreCase("high")) priority = MonoState::High;
+                    if      (cmd.copts_[0].keyword == 2) { priority = MonoState::Low; }
+                    else if (cmd.copts_[0].keyword == 3) { priority = MonoState::High; }
                 }
                 input.mono.process(priority, m, next);
             }
@@ -1466,47 +1436,42 @@ void ApplicationState::processMpe(Route& route, RouteInput& input, const MidiMes
 
 void ApplicationState::applyMpeOp(const ApplicationCommand& cmd, RouteInput& input, const MidiMessage& msg, Array<MidiMessage>& output)
 {
-    // parse the command's options (zones, channels, ranges) and hand the message
-    // to the matching MPE operation (Mpe.cpp) with its per-input state slot,
-    // indexed by zone side so Lower and Upper operations never share state
+    // hand the message to the matching MPE operation (Mpe.cpp) with its compiled
+    // options (zones, channels, ranges) and per-input state slot, indexed by zone
+    // side so Lower and Upper operations never share state
+    cmd.ensureCompiled(*this);
     switch (cmd.command_)
     {
         case MPE_RELOCATE:
         {
-            mpe::Zone src, dst;
-            mpe::parseZone(cmd.opts_[0], src);
-            mpe::parseZone(cmd.opts_[1], dst);
+            const mpe::Zone& src = cmd.copts_[0].zone;
+            const mpe::Zone& dst = cmd.copts_[1].zone;
             mpe::relocate(input.mpeRelocate[src.lower ? 0 : 1], src, dst, msg, output);
             break;
         }
         case MPE_COLLAPSE:
         {
-            mpe::Zone src;
-            mpe::parseZone(cmd.opts_[0], src);
-            const int target = jlimit(1, 16, asDecOrHexIntValue(cmd.opts_[1]));
+            const mpe::Zone& src = cmd.copts_[0].zone;
+            const int target = jlimit(1, 16, cmd.copts_[1].intValue);
             mpe::collapse(input.mpeCollapse[src.lower ? 0 : 1], src, target, msg, output);
             break;
         }
         case MPE_EXPAND:
         {
-            const int srcCh = jlimit(1, 16, asDecOrHexIntValue(cmd.opts_[0]));
-            mpe::Zone dst;
-            mpe::parseZone(cmd.opts_[1], dst);
+            const int srcCh = jlimit(1, 16, cmd.copts_[0].intValue);
+            const mpe::Zone& dst = cmd.copts_[1].zone;
             mpe::expand(input.mpeAlloc[dst.lower ? 0 : 1], srcCh, dst, msg, output);
             break;
         }
         case MPE_BEND:
         {
-            mpe::Zone zone;
-            mpe::parseZone(cmd.opts_[0], zone);
-            mpe::rescaleBend(zone, cmd.opts_[1].getDoubleValue(), cmd.opts_[2].getDoubleValue(), msg, output);
+            mpe::rescaleBend(cmd.copts_[0].zone, cmd.copts_[1].number, cmd.copts_[2].number, msg, output);
             break;
         }
         case MPE_SENS:
         {
-            mpe::Zone zone;
-            mpe::parseZone(cmd.opts_[0], zone);
-            const int semitones = jlimit(0, 96, asDecOrHexIntValue(cmd.opts_[1]));
+            const mpe::Zone& zone = cmd.copts_[0].zone;
+            const int semitones = jlimit(0, 96, cmd.copts_[1].intValue);
             mpe::declareSensitivity(input.mpeSens[zone.lower ? 0 : 1], zone, semitones, msg, output);
             break;
         }
@@ -1566,190 +1531,6 @@ void ApplicationState::processConverters(Route& route, RouteInput& input, const 
     conversion::processMessage(route.convertRules, input.conv, msg, output);
 }
 
-String ApplicationState::messageToText(const MidiMessage& msg) const
-{
-    String line;
-
-    if (msg.getChannel() > 0)
-    {
-        line << "channel " << output7Bit(msg.getChannel()).paddedLeft(' ', 2) << "   ";
-    }
-
-    if (msg.isNoteOn())
-    {
-        line << "note-on         " << outputNote(msg) << " " << output7Bit(msg.getVelocity()).paddedLeft(' ', 3);
-    }
-    else if (msg.isNoteOff())
-    {
-        line << "note-off        " << outputNote(msg) << " " << output7Bit(msg.getVelocity()).paddedLeft(' ', 3);
-    }
-    else if (msg.isAftertouch())
-    {
-        line << "poly-pressure   " << outputNote(msg) << " " << output7Bit(msg.getAfterTouchValue()).paddedLeft(' ', 3);
-    }
-    else if (msg.isController())
-    {
-        line << "control-change   " << output7Bit(msg.getControllerNumber()).paddedLeft(' ', 3) << "   "
-             << output7Bit(msg.getControllerValue()).paddedLeft(' ', 3);
-    }
-    else if (msg.isProgramChange())
-    {
-        line << "program-change   " << output7Bit(msg.getProgramChangeNumber()).paddedLeft(' ', 7);
-    }
-    else if (msg.isChannelPressure())
-    {
-        line << "channel-pressure " << output7Bit(msg.getChannelPressureValue()).paddedLeft(' ', 7);
-    }
-    else if (msg.isPitchWheel())
-    {
-        line << "pitch-bend       " << output14Bit(msg.getPitchWheelValue()).paddedLeft(' ', 7);
-    }
-    else if (msg.isMidiClock())
-    {
-        line << "midi-clock";
-    }
-    else if (msg.isMidiStart())
-    {
-        line << "start";
-    }
-    else if (msg.isMidiStop())
-    {
-        line << "stop";
-    }
-    else if (msg.isMidiContinue())
-    {
-        line << "continue";
-    }
-    else if (msg.isActiveSense())
-    {
-        line << "active-sensing";
-    }
-    else if (msg.getRawDataSize() == 1 && msg.getRawData()[0] == 0xff)
-    {
-        line << "reset";
-    }
-    else if (msg.isSysEx())
-    {
-        // the bytes are emitted in hexadecimal so SendMIDI can read them back
-        line << "system-exclusive";
-        if (!useHexadecimalsByDefault_)
-        {
-            line << " hex";
-        }
-        const uint8* data = msg.getSysExData();
-        const int size = msg.getSysExDataSize();
-        for (int i = 0; i < size; ++i)
-        {
-            line << " " << output7BitAsHex(data[i]);
-        }
-        if (!useHexadecimalsByDefault_)
-        {
-            line << " dec";
-        }
-    }
-    else if (msg.isQuarterFrame())
-    {
-        line << "time-code " << output7Bit(msg.getQuarterFrameSequenceNumber()).paddedLeft(' ', 2) << " "
-             << output7Bit(msg.getQuarterFrameValue());
-    }
-    else if (msg.isSongPositionPointer())
-    {
-        line << "song-position " << output14Bit(msg.getSongPositionPointerMidiBeat()).paddedLeft(' ', 5);
-    }
-    else if (msg.getRawDataSize() == 2 && msg.getRawData()[0] == 0xf3)
-    {
-        line << "song-select " << output7Bit(msg.getRawData()[1]).paddedLeft(' ', 3);
-    }
-    else if (msg.getRawDataSize() == 1 && msg.getRawData()[0] == 0xf6)
-    {
-        line << "tune-request";
-    }
-    else
-    {
-        line << msg.getDescription();
-    }
-
-    return line;
-}
-
-void ApplicationState::parseTextMidi(const StringArray& tokens, Array<MidiMessage>& output) const
-{
-    int channel = 1;
-    bool lineHex = useHexadecimalsByDefault_;
-    int i = 0;
-
-    auto num = [&](const String& s) -> int
-    {
-        if (s.endsWithIgnoreCase("H")) return s.dropLastCharacters(1).getHexValue32();
-        if (s.endsWithIgnoreCase("M")) return s.getIntValue();
-        return lineHex ? s.getHexValue32() : s.getIntValue();
-    };
-    auto next = [&]() -> String { return i < tokens.size() ? tokens[i++] : String(); };
-
-    while (i < tokens.size())
-    {
-        const String tok = tokens[i++].toLowerCase();
-
-        if (tok == "hex")                                     { lineHex = true; }
-        else if (tok == "dec")                                { lineHex = false; }
-        else if (tok == "channel" || tok == "ch")             { channel = jlimit(1, 16, num(next())); }
-        else if (tok == "note-on" || tok == "on")
-        {
-            const int note = asNoteNumber(next());
-            output.add(MidiMessage::noteOn(channel, note, (uint8)jlimit(0, 127, num(next()))));
-        }
-        else if (tok == "note-off" || tok == "off")
-        {
-            const int note = asNoteNumber(next());
-            output.add(MidiMessage::noteOff(channel, note, (uint8)jlimit(0, 127, num(next()))));
-        }
-        else if (tok == "poly-pressure" || tok == "pp")
-        {
-            const int note = asNoteNumber(next());
-            output.add(MidiMessage::aftertouchChange(channel, note, jlimit(0, 127, num(next()))));
-        }
-        else if (tok == "control-change" || tok == "cc")
-        {
-            const int n = jlimit(0, 127, num(next()));
-            output.add(MidiMessage::controllerEvent(channel, n, jlimit(0, 127, num(next()))));
-        }
-        else if (tok == "program-change" || tok == "pc")      { output.add(MidiMessage::programChange(channel, jlimit(0, 127, num(next())))); }
-        else if (tok == "channel-pressure" || tok == "cp")    { output.add(MidiMessage::channelPressureChange(channel, jlimit(0, 127, num(next())))); }
-        else if (tok == "pitch-bend" || tok == "pb")          { output.add(MidiMessage::pitchWheel(channel, jlimit(0, 16383, num(next())))); }
-        else if (tok == "midi-clock" || tok == "mc")          { output.add(MidiMessage::midiClock()); }
-        else if (tok == "start")                              { output.add(MidiMessage::midiStart()); }
-        else if (tok == "stop")                               { output.add(MidiMessage::midiStop()); }
-        else if (tok == "continue" || tok == "cont")          { output.add(MidiMessage::midiContinue()); }
-        else if (tok == "active-sensing" || tok == "as")      { output.add(MidiMessage(0xfe)); }
-        else if (tok == "reset" || tok == "rst")              { output.add(MidiMessage(0xff)); }
-        else if (tok == "song-position" || tok == "spp")      { output.add(MidiMessage::songPositionPointer(jlimit(0, 16383, num(next())))); }
-        else if (tok == "song-select" || tok == "ss")         { output.add(MidiMessage(0xf3, jlimit(0, 127, num(next())))); }
-        else if (tok == "tune-request" || tok == "tun")       { output.add(MidiMessage(0xf6)); }
-        else if (tok == "time-code" || tok == "tc")
-        {
-            const int type = jlimit(0, 7, num(next()));
-            output.add(MidiMessage(0xf1, ((type << 4) | jlimit(0, 15, num(next()))) & 0x7f));
-        }
-        else if (tok == "system-exclusive" || tok == "syx")
-        {
-            // the rest of the line is the SysEx data (with optional hex/dec toggles)
-            Array<uint8> bytes;
-            while (i < tokens.size())
-            {
-                const String b = tokens[i++];
-                if (b.equalsIgnoreCase("hex"))      { lineHex = true; }
-                else if (b.equalsIgnoreCase("dec")) { lineHex = false; }
-                else                                { bytes.add((uint8)(num(b) & 0x7f)); }
-            }
-            if (!bytes.isEmpty())
-            {
-                output.add(MidiMessage::createSysExMessage(bytes.getRawDataPointer(), bytes.size()));
-            }
-        }
-        // unknown tokens are ignored
-    }
-}
-
 void ApplicationState::printMonitor(const String& inName, const MidiMessage& msg)
 {
     String line;
@@ -1772,112 +1553,9 @@ void ApplicationState::printMonitor(const String& inName, const MidiMessage& msg
     std::cout << line << std::endl;
 }
 
-String ApplicationState::output7BitAsHex(int v) const
+textmidi::Format ApplicationState::textFormat() const
 {
-    return String::toHexString(v).paddedLeft('0', 2).toUpperCase();
-}
-
-String ApplicationState::output7Bit(int v) const
-{
-    return useHexadecimalsByDefault_ ? output7BitAsHex(v) : String(v);
-}
-
-String ApplicationState::output14BitAsHex(int v) const
-{
-    return String::toHexString(v).paddedLeft('0', 4).toUpperCase();
-}
-
-String ApplicationState::output14Bit(int v) const
-{
-    return useHexadecimalsByDefault_ ? output14BitAsHex(v) : String(v);
-}
-
-String ApplicationState::outputNote(const MidiMessage& msg) const
-{
-    if (noteNumbersOutput_)
-    {
-        return output7Bit(msg.getNoteNumber()).paddedLeft(' ', 4);
-    }
-    return MidiMessage::getMidiNoteName(msg.getNoteNumber(), true, true, octaveMiddleC_).paddedLeft(' ', 4);
-}
-
-uint8 ApplicationState::asNoteNumber(String value) const
-{
-    if (value.length() >= 2)
-    {
-        value = value.toUpperCase();
-        String first = value.substring(0, 1);
-        if (first.containsOnly("CDEFGABH") && value.substring(value.length() - 1).containsOnly("1234567890"))
-        {
-            int note = 0;
-            switch (first[0])
-            {
-                case 'C': note = 0; break;
-                case 'D': note = 2; break;
-                case 'E': note = 4; break;
-                case 'F': note = 5; break;
-                case 'G': note = 7; break;
-                case 'A': note = 9; break;
-                case 'B': note = 11; break;
-                case 'H': note = 11; break;
-            }
-
-            if (value[1] == 'B')
-            {
-                note -= 1;
-            }
-            else if (value[1] == '#')
-            {
-                note += 1;
-            }
-
-            note += (value.getTrailingIntValue() + 5 - octaveMiddleC_) * 12;
-
-            return (uint8)limit7Bit(note);
-        }
-    }
-
-    return (uint8)limit7Bit(asDecOrHexIntValue(value));
-}
-
-uint8 ApplicationState::asDecOrHex7BitValue(String value) const
-{
-    return (uint8)limit7Bit(asDecOrHexIntValue(value));
-}
-
-uint16 ApplicationState::asDecOrHex14BitValue(String value) const
-{
-    return (uint16)limit14Bit(asDecOrHexIntValue(value));
-}
-
-int ApplicationState::asDecOrHexIntValue(String value) const
-{
-    if (value.endsWithIgnoreCase("H"))
-    {
-        return value.dropLastCharacters(1).getHexValue32();
-    }
-    else if (value.endsWithIgnoreCase("M"))
-    {
-        return value.getIntValue();
-    }
-    else if (useHexadecimalsByDefault_)
-    {
-        return value.getHexValue32();
-    }
-    else
-    {
-        return value.getIntValue();
-    }
-}
-
-uint8 ApplicationState::limit7Bit(int value)
-{
-    return (uint8)jlimit(0, 0x7f, value);
-}
-
-uint16 ApplicationState::limit14Bit(int value)
-{
-    return (uint16)jlimit(0, 0x3fff, value);
+    return { useHexadecimalsByDefault_, noteNumbersOutput_, octaveMiddleC_ };
 }
 
 void ApplicationState::printVersion()

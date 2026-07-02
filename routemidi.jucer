@@ -42,6 +42,8 @@
             file="Source/ScriptUtilClass.cpp"/>
       <FILE id="uuu1PF" name="ScriptUtilClass.h" compile="0" resource="0"
             file="Source/ScriptUtilClass.h"/>
+      <FILE id="txm002" name="TextMidi.cpp" compile="1" resource="0" file="Source/TextMidi.cpp"/>
+      <FILE id="txm001" name="TextMidi.h" compile="0" resource="0" file="Source/TextMidi.h"/>
     </GROUP>
   </MAINGROUP>
   <EXPORTFORMATS>

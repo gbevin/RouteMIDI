@@ -153,6 +153,7 @@
     <ClCompile Include="..\..\..\Source\ScriptMidiMessageClass.cpp"/>
     <ClCompile Include="..\..\..\Source\ScriptOscClass.cpp"/>
     <ClCompile Include="..\..\..\Source\ScriptUtilClass.cpp"/>
+    <ClCompile Include="..\..\..\Source\TextMidi.cpp"/>
     <ClCompile Include="..\..\TestRunner.cpp"/>
     <ClCompile Include="..\..\ScalingTests.cpp"/>
     <ClCompile Include="..\..\TransformTests.cpp"/>
@@ -1079,6 +1080,7 @@
     <ClInclude Include="..\..\..\Source\ScriptMidiMessageClass.h"/>
     <ClInclude Include="..\..\..\Source\ScriptOscClass.h"/>
     <ClInclude Include="..\..\..\Source\ScriptUtilClass.h"/>
+    <ClInclude Include="..\..\..\Source\TextMidi.h"/>
     <ClInclude Include="..\..\TestHelpers.h"/>
     <ClInclude Include="..\..\..\JuceLibraryCode\modules\juce_audio_basics\audio_play_head\juce_AudioPlayHead.h"/>
     <ClInclude Include="..\..\..\JuceLibraryCode\modules\juce_audio_basics\buffers\juce_AudioChannelSet.h"/>
