@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<JUCERPROJECT id="U5JfXz" name="routemidi" projectType="consoleapp" version="0.9.0"
+<JUCERPROJECT id="U5JfXz" name="routemidi" projectType="consoleapp" version="0.9.1"
               bundleIdentifier="com.uwyn.routemidi" includeBinaryInAppConfig="1"
               companyName="Uwyn" companyWebsite="http://www.uwyn.com" companyEmail="info@uwyn.com"
               displaySplashScreen="1" reportAppUsage="1" splashScreenColour="Dark"

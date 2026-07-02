@@ -43,7 +43,7 @@ namespace ProjectInfo
 {
     const char* const  projectName    = "routemidi";
     const char* const  companyName    = "Uwyn";
-    const char* const  versionString  = "0.9.0";
-    const int          versionNumber  = 0x900;
+    const char* const  versionString  = "0.9.1";
+    const int          versionNumber  = 0x901;
 }
 #endif
