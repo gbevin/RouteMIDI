@@ -1,0 +1,36 @@
+# RouteMIDI
+
+> RouteMIDI is a multi-platform (macOS, Windows, Linux) command-line tool that
+> routes MIDI messages between ports while filtering, transforming and
+> converting them. It is the routing/processing member of a family of CLI MIDI
+> tools alongside SendMIDI (send) and ReceiveMIDI (receive/monitor), and all
+> three share the same text MIDI format, so they compose with Unix pipes.
+
+Key facts for generating RouteMIDI command lines:
+
+- Invocation: `routemidi [settings] in <port> [commands ...] out <port> [in ... out ...]`.
+  A route is inputs, then commands, then outputs; the next `in` after an `out`
+  starts a new route. Every input of a route goes to every output.
+- Port names match case-insensitively by substring. `-` as a port name means
+  text MIDI on stdin/stdout, so pipelines can be tested without MIDI hardware:
+  `printf 'channel 1 note-on 60 100\n' | routemidi in - transp 12 out -`
+- Messages flow through fixed stages regardless of command order: filters,
+  then transforms (in written order), then MPE operations (in written order),
+  then conversions, then the outputs.
+- Filters whitelist (`ch`, `note`, `cc`, `noterange`, `velrange`, `inscale`, ...),
+  `not` blacklists. Transforms cover channels, transpose, scale quantize,
+  chords, latch, mono, velocity shaping and type changes. `convert` maps
+  between cc, cc14, rpn, nrpn, pb, cp, pc and pp. MPE operations relocate,
+  collapse, expand, split and adapt MPE zones. `js` runs JavaScript per message.
+- Numbers are decimal by default; notes accept names (`C3`, `F#2`); channels
+  are 1-16; selectors accept `lo..hi` ranges; MPE zones are `lower`/`upper[:n]`.
+
+## Docs
+
+- [README](https://raw.githubusercontent.com/gbevin/RouteMIDI/master/README.md): the full manual: every command, filter semantics, transforms, conversions, MPE routing, text MIDI format, and a section written for AI assistants with a recipe table
+- [JAVASCRIPT.md](https://raw.githubusercontent.com/gbevin/RouteMIDI/master/JAVASCRIPT.md): the per-message JavaScript API (accessors, send functions, OSC, persistent state)
+
+## Related
+
+- [SendMIDI](https://github.com/gbevin/SendMIDI): send MIDI messages from the command line
+- [ReceiveMIDI](https://github.com/gbevin/ReceiveMIDI): receive and monitor MIDI messages from the command line
