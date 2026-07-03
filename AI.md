@@ -54,6 +54,12 @@ MCP:
 The allow-list is deny-by-default: a command added to RouteMIDI in the future is
 unavailable over MCP until it is deliberately reviewed and permitted.
 
+The `inject_midi` tool stays inside this model: its input is parsed strictly as
+text MIDI data (never as commands, scripts or file paths) and the resulting
+messages can only reach output ports that a route already opened, the same
+ports live routing sends to. A line that is not a text MIDI message rejects the
+whole call atomically.
+
 ## The MCP server
 
 RouteMIDI includes a stdio MCP server in the same executable. MCP clients do
@@ -84,6 +90,25 @@ The server exposes these tools:
 - `list_routes`: returns every active route with its id, port connection state
   and the commands of each processing stage (filters, transforms, mpe,
   conversions, split) with their per-stage indexes.
+- `inject_midi`: injects text MIDI messages into a running route as if they
+  arrived on one of its inputs. They run through the route's full pipeline and
+  go to its outputs, and the result echoes what the route emitted, each entry
+  naming the output ports it was sent to, so a route can be exercised and
+  verified in place: audition a note, send a program change, or check what a
+  transform edit does to a specific message. Messages use the shared
+  SendMIDI/ReceiveMIDI text format (one per array element) and send
+  immediately, in order, without scheduling; a call takes at most 128 messages
+  and live MIDI interleaves with the batch rather than waiting for it. The
+  optional `input` index selects which input's per-input state (latch, pedals,
+  MPE, conversions) the messages run through. When an injected message
+  reconfigures an MPE zone on a `panic` route, the safety net's all-notes-off
+  and reset-all-controllers go to the outputs outside the echo, reported by
+  `zoneReset: true` in the result. Lines parse with the same permissive rules
+  as the CLI text streams: a line that yields no message rejects the whole
+  call, but unknown trailing tokens are ignored and a missing trailing value
+  defaults to 0, so `note-on 60` without a velocity becomes an effective
+  note-off. Generate every operand and check the echoed result against the
+  intent.
 - `add_commands`: appends processing commands (filters, transforms, MPE
   operations, conversions) to a running route; ports cannot be changed.
 - `replace_command`: replaces one command of a running route in place, keeping
@@ -173,8 +198,8 @@ One message per line: an optional `channel <1-16>` prefix, then one of `note-on 
 
 * The tool list, client configuration and troubleshooting live in the [MCP server section](#the-mcp-server). Everything below assumes the server was launched with `--mcp`.
 * `start_route` and `add_commands` take the contract's command tokens as a JSON array, one token per element: `["in", "Keyboard", "transp", "12", "out", "Synth"]`. Quoting is not needed; a port name with spaces is simply one array element.
-* MCP mode allows the routing commands (`in`, `out`, `vin`, `vout`, `panic`), the number settings (`dec`, `hex`, `omc`) and every processing command; anything else is rejected with a reason. In particular `-` ports and the monitoring commands are refused because MCP owns standard output for the protocol (use the `list_midi_ports` tool instead of `list`), and `syf` and `jsf` because they touch the local file system (`syf` could not be rolled back when a call fails, and `jsf` would echo file contents back through the route reporting; use inline `js` instead). The check is per command, so a port merely *named* like a command is fine.
-* A good workflow is to verify tokens first with a one-shot text pipe (previous section) and then start the identical tokens live with `start_route`. Tool calls are atomic: an invalid command (a bad MPE zone, a command before the first `in`) rejects the whole call, nothing is started, and session settings such as `hex` or `omc` that appeared in the rejected call are rolled back.
+* MCP mode allows the routing commands (`in`, `out`, `vin`, `vout`, `panic`), the number settings (`dec`, `hex`, `omc`) and every processing command; anything else is rejected with a reason. In particular `-` ports and the monitoring commands are refused because MCP owns standard output for the protocol (use the `list_midi_ports` tool instead of `list`), `syf` because it captures to the local file system and could not be rolled back when a call fails, and the scripting commands (`js`, `jsf`) because they can run code and reach the shell, the network and local files. The check is per command, so a port merely *named* like a command is fine.
+* A good workflow is to verify tokens first with a one-shot text pipe (previous section), start the identical tokens live with `start_route`, and then exercise the running route with `inject_midi`, checking the echoed result against the expectation. Tool calls are atomic: an invalid command (a bad MPE zone, a command before the first `in`) rejects the whole call, nothing is started, and session settings such as `hex` or `omc` that appeared in the rejected call are rolled back; an `inject_midi` call with a line that is not a text MIDI message injects nothing.
 * Routes have stable ids. `list_routes` reports each route's ports (with their connection state) and the commands of every stage with per-stage indexes; a route whose port is not connected yet keeps retrying until the port appears.
 * The `stage` field that `get_schema` reports for each command is the same `stage` argument the editing tools take: `filters`, `transforms`, `mpe`, `conversions` or `split`. Note two placements that differ from the help text's grouping: the RPN/NRPN value transforms (`rpnadd`, `nrpnscale`, ...) edit in `conversions`, and `mpesplit` in `split`.
 * `replace_command` swaps a command in place and keeps its position, which is the right tool for musical live edits: replacing `scale C major` with `scale D minor`, or retuning a `velcurve` or `cccurve` between songs.

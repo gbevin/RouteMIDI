@@ -483,6 +483,7 @@ public:
                 expect(names.contains("get_schema"));
                 expect(names.contains("list_midi_ports"));
                 expect(names.contains("start_route"));
+                expect(names.contains("inject_midi"));
             }
         }
 
@@ -1050,6 +1051,230 @@ public:
             // the failed edits left the route untouched
             expectEquals(state.getRoutes().size(), 1);
             expectEquals(state.getRoutes()[0]->transforms.size(), 1);
+        }
+
+        beginTest("MCP inject_midi runs messages through the route's pipeline and echoes the result");
+        {
+            ApplicationState state;
+            mcp(state, R"json({
+                "jsonrpc": "2.0", "id": 30, "method": "tools/call",
+                "params": { "name": "start_route", "arguments": {
+                    "commands": ["in", "InjectIn", "transp", "12", "out", "InjectOut"] } }
+            })json", true);
+
+            // the injected notes come back transposed in the echo, even though
+            // the route's ports are not connected to hardware
+            const var response = mcp(state, R"json({
+                "jsonrpc": "2.0", "id": 31, "method": "tools/call",
+                "params": { "name": "inject_midi", "arguments": {
+                    "route": 1,
+                    "messages": ["channel 1 note-on 60 100", "channel 1 note-off 60 0"] } }
+            })json", true);
+
+            auto structured = response.getProperty("result", var()).getProperty("structuredContent", var());
+            expectEquals((int)structured.getProperty("route", var()), 1);
+            expectEquals((int)structured.getProperty("injected", var()), 2);
+            expect(! structured.getProperty("zoneReset", var()));
+            auto* emitted = structured.getProperty("emitted", var()).getArray();
+            expect(emitted != nullptr && emitted->size() == 2);
+            if (emitted != nullptr && emitted->size() == 2)
+            {
+                const String first = emitted->getReference(0).getProperty("message", var()).toString();
+                const String second = emitted->getReference(1).getProperty("message", var()).toString();
+                expect(first.contains("note-on") && first.contains("C4"));    // 60 + 12
+                expect(second.contains("note-off") && second.contains("C4"));
+
+                // each emitted entry names the output ports it was sent to
+                auto* outputs = emitted->getReference(0).getProperty("outputs", var()).getArray();
+                expect(outputs != nullptr && outputs->size() == 1);
+                if (outputs != nullptr && outputs->size() == 1)
+                {
+                    expect(outputs->getReference(0).toString() == "InjectOut");
+                }
+            }
+
+            // on a route with several outputs, a broadcast message names them all
+            mcp(state, R"json({
+                "jsonrpc": "2.0", "id": 34, "method": "tools/call",
+                "params": { "name": "start_route", "arguments": {
+                    "commands": ["in", "WideIn", "out", "OutA", "out", "OutB"] } }
+            })json", true);
+            const var broadcast = mcp(state, R"json({
+                "jsonrpc": "2.0", "id": 35, "method": "tools/call",
+                "params": { "name": "inject_midi", "arguments": {
+                    "route": 2, "messages": ["channel 1 note-on 60 100"] } }
+            })json", true);
+            auto broadcastResult = broadcast.getProperty("result", var()).getProperty("structuredContent", var());
+            auto* wide = broadcastResult.getProperty("emitted", var()).getArray();
+            expect(wide != nullptr && wide->size() == 1);
+            if (wide != nullptr && wide->size() == 1)
+            {
+                auto* outputs = wide->getReference(0).getProperty("outputs", var()).getArray();
+                expect(outputs != nullptr && outputs->size() == 2);
+                if (outputs != nullptr && outputs->size() == 2)
+                {
+                    expect(outputs->getReference(0).toString() == "OutA");
+                    expect(outputs->getReference(1).toString() == "OutB");
+                }
+            }
+
+            // a message the route filters out is injected but nothing is emitted
+            mcp(state, R"json({
+                "jsonrpc": "2.0", "id": 32, "method": "tools/call",
+                "params": { "name": "add_commands", "arguments": {
+                    "route": 1, "commands": ["ch", "1"] } }
+            })json", true);
+            const var filtered = mcp(state, R"json({
+                "jsonrpc": "2.0", "id": 33, "method": "tools/call",
+                "params": { "name": "inject_midi", "arguments": {
+                    "route": 1, "messages": ["channel 2 note-on 60 100"] } }
+            })json", true);
+            auto filteredResult = filtered.getProperty("result", var()).getProperty("structuredContent", var());
+            expectEquals((int)filteredResult.getProperty("injected", var()), 1);
+            auto* nothing = filteredResult.getProperty("emitted", var()).getArray();
+            expect(nothing != nullptr && nothing->isEmpty());
+        }
+
+        beginTest("MCP inject_midi drives per-input state and rejects bad calls atomically");
+        {
+            ApplicationState state;
+            mcp(state, R"json({
+                "jsonrpc": "2.0", "id": 40, "method": "tools/call",
+                "params": { "name": "start_route", "arguments": {
+                    "commands": ["in", "PedalIn", "sustain", "out", "PedalOut"] } }
+            })json", true);
+
+            // a line that is not a text MIDI message rejects the whole call,
+            // so the pedal press in the same call never reaches the route
+            const var bad = mcp(state, R"json({
+                "jsonrpc": "2.0", "id": 41, "method": "tools/call",
+                "params": { "name": "inject_midi", "arguments": {
+                    "route": 1,
+                    "messages": ["channel 1 control-change 64 127", "gibberish"] } }
+            })json", true);
+            expect(bad.getProperty("result", var()).getProperty("isError", var()));
+            expect(mcpText(bad).contains("Not a text MIDI message"));
+
+            auto emittedCount = [&state](const String& request) -> int
+            {
+                const var response = mcp(state, request, true);
+                auto structured = response.getProperty("result", var()).getProperty("structuredContent", var());
+                auto* emitted = structured.getProperty("emitted", var()).getArray();
+                return emitted == nullptr ? -1 : emitted->size();
+            };
+
+            // the pedal is still up, so a note and its release both pass
+            expectEquals(emittedCount(R"json({
+                "jsonrpc": "2.0", "id": 42, "method": "tools/call",
+                "params": { "name": "inject_midi", "arguments": {
+                    "route": 1,
+                    "messages": ["channel 1 note-on 60 100", "channel 1 note-off 60 0"] } }
+            })json"), 2);
+
+            // press the pedal (consumed), play a note and release it: the
+            // note-off is held back by the state kept across tool calls
+            expectEquals(emittedCount(R"json({
+                "jsonrpc": "2.0", "id": 43, "method": "tools/call",
+                "params": { "name": "inject_midi", "arguments": {
+                    "route": 1, "messages": ["channel 1 control-change 64 127"] } }
+            })json"), 0);
+            expectEquals(emittedCount(R"json({
+                "jsonrpc": "2.0", "id": 44, "method": "tools/call",
+                "params": { "name": "inject_midi", "arguments": {
+                    "route": 1,
+                    "messages": ["channel 1 note-on 60 100", "channel 1 note-off 60 0"] } }
+            })json"), 1);
+
+            // lifting the pedal releases the held note-off
+            const var release = mcp(state, R"json({
+                "jsonrpc": "2.0", "id": 45, "method": "tools/call",
+                "params": { "name": "inject_midi", "arguments": {
+                    "route": 1, "messages": ["channel 1 control-change 64 0"] } }
+            })json", true);
+            auto releaseResult = release.getProperty("result", var()).getProperty("structuredContent", var());
+            auto* released = releaseResult.getProperty("emitted", var()).getArray();
+            expect(released != nullptr && released->size() == 1);
+            if (released != nullptr && released->size() == 1)
+            {
+                expect(released->getReference(0).getProperty("message", var()).toString().contains("note-off"));
+            }
+
+            // unknown route ids, missing messages and bad input indexes are reported
+            const var noRoute = mcp(state, R"json({
+                "jsonrpc": "2.0", "id": 46, "method": "tools/call",
+                "params": { "name": "inject_midi", "arguments": {
+                    "route": 99, "messages": ["channel 1 note-on 60 100"] } }
+            })json", true);
+            expect(noRoute.getProperty("result", var()).getProperty("isError", var()));
+            expect(mcpText(noRoute).contains("No route with id"));
+
+            const var noMessages = mcp(state, R"json({
+                "jsonrpc": "2.0", "id": 47, "method": "tools/call",
+                "params": { "name": "inject_midi", "arguments": { "route": 1 } }
+            })json", true);
+            expect(noMessages.getProperty("result", var()).getProperty("isError", var()));
+            expect(mcpText(noMessages).contains("Missing messages array"));
+
+            const var noInput = mcp(state, R"json({
+                "jsonrpc": "2.0", "id": 48, "method": "tools/call",
+                "params": { "name": "inject_midi", "arguments": {
+                    "route": 1, "input": 5, "messages": ["channel 1 note-on 60 100"] } }
+            })json", true);
+            expect(noInput.getProperty("result", var()).getProperty("isError", var()));
+            expect(mcpText(noInput).contains("No input at index"));
+
+            // a batch beyond the per-call limit is rejected before anything is
+            // injected, so one tool call cannot monopolize the routing path
+            StringArray flood;
+            for (int i = 0; i < 129; ++i)
+            {
+                flood.add("\"channel 1 note-on 60 100\"");
+            }
+            const var tooMany = mcp(state,
+                R"json({"jsonrpc": "2.0", "id": 49, "method": "tools/call",)json"
+                R"json("params": { "name": "inject_midi", "arguments": {)json"
+                R"json("route": 1, "messages": [)json" + flood.joinIntoString(",") + "] } } }",
+                true);
+            expect(tooMany.getProperty("result", var()).getProperty("isError", var()));
+            expect(mcpText(tooMany).contains("at most 128"));
+        }
+
+        beginTest("MCP inject_midi flags the panic safety net's zone reset");
+        {
+            // reconfiguring an MPE zone on a "panic" route sends all-notes-off
+            // and reset-all-controllers to the outputs outside the echoed
+            // messages, so the result reports it separately
+            ApplicationState state;
+            mcp(state, R"json({
+                "jsonrpc": "2.0", "id": 50, "method": "tools/call",
+                "params": { "name": "start_route", "arguments": {
+                    "commands": ["in", "McmIn", "panic", "out", "McmOut"] } }
+            })json", true);
+
+            auto zoneReset = [&state](const String& request) -> bool
+            {
+                const var response = mcp(state, request, true);
+                auto structured = response.getProperty("result", var()).getProperty("structuredContent", var());
+                return (bool) structured.getProperty("zoneReset", var());
+            };
+
+            // the first MPE Configuration Message announces the zone: no reset
+            expect(! zoneReset(R"json({
+                "jsonrpc": "2.0", "id": 51, "method": "tools/call",
+                "params": { "name": "inject_midi", "arguments": { "route": 1, "messages": [
+                    "channel 1 control-change 101 0",
+                    "channel 1 control-change 100 6",
+                    "channel 1 control-change 6 5"] } }
+            })json"));
+
+            // changing the member count reconfigures the zone: reset flagged
+            expect(zoneReset(R"json({
+                "jsonrpc": "2.0", "id": 52, "method": "tools/call",
+                "params": { "name": "inject_midi", "arguments": { "route": 1, "messages": [
+                    "channel 1 control-change 101 0",
+                    "channel 1 control-change 100 6",
+                    "channel 1 control-change 6 7"] } }
+            })json"));
         }
 
         beginTest("Text MIDI codec round-trips through messageToText/parseTextMidi");

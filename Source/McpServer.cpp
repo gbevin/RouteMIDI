@@ -151,6 +151,21 @@ static DynamicObject* newRouteCommandsSchema()
     return newObjectSchema(properties, { "commands" });
 }
 
+static DynamicObject* newInjectMidiSchema()
+{
+    auto properties = newObject();
+    properties->setProperty("route", var(newIntegerProperty("The route id, as reported by list_routes and start_route")));
+
+    auto messages = newObject();
+    messages->setProperty("type", "array");
+    messages->setProperty("description", "Text MIDI messages in the shared SendMIDI/ReceiveMIDI format, one message per element");
+    messages->setProperty("items", var(newStringSchema("One complete text MIDI message with every operand, e.g. \"channel 1 note-on C3 100\"")));
+    properties->setProperty("messages", var(messages));
+
+    properties->setProperty("input", var(newIntegerProperty("Zero-based index of the route input the messages arrive on (default 0); stateful commands track their state per input")));
+    return newObjectSchema(properties, { "route", "messages" });
+}
+
 static DynamicObject* newMcpTool(const String& name, const String& title,
                                  const String& description,
                                  DynamicObject* inputSchema,
@@ -193,6 +208,21 @@ static Array<var> mcpTools()
                              "transforms, mpe, conversions, split) with their per-stage indexes.",
                              newNoArgsSchema(),
                              true)));
+    tools.add(var(newMcpTool("inject_midi",
+                             "Inject MIDI Into Route",
+                             "Inject text MIDI messages into a running route as if they arrived "
+                             "on one of its inputs: they run through the route's full pipeline "
+                             "(filters, transforms, MPE operations, conversions) and are sent to "
+                             "its outputs. The result echoes the messages the route emitted with "
+                             "the output ports each went to, so a route can be exercised and "
+                             "verified in place. Messages send immediately, in order, without "
+                             "scheduling; at most 128 per call. Lines parse permissively like "
+                             "the CLI text streams: unknown trailing tokens are ignored and a "
+                             "missing trailing value defaults to 0 (a note-on without a velocity "
+                             "becomes an effective note-off), so include every operand and check "
+                             "the echo.",
+                             newInjectMidiSchema(),
+                             false)));
     tools.add(var(newMcpTool("stop_route",
                              "Stop Route",
                              "Stop and remove a route by id, sending all-notes-off to its "
@@ -784,8 +814,10 @@ var McpServer::handleRequest(const var& message)
         result->setProperty("instructions",
                             "RouteMIDI is controlled through these MCP tools: "
                             "get_schema inspects commands, list_midi_ports "
-                            "discovers ports and start_route starts live MIDI "
-                            "routes from explicit command tokens. This MCP "
+                            "discovers ports, start_route starts live MIDI "
+                            "routes from explicit command tokens and "
+                            "inject_midi sends test messages through a running "
+                            "route, echoing what it emitted. This MCP "
                             "interface is experimental and may change between "
                             "RouteMIDI releases.");
         return var(newMcpResponse(id, result));
@@ -1024,6 +1056,118 @@ var McpServer::handleRequest(const var& message)
             }
             auto result = newObject();
             result->setProperty("panicked", route->id);
+            return structuredOk(result);
+        }
+        if (name == "inject_midi")
+        {
+            Route* route = nullptr;
+            int index = -1;
+            const String error = findRouteArg(route, index);
+            if (error.isNotEmpty())
+            {
+                return toolError(error);
+            }
+
+            auto* messageLines = args->getProperty("messages").getArray();
+            if (messageLines == nullptr)
+            {
+                return toolError("Missing messages array");
+            }
+
+            const int inputIndex = args->hasProperty("input") ? (int) args->getProperty("input") : 0;
+            if (inputIndex < 0 || inputIndex >= route->inputs.size())
+            {
+                return toolError("No input at index " + String(inputIndex));
+            }
+
+            // a bounded batch keeps a single tool call from monopolizing the
+            // routing path; longer sequences are simply split over several calls
+            constexpr int maxInjectMessages = 128;
+            if (messageLines->size() > maxInjectMessages)
+            {
+                return toolError("Too many messages: inject_midi accepts at most "
+                                 + String(maxInjectMessages) + " per call");
+            }
+
+            // parse every line before anything is injected, so a call with a
+            // line that isn't a text MIDI message rejects atomically
+            Array<MidiMessage> parsed;
+            for (auto&& line : *messageLines)
+            {
+                const StringArray tokens = state_.parseLineAsParameters(line.toString());
+                const int before = parsed.size();
+                if (!tokens.isEmpty())
+                {
+                    state_.parseTextMidi(tokens, parsed);
+                }
+                if (parsed.size() == before)
+                {
+                    return toolError("Not a text MIDI message: " + line.toString());
+                }
+            }
+            if (parsed.size() > maxInjectMessages)
+            {
+                // one line can carry several messages, so the parsed count is
+                // bounded as well
+                return toolError("Too many messages: inject_midi accepts at most "
+                                 + String(maxInjectMessages) + " per call");
+            }
+
+            RouteInput& input = *route->inputs[inputIndex];
+            Array<MidiMessage> emittedMsgs;
+            Array<int> emittedPorts;
+            bool zoneReset = false;
+            for (const auto& msg : parsed)
+            {
+                Array<MidiMessage> outMsgs;
+                Array<int> outPorts;
+                {
+                    // injected messages take the same path as live MIDI arriving
+                    // on the input: the pipeline runs under the callback lock and
+                    // the results are sent to the route's outputs. The lock is
+                    // taken per message, so live MIDI can interleave with a long
+                    // injected batch instead of stalling behind it
+                    const ScopedLock sl(state_.midiCallbackLock_);
+                    zoneReset = state_.processRouteMessage(*route, input, msg, outMsgs, outPorts) || zoneReset;
+                    state_.sendRouted(*route, outMsgs, outPorts);
+                }
+                emittedMsgs.addArray(outMsgs);
+                emittedPorts.addArray(outPorts);
+            }
+
+            // echo what the route emitted, so the injection doubles as an
+            // in-place verification of the route's processing; each entry names
+            // the output ports it was sent to
+            Array<var> emitted;
+            for (int i = 0; i < emittedMsgs.size(); ++i)
+            {
+                auto item = newObject();
+                item->setProperty("message", state_.messageToText(emittedMsgs.getReference(i)));
+                Array<var> outputNames;
+                if (emittedPorts[i] < 0)
+                {
+                    for (auto* dest : route->outputs)
+                    {
+                        outputNames.add(dest->name);
+                    }
+                }
+                else if (emittedPorts[i] < route->outputs.size())
+                {
+                    outputNames.add(route->outputs[emittedPorts[i]]->name);
+                }
+                item->setProperty("outputs", var(outputNames));
+                emitted.add(var(item));
+            }
+
+            auto result = newObject();
+            result->setProperty("route", route->id);
+            result->setProperty("input", inputIndex);
+            result->setProperty("injected", parsed.size());
+            result->setProperty("emitted", var(emitted));
+            // the panic safety net sends all-notes-off and reset-all-controllers
+            // to the outputs directly when an injected message reconfigures an
+            // MPE zone; those messages are not part of the echo, so flag them
+            result->setProperty("zoneReset", zoneReset);
             return structuredOk(result);
         }
         if (name == "add_commands" || name == "replace_command")

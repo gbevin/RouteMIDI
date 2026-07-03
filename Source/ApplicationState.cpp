@@ -1176,15 +1176,34 @@ void ApplicationState::sendZoneReset(Route& route)
 
 void ApplicationState::routeMessage(Route& route, RouteInput& input, const MidiMessage& msg)
 {
+    Array<MidiMessage> outMsgs;
+    Array<int> outPorts;
+    processRouteMessage(route, input, msg, outMsgs, outPorts);
+    sendRouted(route, outMsgs, outPorts);
+
+    if (monitor_)
+    {
+        for (auto& m : outMsgs)
+        {
+            printMonitor(input.fullInName, m);
+        }
+    }
+}
+
+bool ApplicationState::processRouteMessage(Route& route, RouteInput& input, const MidiMessage& msg,
+                                           Array<MidiMessage>& outMsgs, Array<int>& outPorts)
+{
     // when the safety net is on, flush stuck notes if a zone is reconfigured
+    bool zoneReset = false;
     if (route.panic && input.mcm.reconfigures(msg))
     {
         sendZoneReset(route);
+        zoneReset = true;
     }
 
     if (!passesFilters(route, msg))
     {
-        return;
+        return zoneReset;
     }
 
     Array<MidiMessage> outputMessages;
@@ -1220,43 +1239,35 @@ void ApplicationState::routeMessage(Route& route, RouteInput& input, const MidiM
         if (route.outputSplit.isEmpty())
         {
             // ordinary routing: every message goes to every output
-            for (auto* dest : route.outputs)
-            {
-                sendToDest(dest, outMsg);
-            }
-            if (monitor_)
-            {
-                printMonitor(input.fullInName, outMsg);
-            }
+            outMsgs.add(outMsg);
+            outPorts.add(-1);
         }
         else
         {
             // split routing: each message is dispatched to a specific output
             // (a voice's port) or broadcast to all (port -1)
-            Array<MidiMessage> splitMsgs;
-            Array<int> splitPorts;
-            processSplit(route, outMsg, splitMsgs, splitPorts);
+            processSplit(route, outMsg, outMsgs, outPorts);
+        }
+    }
 
-            for (int i = 0; i < splitMsgs.size(); ++i)
+    return zoneReset;
+}
+
+void ApplicationState::sendRouted(Route& route, const Array<MidiMessage>& outMsgs, const Array<int>& outPorts)
+{
+    for (int i = 0; i < outMsgs.size(); ++i)
+    {
+        const MidiMessage& m = outMsgs.getReference(i);
+        if (outPorts[i] < 0)
+        {
+            for (auto* dest : route.outputs)
             {
-                const MidiMessage& m = splitMsgs.getReference(i);
-                if (splitPorts[i] < 0)
-                {
-                    for (auto* dest : route.outputs)
-                    {
-                        sendToDest(dest, m);
-                    }
-                }
-                else if (splitPorts[i] < route.outputs.size())
-                {
-                    sendToDest(route.outputs[splitPorts[i]], m);
-                }
-
-                if (monitor_)
-                {
-                    printMonitor(input.fullInName, m);
-                }
+                sendToDest(dest, m);
             }
+        }
+        else if (outPorts[i] < route.outputs.size())
+        {
+            sendToDest(route.outputs[outPorts[i]], m);
         }
     }
 }

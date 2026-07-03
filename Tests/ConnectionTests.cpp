@@ -246,6 +246,79 @@ public:
             }
         }
 
+        beginTest("MCP inject_midi reaches a connected output through the route's pipeline");
+        {
+            // injection needs no connected input: the route's input port never
+            // exists, only the output is live, and the injected message must
+            // arrive there transformed
+            const String inName  = "RouteMIDI InjIn "  + Uuid().toString();
+            const String outName = "RouteMIDI InjOut " + Uuid().toString();
+
+            CaptureMidiCallback capture;
+            auto virtualDest = MidiInput::createNewDevice(outName, &capture);
+            if (virtualDest == nullptr)
+            {
+                logMessage("  skipped: virtual MIDI not available on this system");
+                return;
+            }
+            virtualDest->start();
+            if (! waitForPort([] { return MidiOutput::getAvailableDevices(); }, outName, true, 3000))
+            {
+                logMessage("  skipped: virtual ports never appeared in the device lists");
+                return;
+            }
+
+            ApplicationState state;
+            ApplicationState::Control(state).startOutputSender();
+
+            McpServer mcpServer(state);
+            auto mcp = [&mcpServer](const String& json)
+            {
+                auto* previous = std::cerr.rdbuf(nullptr);
+                const var response = mcpServer.handleRequest(JSON::parse(json));
+                std::cerr.rdbuf(previous);
+                return response;
+            };
+
+            mcp(String(R"({"jsonrpc":"2.0","id":1,"method":"tools/call","params":)")
+                + R"({"name":"start_route","arguments":{"commands":["in",")" + inName
+                + R"(","transp","12","out",")" + outName + R"("]}}})");
+            expectEquals(state.getRoutes().size(), 1);
+            ApplicationState::Control(state).reconcileConnections();
+            if (state.getRoutes().isEmpty() || state.getRoutes()[0]->outputs.isEmpty()
+                || state.getRoutes()[0]->outputs[0]->out == nullptr)
+            {
+                logMessage("  skipped: could not open the virtual output in this process");
+                ApplicationState::Control(state).stopOutputSender();
+                return;
+            }
+
+            const var response = mcp(R"({"jsonrpc":"2.0","id":2,"method":"tools/call","params":)"
+                                     R"({"name":"inject_midi","arguments":{"route":1,)"
+                                     R"("messages":["channel 1 note-on 60 100"]}}})");
+            auto structured = response.getProperty("result", var()).getProperty("structuredContent", var());
+            expectEquals((int)structured.getProperty("injected", var()), 1);
+
+            // wait for the injected message to make the trip through CoreMIDI
+            const uint32 start = Time::getMillisecondCounter();
+            for (;;)
+            {
+                { const ScopedLock sl(capture.lock); if (capture.received.size() > 0) break; }
+                if ((int) (Time::getMillisecondCounter() - start) > 2000) break;
+                Thread::sleep(10);
+            }
+            ApplicationState::Control(state).stopOutputSender();
+
+            const ScopedLock sl(capture.lock);
+            expect(capture.received.size() >= 1);
+            if (capture.received.size() >= 1)
+            {
+                const auto& m = capture.received.getReference(0);
+                expect(m.isNoteOn());
+                expectEquals(m.getNoteNumber(), 72);   // 60 + 12
+            }
+        }
+
         beginTest("MCP start_route and stop_route stay safe under a live MIDI stream");
         {
             // a background thread floods a connected route through the real MIDI

@@ -26,9 +26,9 @@ class ApplicationState;
 
 // The MCP (Model Context Protocol) server: speaks newline-delimited JSON-RPC
 // over the stdio transport and implements the RouteMIDI tools (get_schema,
-// list_midi_ports, start_route, list_routes, add_commands, replace_command,
-// remove_command, panic_route and stop_route) on top of an ApplicationState.
-// Run by "routemidi --mcp".
+// list_midi_ports, start_route, list_routes, inject_midi, add_commands,
+// replace_command, remove_command, panic_route and stop_route) on top of an
+// ApplicationState. Run by "routemidi --mcp".
 class McpServer
 {
 public:

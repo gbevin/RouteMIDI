@@ -20,8 +20,8 @@ names and protocol version may change between RouteMIDI releases)
   an MCP endpoint.
 - Once launched with `--mcp`, discover tools through MCP `initialize` and
   `tools/list`. The server exposes `get_schema`, `list_midi_ports`,
-  `start_route`, `list_routes`, `add_commands`, `replace_command`,
-  `remove_command`, `panic_route` and `stop_route`.
+  `start_route`, `list_routes`, `inject_midi`, `add_commands`,
+  `replace_command`, `remove_command`, `panic_route` and `stop_route`.
 - `start_route` and `add_commands` take the same command tokens as the command
   line, minus the executable name, as a JSON array (one token per element). A
   good workflow: verify tokens with a one-shot `in - ... out -` text pipe, then
@@ -38,6 +38,14 @@ names and protocol version may change between RouteMIDI releases)
   `remove_command` edit a running route live (e.g. change a scale or remap a
   curve), and `panic_route` releases anything left sounding after editing
   stateful commands such as latch, mono, the pedals or the MPE operations.
+- `inject_midi` sends text MIDI messages (same format as below, one per array
+  element) into a running route as if they arrived on one of its inputs: they
+  run through the route's pipeline to its outputs, and the result echoes what
+  the route emitted (with the output ports each message went to), so a live
+  route can be auditioned and verified in place. Messages send immediately,
+  in order, without scheduling, at most 128 per call. Parsing is permissive:
+  a missing trailing value defaults to 0 (a velocity-less note-on is an
+  effective note-off), so write every operand and check the echo.
 
 **Route-start rules**
 

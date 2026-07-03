@@ -76,6 +76,17 @@ public:
     // parallel arrays where outPorts[i] is the destination index for outMsgs[i]
     // (-1 means broadcast to every output)
     void processSplit(Route& route, const MidiMessage& msg, Array<MidiMessage>& outMsgs, Array<int>& outPorts);
+
+    // runs one message through every stage of a route (filters, transforms,
+    // MPE operations, conversions, split) and appends the messages the route
+    // emits, with outPorts[i] the destination output index for outMsgs[i]
+    // (-1 means every output); routeMessage sends what this produces, and the
+    // MCP inject_midi tool uses it to inject messages and echo the result.
+    // Returns whether the message tripped the panic safety net's zone reset,
+    // which sends all-notes-off and reset-all-controllers to the outputs
+    // directly, beyond what lands in outMsgs
+    bool processRouteMessage(Route& route, RouteInput& input, const MidiMessage& msg,
+                             Array<MidiMessage>& outMsgs, Array<int>& outPorts);
     const OwnedArray<Route>& getRoutes() const { return routes_; }
 
     // text MIDI codec (TextMidi.cpp) with the current settings: renders and
@@ -118,6 +129,9 @@ private:
     void routeMessage(Route& route, RouteInput& input, const MidiMessage& msg);
     void applyMpeOp(const ApplicationCommand& cmd, RouteInput& input, const MidiMessage& msg, Array<MidiMessage>& output);
     void sendToDest(OutputDest* dest, const MidiMessage& msg);
+    // sends processRouteMessage results to the route's outputs, honoring the
+    // per-message destination index (-1 = every output)
+    void sendRouted(Route& route, const Array<MidiMessage>& outMsgs, const Array<int>& outPorts);
 
     // Outgoing hardware sends are handed to a dedicated thread so the real-time
     // MIDI input callback never blocks on MIDI output I/O. Under a heavy stream
