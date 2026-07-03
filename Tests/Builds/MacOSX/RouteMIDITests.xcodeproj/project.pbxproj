@@ -30,6 +30,7 @@
 		9F1FD4C249FA372C5CC6D19A /* TestRunner.cpp */ = {isa = PBXBuildFile; fileRef = 87F102E2EC0E8251A8E360CD; };
 		A26B17A34DD782FA51B0999B /* Accelerate.framework */ = {isa = PBXBuildFile; fileRef = 9152E34078D29A8AAE5EA0CB; };
 		A3B9BC5C447988F23E5790DC /* Latch.cpp */ = {isa = PBXBuildFile; fileRef = B5371D4BAE8253A9EEE4FC34; };
+		A4A71C8142DA11300ADCC4A5 /* Sustain.cpp */ = {isa = PBXBuildFile; fileRef = 27A807253AC68FA194146265; };
 		A7FA9EC6C18D00912F9249DE /* ScriptOscClass.cpp */ = {isa = PBXBuildFile; fileRef = B8A904ADC5D4CD648027A987; };
 		A8826F1F73C1BB1BAEA4660C /* McpServer.cpp */ = {isa = PBXBuildFile; fileRef = 7452F25D162481479BD70F3D; };
 		A929407C33A369FACE239FC6 /* ScalingTests.cpp */ = {isa = PBXBuildFile; fileRef = 41B62099CE86C4F708E1D8A8; };
@@ -61,6 +62,7 @@
 		19AC3F81C058EC779FD91E80 /* BitScaling.cpp */ /* BitScaling.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = BitScaling.cpp; path = ../../../Source/BitScaling.cpp; sourceTree = SOURCE_ROOT; };
 		2601CB19CB8D9C11BCCAF3FB /* TextMidi.h */ /* TextMidi.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = TextMidi.h; path = ../../../Source/TextMidi.h; sourceTree = SOURCE_ROOT; };
 		26805B057A76A735FEA3254B /* BitScaling.h */ /* BitScaling.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = BitScaling.h; path = ../../../Source/BitScaling.h; sourceTree = SOURCE_ROOT; };
+		27A807253AC68FA194146265 /* Sustain.cpp */ /* Sustain.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Sustain.cpp; path = ../../../Source/Sustain.cpp; sourceTree = SOURCE_ROOT; };
 		2B54B313A59D8706066CF382 /* juce_core */ /* juce_core */ = {isa = PBXFileReference; lastKnownFileType = folder; name = juce_core; path = ../../../JuceLibraryCode/modules/juce_core; sourceTree = SOURCE_ROOT; };
 		41B62099CE86C4F708E1D8A8 /* ScalingTests.cpp */ /* ScalingTests.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = ScalingTests.cpp; path = ../../ScalingTests.cpp; sourceTree = SOURCE_ROOT; };
 		44E8D833C13637A83A8EB2A3 /* ChannelBucket.cpp */ /* ChannelBucket.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = ChannelBucket.cpp; path = ../../../Source/ChannelBucket.cpp; sourceTree = SOURCE_ROOT; };
@@ -89,6 +91,7 @@
 		8C407C921E9D90D075A9F113 /* Cocoa.framework */ /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = System/Library/Frameworks/Cocoa.framework; sourceTree = SDKROOT; };
 		8D7FE2DBDB22E423320F9B00 /* ParsingTests.cpp */ /* ParsingTests.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = ParsingTests.cpp; path = ../../ParsingTests.cpp; sourceTree = SOURCE_ROOT; };
 		9152E34078D29A8AAE5EA0CB /* Accelerate.framework */ /* Accelerate.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Accelerate.framework; path = System/Library/Frameworks/Accelerate.framework; sourceTree = SDKROOT; };
+		9406B1A5F7E99FA639A35066 /* Sustain.h */ /* Sustain.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Sustain.h; path = ../../../Source/Sustain.h; sourceTree = SOURCE_ROOT; };
 		94259D303994E9251076AA20 /* Schema.cpp */ /* Schema.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Schema.cpp; path = ../../../Source/Schema.cpp; sourceTree = SOURCE_ROOT; };
 		9747DCCAE168EAC78BEF151F /* CoreMIDI.framework */ /* CoreMIDI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreMIDI.framework; path = System/Library/Frameworks/CoreMIDI.framework; sourceTree = SDKROOT; };
 		9B5F93F3C976D376BE8EB9C2 /* juce_osc */ /* juce_osc */ = {isa = PBXFileReference; lastKnownFileType = folder; name = juce_osc; path = ../../../JuceLibraryCode/modules/juce_osc; sourceTree = SOURCE_ROOT; };
@@ -209,6 +212,8 @@
 				FEF8124308305487E5963E75,
 				94259D303994E9251076AA20,
 				B670BBCFAA9C202AA89D82D8,
+				27A807253AC68FA194146265,
+				9406B1A5F7E99FA639A35066,
 				BC3AC7AAE26DD24EC82A6052,
 				2601CB19CB8D9C11BCCAF3FB,
 			);
@@ -351,6 +356,7 @@
 				F4F38ADABAA8E6527F1034FA,
 				A8826F1F73C1BB1BAEA4660C,
 				C4224F3888C472B0DD596618,
+				A4A71C8142DA11300ADCC4A5,
 				64CD3BF771D78A5EFEB2D73C,
 				9F1FD4C249FA372C5CC6D19A,
 				A929407C33A369FACE239FC6,

@@ -29,6 +29,7 @@
 		733F39336A3BA81575DD317E /* ScriptMidiMessageClass.cpp */ = {isa = PBXBuildFile; fileRef = 3973848B1FB155637755C9F9; };
 		74E75096858F409D9620368B /* AudioToolbox.framework */ = {isa = PBXBuildFile; fileRef = 5D3F4C219DB9D465708B6231; };
 		775AC60B580F0E0B1F5A59E7 /* Schema.cpp */ = {isa = PBXBuildFile; fileRef = 38630DFA0030BF212C9E9B60; };
+		80ED198ED2167D21A964A902 /* Sustain.cpp */ = {isa = PBXBuildFile; fileRef = 8FD5AB6A856BACE261AC7521; };
 		8C315CE0BB161E8F64351690 /* Foundation.framework */ = {isa = PBXBuildFile; fileRef = 07349D8481B1ED49EE53EB64; };
 		8CC96C84E9919543939AB516 /* Latch.cpp */ = {isa = PBXBuildFile; fileRef = 5133E6DBD03BB2F966578F3E; };
 		8E8410A6B527CB8A75830C3C /* Cocoa.framework */ = {isa = PBXBuildFile; fileRef = 8C841A693EA83A57B62FDF16; };
@@ -61,6 +62,7 @@
 		3973848B1FB155637755C9F9 /* ScriptMidiMessageClass.cpp */ /* ScriptMidiMessageClass.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = ScriptMidiMessageClass.cpp; path = ../../Source/ScriptMidiMessageClass.cpp; sourceTree = SOURCE_ROOT; };
 		39BBB61E6B2796DB8C72B46D /* CoreAudio.framework */ /* CoreAudio.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreAudio.framework; path = System/Library/Frameworks/CoreAudio.framework; sourceTree = SDKROOT; };
 		3B899882E9F48AFC64E535EF /* include_juce_midi_ci.cpp */ /* include_juce_midi_ci.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = include_juce_midi_ci.cpp; path = ../../JuceLibraryCode/include_juce_midi_ci.cpp; sourceTree = SOURCE_ROOT; };
+		3D48DC81B13A450D530A0037 /* Sustain.h */ /* Sustain.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Sustain.h; path = ../../Source/Sustain.h; sourceTree = SOURCE_ROOT; };
 		5133E6DBD03BB2F966578F3E /* Latch.cpp */ /* Latch.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Latch.cpp; path = ../../Source/Latch.cpp; sourceTree = SOURCE_ROOT; };
 		52AE88A364FFF2111D8EF313 /* include_juce_osc.cpp */ /* include_juce_osc.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = include_juce_osc.cpp; path = ../../JuceLibraryCode/include_juce_osc.cpp; sourceTree = SOURCE_ROOT; };
 		55BBBA41C247C883C31B9DA4 /* Schema.h */ /* Schema.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Schema.h; path = ../../Source/Schema.h; sourceTree = SOURCE_ROOT; };
@@ -73,6 +75,7 @@
 		7DD493C8E6F3B7C63C78F6DE /* include_juce_core.mm */ /* include_juce_core.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = include_juce_core.mm; path = ../../JuceLibraryCode/include_juce_core.mm; sourceTree = SOURCE_ROOT; };
 		8A5BABA1DEBF1BBC38C35A84 /* AppConfig.h */ /* AppConfig.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = AppConfig.h; path = ../../JuceLibraryCode/AppConfig.h; sourceTree = SOURCE_ROOT; };
 		8C841A693EA83A57B62FDF16 /* Cocoa.framework */ /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = System/Library/Frameworks/Cocoa.framework; sourceTree = SDKROOT; };
+		8FD5AB6A856BACE261AC7521 /* Sustain.cpp */ /* Sustain.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Sustain.cpp; path = ../../Source/Sustain.cpp; sourceTree = SOURCE_ROOT; };
 		8FF3E27E707D2D5F6D83FDEE /* McpServer.h */ /* McpServer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = McpServer.h; path = ../../Source/McpServer.h; sourceTree = SOURCE_ROOT; };
 		92335890AFA077CA46856B96 /* ConsoleApp */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = routemidi; sourceTree = BUILT_PRODUCTS_DIR; };
 		984B89DA298818FDB2DF5FC5 /* Latch.h */ /* Latch.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Latch.h; path = ../../Source/Latch.h; sourceTree = SOURCE_ROOT; };
@@ -197,6 +200,8 @@
 				8FF3E27E707D2D5F6D83FDEE,
 				38630DFA0030BF212C9E9B60,
 				55BBBA41C247C883C31B9DA4,
+				8FD5AB6A856BACE261AC7521,
+				3D48DC81B13A450D530A0037,
 				22704F653400656D46C6CF31,
 				C824511B9526921A9B1CD762,
 				5F6526C961F6F88C95A67C56,
@@ -314,6 +319,7 @@
 				2BA07F2CF2B004870E08CD28,
 				B61C2506A473A9D6519ADFDF,
 				775AC60B580F0E0B1F5A59E7,
+				80ED198ED2167D21A964A902,
 				247F98C66BBBEFD9C652B644,
 				A03F1373B6076C5E5685E241,
 				733F39336A3BA81575DD317E,

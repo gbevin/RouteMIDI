@@ -91,6 +91,8 @@ ApplicationState::ApplicationState()
     commands_.add({"chord",     "",                       CHORD,                  -1, {"intervals"},              {"Stack notes at the given semitone intervals (a chord)"}});
     commands_.add({"latch",     "",                       LATCH,                  -1, {"(mode)"},                 {"Keep notes on after release; toggle (default) or hold"}});
     commands_.add({"mono",      "",                       MONO,                   -1, {"(priority)"},             {"Force monophony; priority last (default), low or high"}});
+    commands_.add({"sustain",   "sustain-pedal",          SUSTAIN,                 0, {""},                       {"Apply the sustain pedal (CC 64) to the notes themselves"}});
+    commands_.add({"sost",      "sostenuto-pedal",        SOSTENUTO,               0, {""},                       {"Apply the sostenuto pedal (CC 66) to the notes themselves"}});
     commands_.add({"notecc",    "note-to-control-change", NOTE_TO_CC,              2, {"note", "cc"},             {"Turn a note into a Control Change (velocity as value)"}});
     commands_.add({"ccnote",    "control-change-to-note", CC_TO_NOTE,              2, {"cc", "note"},             {"Turn a Control Change into a note (64+ on, else off)"}});
     commands_.add({"notepc",    "note-to-program-change", NOTE_TO_PROGRAM,         2, {"note", "program"},        {"Turn a note-on into a Program Change (note-off dropped)"}});
@@ -100,19 +102,25 @@ ApplicationState::ApplicationState()
     commands_.add({"velcurve",  "velocity-curve",         VELOCITY_CURVE,          1, {"gamma"},                  {"Apply a gamma curve to note-on velocity (1-127)"}});
     commands_.add({"velclip",   "velocity-clip",          VELOCITY_CLIP,           2, {"min", "max"},             {"Clamp note-on velocity into a min-max range"}});
     commands_.add({"velcomp",   "velocity-compress",      VELOCITY_COMPRESS,       1, {"amount"},                 {"Squeeze note-on velocity toward the mid-range (0-1)"}});
+    commands_.add({"velinvert", "velocity-invert",        VELOCITY_INVERT,         0, {""},                       {"Invert note-on velocity (soft becomes loud)"}});
     commands_.add({"ccmap",     "control-change-map",     CONTROL_CHANGE_MAP,      2, {"from", "to"},             {"Remap a Control Change controller number"}});
     commands_.add({"ccadd",     "control-change-add",     CONTROL_CHANGE_ADD,      2, {"number", "value"},        {"Add an offset to a controller's value (clamped 0-127)"}});
     commands_.add({"ccscale",   "control-change-scale",   CONTROL_CHANGE_SCALE,    2, {"number", "factor"},       {"Scale a controller's value by a factor (clamped 0-127)"}});
     commands_.add({"cccurve",   "control-change-curve",   CONTROL_CHANGE_CURVE,    2, {"number", "gamma"},        {"Apply a gamma curve to a controller's value"}});
+    commands_.add({"ccinvert",  "control-change-invert",  CONTROL_CHANGE_INVERT,   1, {"number"},                 {"Invert a controller's value (0-127 mirrored)"}});
+    commands_.add({"ccrescale", "control-change-rescale", CONTROL_CHANGE_RESCALE,  5, {"number", "inlow", "inhigh", "outlow", "outhigh"},
+                                                                                                                  {"Rescale a controller's value from one range onto another (a reversed output range inverts)"}});
     commands_.add({"pcmap",     "program-change-map",     PROGRAM_CHANGE_MAP,      2, {"from", "to"},             {"Remap a Program Change number"}});
     commands_.add({"pcadd",     "program-change-add",     PROGRAM_CHANGE_ADD,      1, {"number"},                 {"Add an offset to Program Change number (clamped 0-127)"}});
     commands_.add({"pbadd",     "pitch-bend-add",         PITCH_BEND_ADD,          1, {"number"},                 {"Add an offset to Pitch Bend (clamped 0-16383)"}});
     commands_.add({"pbscale",   "pitch-bend-scale",       PITCH_BEND_SCALE,        1, {"factor"},                 {"Scale Pitch Bend around center by a factor (0-16383)"}});
     commands_.add({"pbset",     "pitch-bend-set",         PITCH_BEND_SET,          1, {"number"},                 {"Set a fixed Pitch Bend value (0-16383)"}});
+    commands_.add({"pbinvert",  "pitch-bend-invert",      PITCH_BEND_INVERT,       0, {""},                       {"Invert Pitch Bend around the center (up becomes down)"}});
     commands_.add({"cpadd",     "channel-pressure-add",   CHANNEL_PRESSURE_ADD,    1, {"number"},                 {"Add an offset to Channel Pressure (clamped 0-127)"}});
     commands_.add({"cpscale",   "channel-pressure-scale", CHANNEL_PRESSURE_SCALE,  1, {"factor"},                 {"Scale Channel Pressure by a factor (clamped 0-127)"}});
     commands_.add({"cpset",     "channel-pressure-set",   CHANNEL_PRESSURE_SET,    1, {"number"},                 {"Set a fixed Channel Pressure value (0-127)"}});
     commands_.add({"cpcurve",   "channel-pressure-curve", CHANNEL_PRESSURE_CURVE,  1, {"gamma"},                  {"Apply a gamma curve to Channel Pressure"}});
+    commands_.add({"cpinvert",  "channel-pressure-invert",CHANNEL_PRESSURE_INVERT, 0, {""},                       {"Invert Channel Pressure (0-127 mirrored)"}});
     commands_.add({"nrpnadd",   "nrpn-add",               NRPN_ADD,                2, {"param", "number"},        {"Add an offset to an NRPN value (clamped to its resolution)"}});
     commands_.add({"nrpnscale", "nrpn-scale",             NRPN_SCALE,              2, {"param", "factor"},        {"Scale an NRPN value by a factor (clamped to its resolution)"}});
     commands_.add({"nrpncurve", "nrpn-curve",             NRPN_CURVE,              2, {"param", "gamma"},         {"Apply a gamma curve to an NRPN value"}});
@@ -1120,15 +1128,19 @@ void ApplicationState::sendPanic(Route& route)
         for (int channel = 1; channel <= 16; ++channel)
         {
             enqueueSend(dest->out.get(), MidiMessage::controllerEvent(channel, 64, 0));   // sustain off
+            enqueueSend(dest->out.get(), MidiMessage::controllerEvent(channel, 66, 0));   // sostenuto off
             enqueueSend(dest->out.get(), MidiMessage::controllerEvent(channel, 123, 0));  // all notes off
         }
     }
 
-    // the all-notes-off above silences any latched notes, so drop their state too
+    // the all-notes-off above silences any latched or pedal-held notes, so drop
+    // their state too
     for (auto* input : route.inputs)
     {
         input->latch.clear();
         input->mono.reset();
+        input->sustain.clear();
+        input->sostenuto.clear();
         input->conv.pressure.reset();
     }
 }
@@ -1150,11 +1162,14 @@ void ApplicationState::sendZoneReset(Route& route)
         }
     }
 
-    // a zone change flushes stuck notes downstream, so drop latched state as well
+    // a zone change flushes stuck notes downstream, so drop latched and
+    // pedal-held state as well
     for (auto* input : route.inputs)
     {
         input->latch.clear();
         input->mono.reset();
+        input->sustain.clear();
+        input->sostenuto.clear();
         input->conv.pressure.reset();
     }
 }
@@ -1410,6 +1425,18 @@ Array<MidiMessage> ApplicationState::applyTransforms(Route& route, RouteInput& i
                     else if (cmd.copts_[0].keyword == 3) { priority = MonoState::High; }
                 }
                 input.mono.process(priority, m, next);
+            }
+            else if (cmd.command_ == SUSTAIN)
+            {
+                // pre-applies the sustain pedal to the notes, for synths that
+                // ignore CC 64
+                input.sustain.process(false, m, next);
+            }
+            else if (cmd.command_ == SOSTENUTO)
+            {
+                // pre-applies the sostenuto pedal to the notes held at press,
+                // for synths that ignore CC 66
+                input.sostenuto.process(true, m, next);
             }
             else
             {

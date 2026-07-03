@@ -112,6 +112,8 @@ Transforms:
   chord     intervals  Stack notes at the given semitone intervals (a chord)
   latch     (mode)     Keep notes on after release; toggle (default) or hold
   mono      (priority) Force monophony; priority last (default), low or high
+  sustain              Apply the sustain pedal (CC 64) to the notes themselves
+  sost                 Apply the sostenuto pedal (CC 66) to the notes themselves
   notecc    note cc    Turn a note into a Control Change (velocity as value)
   ccnote    cc note    Turn a Control Change into a note (64+ on, else off)
   notepc    note       Turn a note-on into a Program Change (note-off dropped)
@@ -122,6 +124,7 @@ Transforms:
   velcurve  gamma      Apply a gamma curve to note-on velocity (1-127)
   velclip   min max    Clamp note-on velocity into a min-max range
   velcomp   amount     Squeeze note-on velocity toward the mid-range (0-1)
+  velinvert            Invert note-on velocity (soft becomes loud)
   ccmap     from to    Remap a Control Change controller number
   ccadd     number     Add an offset to a controller's value (clamped 0-127)
             value
@@ -129,15 +132,23 @@ Transforms:
             factor
   cccurve   number     Apply a gamma curve to a controller's value
             gamma
+  ccinvert  number     Invert a controller's value (0-127 mirrored)
+  ccrescale number     Rescale a controller's value from one range onto another
+            inlow      (a reversed output range inverts)
+            inhigh
+            outlow
+            outhigh
   pcmap     from to    Remap a Program Change number
   pcadd     number     Add an offset to Program Change number (clamped 0-127)
   pbadd     number     Add an offset to Pitch Bend (clamped 0-16383)
   pbscale   factor     Scale Pitch Bend around center by a factor (0-16383)
   pbset     number     Set a fixed Pitch Bend value (0-16383)
+  pbinvert             Invert Pitch Bend around the center (up becomes down)
   cpadd     number     Add an offset to Channel Pressure (clamped 0-127)
   cpscale   factor     Scale Channel Pressure by a factor (clamped 0-127)
   cpset     number     Set a fixed Channel Pressure value (0-127)
   cpcurve   gamma      Apply a gamma curve to Channel Pressure
+  cpinvert             Invert Channel Pressure (0-127 mirrored)
   nrpnadd   param      Add an offset to an NRPN value (clamped to its
             number     resolution)
   nrpnscale param      Scale an NRPN value by a factor (clamped to its
@@ -197,15 +208,17 @@ Alternatively, you can use the following long versions of the commands:
   system-common system-exclusive system-exclusive-file time-code song-position
   song-select tune-request note-range velocity-range control-change-range
   in-scale mpe-master mpe-member mpe-zone channel-map channel-set channel-add
-  transpose diatonic-transpose note-map note-to-control-change
-  control-change-to-note note-to-program-change velocity-scale velocity-set
-  velocity-add velocity-curve velocity-clip velocity-compress
-  control-change-map control-change-add control-change-scale
-  control-change-curve program-change-map program-change-add pitch-bend-add
-  pitch-bend-scale pitch-bend-set channel-pressure-add channel-pressure-scale
-  channel-pressure-set channel-pressure-curve nrpn-add nrpn-scale nrpn-curve
-  rpn-add rpn-scale rpn-curve javascript javascript-file mpe-mono mpe-expand
-  mpe-split mpe-bend mpe-sensitivity
+  transpose diatonic-transpose note-map sustain-pedal sostenuto-pedal
+  note-to-control-change control-change-to-note note-to-program-change
+  velocity-scale velocity-set velocity-add velocity-curve velocity-clip
+  velocity-compress velocity-invert control-change-map control-change-add
+  control-change-scale control-change-curve control-change-invert
+  control-change-rescale program-change-map program-change-add pitch-bend-add
+  pitch-bend-scale pitch-bend-set pitch-bend-invert channel-pressure-add
+  channel-pressure-scale channel-pressure-set channel-pressure-curve
+  channel-pressure-invert nrpn-add nrpn-scale nrpn-curve rpn-add rpn-scale
+  rpn-curve javascript javascript-file mpe-mono mpe-expand mpe-split mpe-bend
+  mpe-sensitivity
 ```
 
 ## Routes
@@ -313,6 +326,21 @@ routemidi in "Keyboard" velclip 40 100 out "Synth"      # never too soft or too 
 routemidi in "Keyboard" velcomp 0.5 out "Synth"         # tighten the dynamic range
 ```
 
+The invert transforms mirror a value across its range: `velinvert` flips note-on velocity (soft becomes loud), `ccinvert` flips a controller's value (0 becomes 127 and vice versa, for instance to reverse a pedal or fader that works backwards), `cpinvert` flips Channel Pressure, and `pbinvert` mirrors Pitch Bend around its centre so a bend up becomes the same bend down.
+
+```
+routemidi in "Pedal" ccinvert 11 out "Synth"            # reverse an expression pedal
+routemidi in "Keyboard" pbinvert out "Synth"            # bend up becomes bend down
+```
+
+`ccrescale` maps a controller's input range onto a different output range: it takes the controller number followed by `inlow inhigh outlow outhigh`, clamps the incoming value into the input range and rescales it linearly onto the output range. That calibrates a controller that never quite reaches its extremes, tames one that is too sensitive, or offsets its response; reversing the output bounds inverts the response at the same time.
+
+```
+routemidi in "Pedal" ccrescale 11 20 108 0 127 out "Synth"   # use the pedal's real travel
+routemidi in "Fader" ccrescale 7 0 127 40 100 out "Mixer"    # keep the level in a window
+routemidi in "Pedal" ccrescale 11 0 127 127 0 out "Synth"    # invert while rescaling
+```
+
 A few transforms change a message from one type to another. `notecc` turns a specific note into a Control Change (the note-on velocity becomes the value, and the note-off sends 0); `ccnote` turns a Control Change into a note (a value of 64 or more triggers a note-on with that value as the velocity, below 64 a note-off); and `notepc` turns a note-on into a Program Change (the note-off is dropped). `ccnote` is aimed at switch- or pedal-style controllers; a continuously changing CC would retrigger the note. Since `notecc` uses the velocity as the value, put a `velset` in front of it for a fixed value.
 
 ```
@@ -385,6 +413,13 @@ The `mono` transform forces monophony (only one note sounds at a time), which is
 routemidi in "Keyboard" mono out "Synth"                # last-note mono
 routemidi in "Bass" mono low out "Synth"                # lowest note wins
 routemidi in "LinnStrument" chset 1 mono out "Mono"     # collapse MPE to a mono synth
+```
+
+The `sustain` and `sost` transforms apply a pedal to the note stream itself, for synths and samplers whose MIDI implementation ignores the pedal (or has none). `sustain` holds back every note-off that arrives while the sustain pedal (CC 64) is down and sends them when the pedal is lifted; `sost` does the same for the sostenuto pedal (CC 66), but only for the notes whose keys were down at the moment the pedal was pressed, so notes played afterwards are unaffected. The pedal message itself is consumed, since its effect is already applied, and re-striking a note that is sounding with its key released retriggers it cleanly (a note-off is sent first). Both pedals are tracked per channel, and everything held is released when the route hits `panic` (on disconnect, exit or an MPE zone change).
+
+```
+routemidi in "Keyboard" sustain out "Sampler"           # pedal works on any sampler
+routemidi in "Keyboard" sost out "Synth"                # sostenuto for synths without it
 ```
 
 For ultimate flexibility, the `js` and `jsf` commands run JavaScript on each message and can inspect it, rewrite it, drop it, or emit additional messages (so one note can become a chord, for instance). See the [JAVASCRIPT.md](JAVASCRIPT.md) documentation file for details.
@@ -573,7 +608,7 @@ routemidi in "A" in "B" mon src out "Synth"         # show which input each came
 
 ## Panic
 
-Add `panic` to a route to make it send an all-notes-off safety net (sustain off and all-notes-off on every channel) to that route's outputs whenever one of its inputs disconnects, and once more when RouteMIDI exits. This prevents stuck notes when a controller is unplugged mid-performance. It also fires when an **MPE zone is reconfigured** mid-stream: when an MPE Configuration Message changes a zone's member count (or turns the zone off), it sends all-notes-off and reset-all-controllers downstream, since non-MPE devices won't reset themselves.
+Add `panic` to a route to make it send an all-notes-off safety net (sustain off, sostenuto off and all-notes-off on every channel) to that route's outputs whenever one of its inputs disconnects, and once more when RouteMIDI exits. This prevents stuck notes when a controller is unplugged mid-performance. It also fires when an **MPE zone is reconfigured** mid-stream: when an MPE Configuration Message changes a zone's member count (or turns the zone off), it sends all-notes-off and reset-all-controllers downstream, since non-MPE devices won't reset themselves.
 
 ```
 routemidi in "Keyboard" panic out "Synth"

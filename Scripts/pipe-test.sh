@@ -88,6 +88,22 @@ EXPECTED='channel  1   note-on           C4 100
 channel  1   note-off          C4   0'
 run "transpose transform" in - transp 12 out -
 
+# --- the sustain pedal is applied to the notes themselves ------------------------
+INPUT='channel 1 control-change 64 127
+channel 1 note-on 60 100
+channel 1 note-off 60 0
+channel 1 control-change 64 0'
+EXPECTED='channel  1   note-on           C3 100
+channel  1   note-off          C3   0'
+run "sustain pedal pre-application" in - sustain out -
+
+# --- a controller value range is rescaled onto another range ---------------------
+INPUT='channel 1 control-change 11 0
+channel 1 control-change 11 127'
+EXPECTED='channel  1   control-change    11    20
+channel  1   control-change    11   100'
+run "ccrescale range mapping" in - ccrescale 11 0 127 20 100 out -
+
 # --- a conversion turns one message type into another ---------------------------
 INPUT='channel 1 control-change 7 127
 channel 1 control-change 7 64

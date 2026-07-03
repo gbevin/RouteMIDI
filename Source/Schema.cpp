@@ -107,6 +107,8 @@ static const char* commandStage(CommandIndex command)
         case CHORD:
         case LATCH:
         case MONO:
+        case SUSTAIN:
+        case SOSTENUTO:
         case NOTE_TO_CC:
         case CC_TO_NOTE:
         case NOTE_TO_PROGRAM:
@@ -116,19 +118,24 @@ static const char* commandStage(CommandIndex command)
         case VELOCITY_CURVE:
         case VELOCITY_CLIP:
         case VELOCITY_COMPRESS:
+        case VELOCITY_INVERT:
         case CONTROL_CHANGE_MAP:
         case CONTROL_CHANGE_ADD:
         case CONTROL_CHANGE_SCALE:
         case CONTROL_CHANGE_CURVE:
+        case CONTROL_CHANGE_INVERT:
+        case CONTROL_CHANGE_RESCALE:
         case PROGRAM_CHANGE_MAP:
         case PROGRAM_CHANGE_ADD:
         case PITCH_BEND_ADD:
         case PITCH_BEND_SCALE:
         case PITCH_BEND_SET:
+        case PITCH_BEND_INVERT:
         case CHANNEL_PRESSURE_ADD:
         case CHANNEL_PRESSURE_SCALE:
         case CHANNEL_PRESSURE_SET:
         case CHANNEL_PRESSURE_CURVE:
+        case CHANNEL_PRESSURE_INVERT:
         case JAVASCRIPT:
         case JAVASCRIPT_FILE:
             return "transforms";

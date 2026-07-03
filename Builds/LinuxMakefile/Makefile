@@ -82,6 +82,7 @@ OBJECTS_CONSOLEAPP := \
   $(JUCE_OBJDIR)/Main_90ebc5c2.o \
   $(JUCE_OBJDIR)/McpServer_3f7b345e.o \
   $(JUCE_OBJDIR)/Schema_ea09caa.o \
+  $(JUCE_OBJDIR)/Sustain_fe08e904.o \
   $(JUCE_OBJDIR)/Mpe_60014c83.o \
   $(JUCE_OBJDIR)/Route_a82a312a.o \
   $(JUCE_OBJDIR)/ScriptMidiMessageClass_6b9b1366.o \
@@ -157,6 +158,11 @@ $(JUCE_OBJDIR)/McpServer_3f7b345e.o: ../../Source/McpServer.cpp
 $(JUCE_OBJDIR)/Schema_ea09caa.o: ../../Source/Schema.cpp
 	-$(V_AT)mkdir -p $(@D)
 	@echo "Compiling Schema.cpp"
+	$(V_AT)$(CXX) $(JUCE_CXXFLAGS) $(JUCE_CPPFLAGS_CONSOLEAPP) $(JUCE_CFLAGS_CONSOLEAPP) -o "$@" -c "$<"
+
+$(JUCE_OBJDIR)/Sustain_fe08e904.o: ../../Source/Sustain.cpp
+	-$(V_AT)mkdir -p $(@D)
+	@echo "Compiling Sustain.cpp"
 	$(V_AT)$(CXX) $(JUCE_CXXFLAGS) $(JUCE_CPPFLAGS_CONSOLEAPP) $(JUCE_CFLAGS_CONSOLEAPP) -o "$@" -c "$<"
 
 $(JUCE_OBJDIR)/Mpe_60014c83.o: ../../Source/Mpe.cpp

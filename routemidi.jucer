@@ -30,6 +30,8 @@
       <FILE id="mcp001" name="McpServer.h" compile="0" resource="0" file="Source/McpServer.h"/>
       <FILE id="sch002" name="Schema.cpp" compile="1" resource="0" file="Source/Schema.cpp"/>
       <FILE id="sch001" name="Schema.h" compile="0" resource="0" file="Source/Schema.h"/>
+      <FILE id="sst002" name="Sustain.cpp" compile="1" resource="0" file="Source/Sustain.cpp"/>
+      <FILE id="sst001" name="Sustain.h" compile="0" resource="0" file="Source/Sustain.h"/>
       <FILE id="mpe002" name="Mpe.cpp" compile="1" resource="0" file="Source/Mpe.cpp"/>
       <FILE id="mpe001" name="Mpe.h" compile="0" resource="0" file="Source/Mpe.h"/>
       <FILE id="rte002" name="Route.cpp" compile="1" resource="0" file="Source/Route.cpp"/>

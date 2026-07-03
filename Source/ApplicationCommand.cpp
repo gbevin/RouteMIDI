@@ -318,25 +318,32 @@ bool ApplicationCommand::isTransform() const
         case CHORD:
         case LATCH:
         case MONO:
+        case SUSTAIN:
+        case SOSTENUTO:
         case VELOCITY_SCALE:
         case VELOCITY_SET:
         case VELOCITY_ADD:
         case VELOCITY_CURVE:
         case VELOCITY_CLIP:
         case VELOCITY_COMPRESS:
+        case VELOCITY_INVERT:
         case CONTROL_CHANGE_MAP:
         case CONTROL_CHANGE_ADD:
         case CONTROL_CHANGE_SCALE:
         case CONTROL_CHANGE_CURVE:
+        case CONTROL_CHANGE_INVERT:
+        case CONTROL_CHANGE_RESCALE:
         case PROGRAM_CHANGE_MAP:
         case PROGRAM_CHANGE_ADD:
         case PITCH_BEND_ADD:
         case PITCH_BEND_SCALE:
         case PITCH_BEND_SET:
+        case PITCH_BEND_INVERT:
         case CHANNEL_PRESSURE_ADD:
         case CHANNEL_PRESSURE_SCALE:
         case CHANNEL_PRESSURE_SET:
         case CHANNEL_PRESSURE_CURVE:
+        case CHANNEL_PRESSURE_INVERT:
         case JAVASCRIPT:
         case JAVASCRIPT_FILE:
             return true;
@@ -663,6 +670,15 @@ bool ApplicationCommand::transform(const ApplicationState& state, MidiMessage& m
                 msg.setTimeStamp(timestamp);
             }
             break;
+        case VELOCITY_INVERT:
+            // mirror the 1-127 velocity range, so soft becomes loud (64 stays)
+            if (msg.isNoteOn() && msg.getVelocity() > 0)
+            {
+                int v = jlimit(1, 127, 128 - (int)msg.getVelocity());
+                msg = MidiMessage::noteOn(msg.getChannel(), msg.getNoteNumber(), (uint8)v);
+                msg.setTimeStamp(timestamp);
+            }
+            break;
         case CONTROL_CHANGE_MAP:
             if (msg.isController() &&
                 msg.getControllerNumber() == copts_[0].value7)
@@ -697,6 +713,40 @@ bool ApplicationCommand::transform(const ApplicationState& state, MidiMessage& m
             {
                 int v = applyGammaCurve(msg.getControllerValue(), 127, copts_[1].number);
                 msg = MidiMessage::controllerEvent(msg.getChannel(), msg.getControllerNumber(), v);
+                msg.setTimeStamp(timestamp);
+            }
+            break;
+        case CONTROL_CHANGE_INVERT:
+            // mirror the 0-127 value range (0 becomes 127 and vice versa)
+            if (msg.isController() &&
+                msg.getControllerNumber() == copts_[0].value7)
+            {
+                msg = MidiMessage::controllerEvent(msg.getChannel(), msg.getControllerNumber(),
+                                                   127 - msg.getControllerValue());
+                msg.setTimeStamp(timestamp);
+            }
+            break;
+        case CONTROL_CHANGE_RESCALE:
+            // map an input value range linearly onto an output range; the value
+            // is clamped into the input range first, and a reversed output range
+            // inverts the response
+            if (msg.isController() &&
+                msg.getControllerNumber() == copts_[0].value7)
+            {
+                int inLo  = copts_[1].value7, inHi  = copts_[2].value7;
+                int outLo = copts_[3].value7, outHi = copts_[4].value7;
+                if (inLo > inHi)
+                {
+                    // a reversed input range keeps its stated endpoint mapping
+                    std::swap(inLo, inHi);
+                    std::swap(outLo, outHi);
+                }
+                const int v = jlimit(inLo, inHi, msg.getControllerValue());
+                const int mapped = inHi == inLo
+                    ? outLo
+                    : roundToInt(outLo + (v - inLo) * (double)(outHi - outLo) / (inHi - inLo));
+                msg = MidiMessage::controllerEvent(msg.getChannel(), msg.getControllerNumber(),
+                                                   jlimit(0, 127, mapped));
                 msg.setTimeStamp(timestamp);
             }
             break;
@@ -741,6 +791,16 @@ bool ApplicationCommand::transform(const ApplicationState& state, MidiMessage& m
                 msg.setTimeStamp(timestamp);
             }
             break;
+        case PITCH_BEND_INVERT:
+            // mirror the bend around the centre, like pbscale -1: a bend up
+            // becomes the same bend down
+            if (msg.isPitchWheel())
+            {
+                int pb = jlimit(0, 16383, 16384 - msg.getPitchWheelValue());
+                msg = MidiMessage::pitchWheel(msg.getChannel(), pb);
+                msg.setTimeStamp(timestamp);
+            }
+            break;
         case CHANNEL_PRESSURE_ADD:
             if (msg.isChannelPressure())
             {
@@ -770,6 +830,15 @@ bool ApplicationCommand::transform(const ApplicationState& state, MidiMessage& m
             {
                 int v = applyGammaCurve(msg.getChannelPressureValue(), 127, copts_[0].number);
                 msg = MidiMessage::channelPressureChange(msg.getChannel(), v);
+                msg.setTimeStamp(timestamp);
+            }
+            break;
+        case CHANNEL_PRESSURE_INVERT:
+            // mirror the 0-127 pressure range
+            if (msg.isChannelPressure())
+            {
+                msg = MidiMessage::channelPressureChange(msg.getChannel(),
+                                                         127 - msg.getChannelPressureValue());
                 msg.setTimeStamp(timestamp);
             }
             break;

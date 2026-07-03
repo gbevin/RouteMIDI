@@ -392,6 +392,92 @@ public:
             expect(out[0].isController());
         }
 
+        beginTest("Sustain pedal applied to the note stream");
+        {
+            Route route;
+            route.inputs.add(new RouteInput());
+            auto& input = *route.inputs[0];
+            route.transforms.add(makeCommand(SUSTAIN));
+
+            // the pedal itself is consumed
+            auto out = state.applyTransforms(route, input, MidiMessage::controllerEvent(1, 64, 127));
+            expectEquals(out.size(), 0);
+
+            // notes sound normally while the pedal is down
+            out = state.applyTransforms(route, input, MidiMessage::noteOn(1, 60, (uint8)100));
+            expectEquals(out.size(), 1);
+            expect(out[0].isNoteOn());
+
+            // their note-offs are held back
+            out = state.applyTransforms(route, input, MidiMessage::noteOff(1, 60, (uint8)0));
+            expectEquals(out.size(), 0);
+
+            // re-striking a sustained note retriggers it: off first, then on
+            out = state.applyTransforms(route, input, MidiMessage::noteOn(1, 60, (uint8)90));
+            expectEquals(out.size(), 2);
+            expect(out[0].isNoteOff());
+            expect(out[1].isNoteOn());
+            expectEquals((int)out[1].getVelocity(), 90);
+
+            // release the key again, then lift the pedal: the held note-off is sent
+            out = state.applyTransforms(route, input, MidiMessage::noteOff(1, 60, (uint8)0));
+            expectEquals(out.size(), 0);
+            out = state.applyTransforms(route, input, MidiMessage::controllerEvent(1, 64, 0));
+            expectEquals(out.size(), 1);
+            expect(out[0].isNoteOff());
+            expectEquals(out[0].getNoteNumber(), 60);
+
+            // with the pedal up, note-offs pass straight through
+            out = state.applyTransforms(route, input, MidiMessage::noteOn(1, 62, (uint8)100));
+            expectEquals(out.size(), 1);
+            out = state.applyTransforms(route, input, MidiMessage::noteOff(1, 62, (uint8)0));
+            expectEquals(out.size(), 1);
+            expect(out[0].isNoteOff());
+
+            // the pedal is tracked per channel: channel 2's pedal is up
+            out = state.applyTransforms(route, input, MidiMessage::controllerEvent(1, 64, 127));
+            expectEquals(out.size(), 0);
+            out = state.applyTransforms(route, input, MidiMessage::noteOn(2, 60, (uint8)100));
+            expectEquals(out.size(), 1);
+            out = state.applyTransforms(route, input, MidiMessage::noteOff(2, 60, (uint8)0));
+            expectEquals(out.size(), 1);
+
+            // other messages pass through untouched
+            out = state.applyTransforms(route, input, MidiMessage::controllerEvent(1, 7, 100));
+            expectEquals(out.size(), 1);
+            expect(out[0].isController());
+        }
+
+        beginTest("Sostenuto pedal holds only the notes down at press");
+        {
+            Route route;
+            route.inputs.add(new RouteInput());
+            auto& input = *route.inputs[0];
+            route.transforms.add(makeCommand(SOSTENUTO));
+
+            // hold C, press the pedal (consumed), then play E
+            auto out = state.applyTransforms(route, input, MidiMessage::noteOn(1, 60, (uint8)100));
+            expectEquals(out.size(), 1);
+            out = state.applyTransforms(route, input, MidiMessage::controllerEvent(1, 66, 127));
+            expectEquals(out.size(), 0);
+            out = state.applyTransforms(route, input, MidiMessage::noteOn(1, 64, (uint8)100));
+            expectEquals(out.size(), 1);
+
+            // C was down at the press, so its note-off is held; E's passes
+            out = state.applyTransforms(route, input, MidiMessage::noteOff(1, 60, (uint8)0));
+            expectEquals(out.size(), 0);
+            out = state.applyTransforms(route, input, MidiMessage::noteOff(1, 64, (uint8)0));
+            expectEquals(out.size(), 1);
+            expect(out[0].isNoteOff());
+            expectEquals(out[0].getNoteNumber(), 64);
+
+            // lifting the pedal releases the captured note
+            out = state.applyTransforms(route, input, MidiMessage::controllerEvent(1, 66, 0));
+            expectEquals(out.size(), 1);
+            expect(out[0].isNoteOff());
+            expectEquals(out[0].getNoteNumber(), 60);
+        }
+
         beginTest("Velocity transforms (note-on only)");
         {
             MidiMessage m = MidiMessage::noteOn(1, 60, (uint8)100);
@@ -430,6 +516,17 @@ public:
             expect(makeCommand(VELOCITY_COMPRESS, {"0.5"}).transform(state, m));
             expectEquals((int)m.getVelocity(), 42);   // 64 + (20-64)*0.5
 
+            // velinvert mirrors the 1-127 range: soft becomes loud, 64 stays
+            m = MidiMessage::noteOn(1, 60, (uint8)100);
+            expect(makeCommand(VELOCITY_INVERT).transform(state, m));
+            expectEquals((int)m.getVelocity(), 28);   // 128 - 100
+            m = MidiMessage::noteOn(1, 60, (uint8)1);
+            expect(makeCommand(VELOCITY_INVERT).transform(state, m));
+            expectEquals((int)m.getVelocity(), 127);
+            m = MidiMessage::noteOn(1, 60, (uint8)64);
+            expect(makeCommand(VELOCITY_INVERT).transform(state, m));
+            expectEquals((int)m.getVelocity(), 64);
+
             // note-off velocity is left untouched
             m = MidiMessage::noteOff(1, 60, (uint8)80);
             expect(makeCommand(VELOCITY_SET, {"10"}).transform(state, m));
@@ -452,10 +549,67 @@ public:
             expect(makeCommand(CONTROL_CHANGE_SCALE, {"7", "0.5"}).transform(state, m));
             expectEquals(m.getControllerValue(), 50);
 
+            // ccinvert mirrors the 0-127 value range
+            m = MidiMessage::controllerEvent(1, 7, 100);
+            expect(makeCommand(CONTROL_CHANGE_INVERT, {"7"}).transform(state, m));
+            expectEquals(m.getControllerValue(), 27);
+            m = MidiMessage::controllerEvent(1, 7, 0);
+            expect(makeCommand(CONTROL_CHANGE_INVERT, {"7"}).transform(state, m));
+            expectEquals(m.getControllerValue(), 127);
+
             // a different controller is left alone
             m = MidiMessage::controllerEvent(1, 8, 100);
             expect(makeCommand(CONTROL_CHANGE_SCALE, {"7", "0.5"}).transform(state, m));
             expectEquals(m.getControllerValue(), 100);
+            m = MidiMessage::controllerEvent(1, 8, 100);
+            expect(makeCommand(CONTROL_CHANGE_INVERT, {"7"}).transform(state, m));
+            expectEquals(m.getControllerValue(), 100);
+        }
+
+        beginTest("Control Change range rescaling");
+        {
+            // the input range maps linearly onto the output range
+            MidiMessage m = MidiMessage::controllerEvent(1, 11, 0);
+            expect(makeCommand(CONTROL_CHANGE_RESCALE, {"11", "0", "127", "20", "100"}).transform(state, m));
+            expectEquals(m.getControllerValue(), 20);
+            m = MidiMessage::controllerEvent(1, 11, 127);
+            expect(makeCommand(CONTROL_CHANGE_RESCALE, {"11", "0", "127", "20", "100"}).transform(state, m));
+            expectEquals(m.getControllerValue(), 100);
+            m = MidiMessage::controllerEvent(1, 11, 64);
+            expect(makeCommand(CONTROL_CHANGE_RESCALE, {"11", "0", "127", "20", "100"}).transform(state, m));
+            expectEquals(m.getControllerValue(), 60);
+
+            // values outside the input range clamp to the nearest endpoint,
+            // which calibrates a pedal that never reaches its extremes
+            m = MidiMessage::controllerEvent(1, 11, 10);
+            expect(makeCommand(CONTROL_CHANGE_RESCALE, {"11", "20", "100", "0", "127"}).transform(state, m));
+            expectEquals(m.getControllerValue(), 0);
+            m = MidiMessage::controllerEvent(1, 11, 110);
+            expect(makeCommand(CONTROL_CHANGE_RESCALE, {"11", "20", "100", "0", "127"}).transform(state, m));
+            expectEquals(m.getControllerValue(), 127);
+
+            // a reversed output range inverts the response
+            m = MidiMessage::controllerEvent(1, 11, 0);
+            expect(makeCommand(CONTROL_CHANGE_RESCALE, {"11", "0", "127", "127", "0"}).transform(state, m));
+            expectEquals(m.getControllerValue(), 127);
+            m = MidiMessage::controllerEvent(1, 11, 100);
+            expect(makeCommand(CONTROL_CHANGE_RESCALE, {"11", "0", "127", "127", "0"}).transform(state, m));
+            expectEquals(m.getControllerValue(), 27);
+
+            // a reversed input range keeps its stated endpoint mapping
+            m = MidiMessage::controllerEvent(1, 11, 0);
+            expect(makeCommand(CONTROL_CHANGE_RESCALE, {"11", "127", "0", "0", "127"}).transform(state, m));
+            expectEquals(m.getControllerValue(), 127);
+
+            // a collapsed input range pins the output to its low endpoint
+            m = MidiMessage::controllerEvent(1, 11, 30);
+            expect(makeCommand(CONTROL_CHANGE_RESCALE, {"11", "64", "64", "0", "127"}).transform(state, m));
+            expectEquals(m.getControllerValue(), 0);
+
+            // a different controller is left alone
+            m = MidiMessage::controllerEvent(1, 12, 64);
+            expect(makeCommand(CONTROL_CHANGE_RESCALE, {"11", "0", "127", "20", "100"}).transform(state, m));
+            expectEquals(m.getControllerValue(), 64);
         }
 
         beginTest("Program Change transforms");
@@ -482,6 +636,17 @@ public:
             m = MidiMessage::pitchWheel(1, 12288);
             expect(makeCommand(PITCH_BEND_SET, {"0"}).transform(state, m));
             expectEquals(m.getPitchWheelValue(), 0);
+
+            // pbinvert mirrors the bend around the centre; the centre stays put
+            m = MidiMessage::pitchWheel(1, 12288);
+            expect(makeCommand(PITCH_BEND_INVERT).transform(state, m));
+            expectEquals(m.getPitchWheelValue(), 4096);
+            m = MidiMessage::pitchWheel(1, 8192);
+            expect(makeCommand(PITCH_BEND_INVERT).transform(state, m));
+            expectEquals(m.getPitchWheelValue(), 8192);
+            m = MidiMessage::pitchWheel(1, 0);
+            expect(makeCommand(PITCH_BEND_INVERT).transform(state, m));
+            expectEquals(m.getPitchWheelValue(), 16383);   // clamped mirror
         }
 
         beginTest("Channel Pressure transforms");
@@ -497,6 +662,11 @@ public:
             m = MidiMessage::channelPressureChange(1, 10);
             expect(makeCommand(CHANNEL_PRESSURE_SET, {"64"}).transform(state, m));
             expectEquals(m.getChannelPressureValue(), 64);
+
+            // cpinvert mirrors the 0-127 pressure range
+            m = MidiMessage::channelPressureChange(1, 100);
+            expect(makeCommand(CHANNEL_PRESSURE_INVERT).transform(state, m));
+            expectEquals(m.getChannelPressureValue(), 27);
         }
 
         beginTest("Gamma curves");

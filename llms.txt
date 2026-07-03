@@ -37,7 +37,7 @@ names and protocol version may change between RouteMIDI releases)
   commands with per-stage indexes; `add_commands`/`replace_command`/
   `remove_command` edit a running route live (e.g. change a scale or remap a
   curve), and `panic_route` releases anything left sounding after editing
-  stateful commands such as latch, mono or the MPE operations.
+  stateful commands such as latch, mono, the pedals or the MPE operations.
 
 **Route-start rules**
 

@@ -90,9 +90,9 @@ The server exposes these tools:
   its position in the stage, for example swapping `scale C major` for
   `scale D minor` or retuning a `cccurve` mid-performance.
 - `remove_command`: removes one command from a running route by stage and index.
-- `panic_route`: sends sustain-off and all-notes-off to a route's outputs and
-  clears its latch and mono state; use it after editing stateful commands to
-  release anything left sounding.
+- `panic_route`: sends pedal-off and all-notes-off to a route's outputs and
+  clears its latch, mono and pedal state; use it after editing stateful
+  commands to release anything left sounding.
 - `stop_route`: stops and removes a route, sending all-notes-off to its outputs
   first.
 
@@ -141,7 +141,7 @@ routemidi [settings] in|vin <port> [commands ...] out|vout <port> [out ...] [in 
 
 * No filters means everything passes. One or more positive filters form a whitelist (a message must match at least one); `not <filter>` blocks matching messages and negates only the next filter; both combine.
 * Transforms that would push a note out of 0-127 drop the message; value transforms clamp instead.
-* `latch`, `mono`, the MPE operations and the conversions keep running per-input state (held notes, RPN selections, 14-bit pairings), so each input should carry one device's continuous stream.
+* `latch`, `mono`, the pedals (`sustain`, `sost`), the MPE operations and the conversions keep running per-input state (held notes, RPN selections, 14-bit pairings), so each input should carry one device's continuous stream.
 * The stages always run filters, then transforms, then MPE operations, then conversions, regardless of command order (see [Routes](README.md#routes)).
 * Every route must start with `in` or `vin`; filter/transform commands before the first `in` are ignored with a warning.
 
@@ -178,7 +178,7 @@ One message per line: an optional `channel <1-16>` prefix, then one of `note-on 
 * Routes have stable ids. `list_routes` reports each route's ports (with their connection state) and the commands of every stage with per-stage indexes; a route whose port is not connected yet keeps retrying until the port appears.
 * The `stage` field that `get_schema` reports for each command is the same `stage` argument the editing tools take: `filters`, `transforms`, `mpe`, `conversions` or `split`. Note two placements that differ from the help text's grouping: the RPN/NRPN value transforms (`rpnadd`, `nrpnscale`, ...) edit in `conversions`, and `mpesplit` in `split`.
 * `replace_command` swaps a command in place and keeps its position, which is the right tool for musical live edits: replacing `scale C major` with `scale D minor`, or retuning a `velcurve` or `cccurve` between songs.
-* After removing or replacing stateful commands (`latch`, `mono`, the MPE operations), call `panic_route` to release anything left sounding.
+* After removing or replacing stateful commands (`latch`, `mono`, the pedals, the MPE operations), call `panic_route` to release anything left sounding.
 
 **Recipes**
 
@@ -197,6 +197,8 @@ Every recipe below also works as an MCP `start_route` payload: drop the `routemi
 | Drop clock and active sensing | `routemidi in "Seq" not clock not as out "Synth"` |
 | Move channel 10 onto channel 1 | `routemidi in "Multi" chmap 10 1 out "Synth"` |
 | Hold notes after release | `routemidi in "K" latch out "Synth"` |
+| Sustain pedal for a synth that ignores CC 64 | `routemidi in "K" sustain out "Sampler"` |
+| Calibrate an expression pedal's travel | `routemidi in "Pedal" ccrescale 11 20 108 0 127 out "Synth"` |
 | Drive a mono synth (low-note priority) | `routemidi in "K" mono low out "Synth"` |
 | MPE controller to a non-MPE synth | `routemidi in "Seaboard" mpemono lower 1 out "Mono Synth"` |
 | Regular keyboard to an MPE synth | `routemidi in "K" mpexp 1 lower:15 out "MPE Synth"` |

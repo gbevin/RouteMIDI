@@ -25,6 +25,7 @@
 #include "Latch.h"
 #include "Mono.h"
 #include "Mpe.h"
+#include "Sustain.h"
 
 // A single MIDI input port of a route.
 struct RouteInput
@@ -49,6 +50,8 @@ struct RouteInput
 
     LatchState latch;                     // held-note tracking for the latch transform
     MonoState mono;                       // held-note tracking for the mono transform
+    SustainState sustain;                 // pedal tracking for the sustain transform
+    SustainState sostenuto;               // pedal tracking for the sostenuto transform
 };
 
 // A single MIDI output destination of a route.

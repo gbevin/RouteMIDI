@@ -151,6 +151,7 @@
     <ClCompile Include="..\..\Source\Main.cpp"/>
     <ClCompile Include="..\..\Source\McpServer.cpp"/>
     <ClCompile Include="..\..\Source\Schema.cpp"/>
+    <ClCompile Include="..\..\Source\Sustain.cpp"/>
     <ClCompile Include="..\..\Source\Mpe.cpp"/>
     <ClCompile Include="..\..\Source\Route.cpp"/>
     <ClCompile Include="..\..\Source\ScriptMidiMessageClass.cpp"/>
@@ -1071,6 +1072,7 @@
     <ClInclude Include="..\..\Source\Mono.h"/>
     <ClInclude Include="..\..\Source\McpServer.h"/>
     <ClInclude Include="..\..\Source\Schema.h"/>
+    <ClInclude Include="..\..\Source\Sustain.h"/>
     <ClInclude Include="..\..\Source\Mpe.h"/>
     <ClInclude Include="..\..\Source\Route.h"/>
     <ClInclude Include="..\..\Source\ScriptMidiMessageClass.h"/>

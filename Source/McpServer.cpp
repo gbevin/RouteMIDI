@@ -329,6 +329,20 @@ static void cleanupAfterCommandChange(Route& route, const ApplicationCommand& cm
             input->mono.reset();
         }
     }
+    if (cmd.command_ == SUSTAIN || cmd.command_ == SOSTENUTO)
+    {
+        for (auto* input : route.inputs)
+        {
+            if (cmd.command_ == SUSTAIN)
+            {
+                input->sustain.clear();
+            }
+            else
+            {
+                input->sostenuto.clear();
+            }
+        }
+    }
     if (cmd.command_ == MPE_SPLIT)
     {
         route.mpeSplit = mpe::Splitter();
