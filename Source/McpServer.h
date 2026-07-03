@@ -41,12 +41,12 @@ public:
     // back from the reader thread; the application quits when stdin closes
     void start();
 
-    // handles one JSON-RPC request and returns the response as JSON (empty
-    // for notifications); lets the test suite bypass the stdio transport
-    String handleJsonForTest(const String& requestJson);
+    // handles one parsed JSON-RPC request and returns the response, or a void var
+    // for a notification (which has no response). The stdin reader thread calls
+    // this for each incoming message; it is the server's core operation.
+    var handleRequest(const var& message);
 
 private:
-    var handleRequest(const var& message);
 
     ApplicationState& state_;
     std::thread thread_;

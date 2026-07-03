@@ -19,6 +19,7 @@
 #include "JuceHeader.h"
 
 #include "../Source/ApplicationState.h"
+#include "../Source/McpServer.h"
 
 namespace
 {
@@ -39,6 +40,8 @@ namespace
         std::cerr.rdbuf(previous);
     }
 
+    // drives the MCP request handler directly (no stdio transport); a throwaway
+    // McpServer is fine because all state lives in the ApplicationState it wraps
     var mcp(ApplicationState& state, const String& requestJson, bool quiet = false)
     {
         std::streambuf* previous = nullptr;
@@ -47,14 +50,15 @@ namespace
             previous = std::cerr.rdbuf(nullptr);
         }
 
-        const String responseJson = state.handleMcpJsonForTest(requestJson);
+        McpServer server(state);
+        const var response = server.handleRequest(JSON::parse(requestJson));
 
         if (quiet)
         {
             std::cerr.rdbuf(previous);
         }
 
-        return responseJson.isEmpty() ? var() : JSON::parse(responseJson);
+        return response;
     }
 
     String mcpText(const var& response)

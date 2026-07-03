@@ -722,12 +722,6 @@ McpServer::~McpServer()
     }
 }
 
-String McpServer::handleJsonForTest(const String& requestJson)
-{
-    const var response = handleRequest(JSON::parse(requestJson));
-    return response.isVoid() ? String() : JSON::toString(response, true);
-}
-
 var McpServer::handleRequest(const var& message)
 {
     auto* request = message.getDynamicObject();

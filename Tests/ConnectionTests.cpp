@@ -19,6 +19,7 @@
 #include "JuceHeader.h"
 
 #include "../Source/ApplicationState.h"
+#include "../Source/McpServer.h"
 
 // Exercises ApplicationState::timerCallback() - the connect/disconnect reconcile
 // pass - against real (virtual) CoreMIDI/ALSA endpoints. Virtual MIDI ports only
@@ -277,12 +278,13 @@ public:
             ApplicationState state;
             state.startOutputSenderForTest();
 
-            auto mcp = [&state](const String& json)
+            McpServer mcpServer(state);
+            auto mcp = [&mcpServer](const String& json)
             {
                 auto* previous = std::cerr.rdbuf(nullptr);
-                const String response = state.handleMcpJsonForTest(json);
+                const var response = mcpServer.handleRequest(JSON::parse(json));
                 std::cerr.rdbuf(previous);
-                return JSON::parse(response);
+                return response;
             };
             auto receivedCount = [&capture]
             {

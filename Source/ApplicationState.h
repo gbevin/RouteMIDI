@@ -55,24 +55,23 @@ public:
     static uint8 limit7Bit(int value)   { return textmidi::limit7Bit(value); }
     static uint16 limit14Bit(int value) { return textmidi::limit14Bit(value); }
 
-    // entry points also used by the test suite (Tests/) to drive the parser,
-    // the filter stage and the converter stage without real MIDI hardware
+    // the parser and the per-message processing stages, exposed so a route can
+    // be built and driven a message at a time without real MIDI hardware
     void parseParameters(StringArray& parameters);
     // like parseParameters, but newly created routes land in the given staging
     // list instead of routes_ (see the MCP start_route tool)
     void parseParametersInto(OwnedArray<Route>& target, StringArray& parameters);
     String schemaJson() const;
-    String handleMcpJsonForTest(const String& requestJson);
     bool passesFilters(Route& route, const MidiMessage& msg);
     Array<MidiMessage> applyTransforms(Route& route, RouteInput& input, const MidiMessage& msg);
     void processMpe(Route& route, RouteInput& input, const MidiMessage& msg, Array<MidiMessage>& output);
     void processConverters(Route& route, RouteInput& input, const MidiMessage& msg, Array<MidiMessage>& output);
     void rebuildConvertRules(Route& route);   // compile route.converters to route.convertRules
-    // drives one round of the connect/disconnect reconciliation the timer normally
-    // runs; the test suite uses it to exercise that logic without a live timer
+    // runs one round of the connect/disconnect reconciliation that the timer
+    // otherwise performs periodically, without waiting for a live timer
     void pollConnectionsForTest() { timerCallback(); }
-    // start/stop the background output sender (normally run by initialise); the test
-    // suite uses these to let routed messages actually reach a connected output
+    // start and stop the background output sender that initialise() otherwise
+    // owns, so routed messages can reach a connected output on demand
     void startOutputSenderForTest() { startOutputSender(); }
     void stopOutputSenderForTest()  { stopOutputSender(); }
     // distributes a message across a route's output ports as MPE voices; fills
@@ -81,9 +80,8 @@ public:
     void processSplit(Route& route, const MidiMessage& msg, Array<MidiMessage>& outMsgs, Array<int>& outPorts);
     const OwnedArray<Route>& getRoutes() const { return routes_; }
 
-    // text MIDI codec (TextMidi.cpp) with the current settings, also exercised by
-    // the test suite to check round-tripping against the SendMIDI/ReceiveMIDI-
-    // compatible text format
+    // text MIDI codec (TextMidi.cpp) with the current settings: renders and
+    // parses the SendMIDI/ReceiveMIDI-compatible text format
     String messageToText(const MidiMessage& msg) const
     {
         return textmidi::messageToText(msg, textFormat());
@@ -174,8 +172,8 @@ private:
     ScriptMidiMessageClass* scriptMidiMessage_;
     bool hasScript_;
 
-    // the MCP stdio server (McpServer.cpp), created by "--mcp" and by the test
-    // hook; it drives routes_ and the processing commands, so it is a friend
+    // the MCP stdio server (McpServer.cpp), created by "--mcp"; it drives routes_
+    // and the processing commands, so it is a friend
     friend class McpServer;
     std::unique_ptr<McpServer> mcpServer_;
 

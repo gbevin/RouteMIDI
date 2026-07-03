@@ -1581,15 +1581,6 @@ String ApplicationState::schemaJson() const
     return schema::commandsJson(commands_, DEFAULT_OCTAVE_MIDDLE_C);
 }
 
-String ApplicationState::handleMcpJsonForTest(const String& requestJson)
-{
-    if (mcpServer_ == nullptr)
-    {
-        mcpServer_ = std::make_unique<McpServer>(*this);
-    }
-    return mcpServer_->handleJsonForTest(requestJson);
-}
-
 void ApplicationState::printSchemaJson()
 {
     std::cout << schemaJson() << std::endl;
