@@ -67,13 +67,11 @@ public:
     void processMpe(Route& route, RouteInput& input, const MidiMessage& msg, Array<MidiMessage>& output);
     void processConverters(Route& route, RouteInput& input, const MidiMessage& msg, Array<MidiMessage>& output);
     void rebuildConvertRules(Route& route);   // compile route.converters to route.convertRules
-    // runs one round of the connect/disconnect reconciliation that the timer
-    // otherwise performs periodically, without waiting for a live timer
-    void pollConnectionsForTest() { timerCallback(); }
-    // start and stop the background output sender that initialise() otherwise
-    // owns, so routed messages can reach a connected output on demand
-    void startOutputSenderForTest() { startOutputSender(); }
-    void stopOutputSenderForTest()  { stopOutputSender(); }
+    // Control (defined below) drives the internal lifecycle steps that the JUCE
+    // application object and its timer otherwise run, so an ApplicationState can
+    // be driven directly, without the application's event loop
+    class Control;
+
     // distributes a message across a route's output ports as MPE voices; fills
     // parallel arrays where outPorts[i] is the destination index for outMsgs[i]
     // (-1 means broadcast to every output)
@@ -178,4 +176,27 @@ private:
     std::unique_ptr<McpServer> mcpServer_;
 
     CriticalSection midiCallbackLock_;
+};
+
+// Direct control over the lifecycle steps that the JUCE application object and
+// its Timer normally drive: a connection-reconcile pass, and the background
+// output sender that hands MIDI to the hardware. It lets an ApplicationState be
+// driven step by step without the application's event loop. As a nested class
+// it reaches those private members without widening the public interface.
+class ApplicationState::Control
+{
+public:
+    explicit Control(ApplicationState& state) : state_(state) {}
+
+    // run one connect/disconnect reconcile pass; the Timer otherwise runs these
+    // periodically once the application is live
+    void reconcileConnections() { state_.timerCallback(); }
+
+    // start and stop the background output sender that initialise() otherwise
+    // owns, so routed messages reach a connected output
+    void startOutputSender() { state_.startOutputSender(); }
+    void stopOutputSender()  { state_.stopOutputSender(); }
+
+private:
+    ApplicationState& state_;
 };

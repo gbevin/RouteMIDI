@@ -106,7 +106,7 @@ public:
         state.parseParameters(params);
 
         // the reconcile pass is what opens both ends
-        state.pollConnectionsForTest();
+        ApplicationState::Control(state).reconcileConnections();
         auto& routes = state.getRoutes();
         if (routes.isEmpty() || routes[0]->inputs.isEmpty() || routes[0]->outputs.isEmpty()
             || routes[0]->inputs[0]->midiIn == nullptr || routes[0]->outputs[0]->out == nullptr)
@@ -115,7 +115,7 @@ public:
             return false;
         }
 
-        state.startOutputSenderForTest();
+        ApplicationState::Control(state).startOutputSender();
         virtualSource->sendMessageNow(toSend);
 
         // wait for the routed message to make the round trip through CoreMIDI
@@ -126,7 +126,7 @@ public:
             if ((int) (Time::getMillisecondCounter() - start) > 2000) break;
             Thread::sleep(10);
         }
-        state.stopOutputSenderForTest();
+        ApplicationState::Control(state).stopOutputSender();
 
         const ScopedLock sl(capture.lock);
         out = capture.received;
@@ -164,7 +164,7 @@ public:
             }
 
             // a reconcile pass should now find and open the port
-            state.pollConnectionsForTest();
+            ApplicationState::Control(state).reconcileConnections();
             expect(input->midiIn != nullptr);
             expect(input->fullInName.contains(portName));
 
@@ -175,7 +175,7 @@ public:
                 logMessage("  note: port lingered in the list; skipping disconnect check");
                 return;
             }
-            state.pollConnectionsForTest();
+            ApplicationState::Control(state).reconcileConnections();
             expect(input->midiIn == nullptr);
             expect(input->fullInName.isEmpty());
         }
@@ -208,7 +208,7 @@ public:
                 return;
             }
 
-            state.pollConnectionsForTest();
+            ApplicationState::Control(state).reconcileConnections();
             expect(dest->out != nullptr);
             expect(dest->fullName.contains(portName));
         }
@@ -249,13 +249,12 @@ public:
         beginTest("MCP start_route and stop_route stay safe under a live MIDI stream");
         {
             // a background thread floods a connected route through the real MIDI
-            // callback path while routes are started and stopped over MCP. This
-            // exercises the teardown ordering of stop_route (unlink, panic, drain,
-            // delete: a message arriving mid-teardown must never leave a dangling
-            // output pointer in the send queue) and the lock-free device opens of
-            // start_route against live callbacks. It is a concurrency stress, not
-            // a deterministic race reproducer: a regression shows up as a crash or
-            // a stalled stream, most reliably under a sanitizer.
+            // callback path while routes are started and stopped over MCP, so the
+            // teardown ordering of stop_route (unlink, panic, drain, delete) and
+            // the lock-free device opens of start_route run concurrently with live
+            // callbacks. It exercises that a message arriving during teardown is
+            // handled cleanly and the stream keeps flowing; run it under a
+            // sanitizer for the strongest signal.
             const String inName  = "RouteMIDI LiveIn "  + Uuid().toString();
             const String outName = "RouteMIDI LiveOut " + Uuid().toString();
 
@@ -276,7 +275,7 @@ public:
             }
 
             ApplicationState state;
-            state.startOutputSenderForTest();
+            ApplicationState::Control(state).startOutputSender();
 
             McpServer mcpServer(state);
             auto mcp = [&mcpServer](const String& json)
@@ -355,8 +354,8 @@ public:
                 // the live stream survived the churn and is still flowing
                 expect(waitForMoreThan(receivedCount(), 3000));
 
-                // finally stop the live route itself mid-stream: its outputs are
-                // being enqueued at this very moment, the exact teardown race
+                // finally stop the live route itself mid-stream, while its outputs
+                // are being enqueued on the callback thread
                 const var stopLive = mcp(String(R"({"jsonrpc":"2.0","id":4,"method":"tools/call","params":)")
                                          + R"({"name":"stop_route","arguments":{"route":)"
                                          + String(liveId) + "}}}");
@@ -366,7 +365,7 @@ public:
 
             stopFlood = true;
             flood.join();
-            state.stopOutputSenderForTest();
+            ApplicationState::Control(state).stopOutputSender();
         }
     }
 };

@@ -451,7 +451,8 @@ public:
         beginTest("relocate re-asserts a per-note CC when the previous note regains the channel");
         {
             // ch2 and ch4 fold onto dst ch2; ch4 (active) drives CC 6/38, while ch2
-            // silently holds its own values. when ch4 releases, ch2 owns the channel
+            // holds its own values without emitting them. when ch4 releases, ch2
+            // owns the channel
             // and its held CC 6/38 must be re-sent so the receiver stops holding ch4's
             Array<MidiMessage> in;
             in.add(MidiMessage::noteOn(2, 60, (uint8)100));           // older note

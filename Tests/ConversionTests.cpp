@@ -679,9 +679,9 @@ public:
 
         beginTest("a value transform regenerates a 14-bit pair once, at full resolution");
         {
-            // transforms apply at the parsed resolution, so acting on the 7-bit MSB
-            // half of a pair would glitch (an add lands 128x too big); once pairing
-            // is learned, only the exact 14-bit value is transformed and regenerated
+            // transforms apply at the value's own resolution, so once pairing is
+            // learned each MSB+LSB pair is transformed once as a 14-bit value and
+            // regenerated, rather than acting on the 7-bit MSB half of the pair
             Array<MidiMessage> in;
             in.addArray(rpnInput(1, 1000, 8000, true, true));    // frame 1: learning
             in.addArray(rpnInput(1, 1000, 8000, true, true));    // frame 2
@@ -691,8 +691,8 @@ public:
             expectEquals(values.size(), 2);                      // one 14-bit regen per frame
             expectEquals(values[0], 8100);
             expectEquals(values[1], 8100);
-            // frame 1's MSB half regenerated a (glitched, clamped) 7-bit NRPN while
-            // pairing was unknown; frame 2's MSB half regenerated nothing
+            // frame 1's MSB half regenerates a clamped 7-bit NRPN while pairing is
+            // not yet learned; frame 2's MSB half regenerates nothing
             expectEquals(countController(out, 6, 127), 1);
         }
 
@@ -751,8 +751,8 @@ public:
         beginTest("data increment/decrement of an intercepted parameter is consumed");
         {
             // CC 96/97 act on the selected parameter; when that parameter's selects
-            // were consumed by a rule, forwarding an increment would let it land on
-            // whatever parameter is still selected downstream
+            // were consumed by a rule, its increment is consumed too, so it does
+            // not reach and modify whatever parameter is selected downstream
             Array<MidiMessage> in;
             in.add(MidiMessage::controllerEvent(1, 99, 32));     // NRPN 4128: intercepted
             in.add(MidiMessage::controllerEvent(1, 98, 32));
@@ -777,8 +777,8 @@ public:
             // a stray RPN select byte interleaved into an NRPN selection means the
             // NRPN select pair never completes cleanly, so interception can't be
             // decided at select time. The data entry still converts through the
-            // tracked selection, and converting must mark the selection intercepted
-            // so the closing null is consumed with the frame instead of leaking
+            // tracked selection, and converting marks the selection intercepted so
+            // the closing null is consumed with the frame rather than passed
             // downstream (where it would deselect an unrelated parameter)
             Array<MidiMessage> in;
             in.add(MidiMessage::controllerEvent(1, 99, 32));    // NRPN select MSB (4128)

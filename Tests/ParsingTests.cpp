@@ -528,7 +528,7 @@ public:
             expect(ports.getProperty("outputs", var()).isArray());
         }
 
-        beginTest("MCP start_route rejects stdio routes that would corrupt protocol output");
+        beginTest("MCP start_route rejects stdin/stdout routes");
         {
             ApplicationState state;
             const var response = mcp(state, R"json({
@@ -595,9 +595,9 @@ public:
         beginTest("MCP start_route rejects incomplete commands atomically");
         {
             // a trailing half-finished command must not leave the parser waiting
-            // for arguments, where it would swallow the first tokens of the next
-            // tool call (previously ["in"] then ["out","X"] silently created a
-            // route with an input named "out")
+            // for arguments; otherwise the first tokens of the next tool call would
+            // be consumed as the missing arguments (an "in" with no name taking the
+            // next call's "out" as its port)
             ApplicationState state;
             const var first = mcp(state, R"json({
                 "jsonrpc": "2.0",
@@ -644,8 +644,8 @@ public:
             expect(mcpText(badZone).contains("Invalid MPE zone"));
             expectEquals(state.getRoutes().size(), 0);
 
-            // a processing command before the first "in" would silently vanish;
-            // over MCP that is a mistake the agent needs to hear about
+            // a processing command before the first "in" has no route to attach
+            // to; over MCP that is returned as an error rather than ignored
             const var early = mcp(state, R"json({
                 "jsonrpc": "2.0", "id": 31, "method": "tools/call",
                 "params": { "name": "start_route", "arguments": {
@@ -692,7 +692,8 @@ public:
             })json", true);
             expect(! route.getProperty("result", var()).getProperty("isError", var()));
             {
-                // "12" still parses as decimal: 60 + 12 = 72 (hex leakage would give 78)
+                // "12" still parses as decimal: 60 + 12 = 72 (hex mode carried
+                // over would make it 60 + 0x12 = 78)
                 Array<MidiMessage> out = state.applyTransforms(*state.getRoutes()[0],
                                                                *state.getRoutes()[0]->inputs[0],
                                                                MidiMessage::noteOn(1, 60, (uint8) 100));
@@ -723,7 +724,7 @@ public:
             }
         }
 
-        beginTest("MCP start_route does not leak a trailing 'not' into the next call");
+        beginTest("MCP start_route clears a trailing 'not' between calls");
         {
             ApplicationState state;
             mcp(state, R"json({
@@ -745,8 +746,8 @@ public:
         {
             ApplicationState state;
 
-            // "src" enables monitoring just like "mon" and would corrupt the
-            // JSON-RPC framing on stdout with every routed message
+            // "src" enables monitoring, which writes routed messages to the
+            // stdout that the JSON-RPC framing owns, so it is rejected like "mon"
             const var src = mcp(state, R"json({
                 "jsonrpc": "2.0", "id": 50, "method": "tools/call",
                 "params": { "name": "start_route", "arguments": {
@@ -787,8 +788,8 @@ public:
         {
             ApplicationState state;
 
-            // commands outside the allow-list are rejected with a reason, even
-            // ones that were never in the old deny-list (nn/ts formatting)
+            // commands outside the allow-list are rejected with a reason,
+            // including the monitor-formatting settings nn and ts
             const var nn = mcp(state, R"json({
                 "jsonrpc": "2.0", "id": 60, "method": "tools/call",
                 "params": { "name": "start_route", "arguments": {
@@ -806,7 +807,7 @@ public:
 
             // the check works at the command level, not the token level: a port
             // that happens to be NAMED like a forbidden command is a fixed
-            // argument and passes (the old token scan wrongly rejected this)
+            // argument and is accepted
             const var portNamedMon = mcp(state, R"json({
                 "jsonrpc": "2.0", "id": 62, "method": "tools/call",
                 "params": { "name": "start_route", "arguments": {
@@ -818,11 +819,11 @@ public:
             expect(state.getRoutes()[0]->outputs[0]->name == "syf");
         }
 
-        beginTest("MCP rejects jsf so local file contents cannot leak into responses");
+        beginTest("MCP rejects jsf and keeps file contents out of tool responses");
         {
-            // jsf reads an arbitrary local file into the command's options at
-            // parse time, and route reporting echoes options verbatim, so over
-            // MCP it would let a client read any file
+            // jsf reads a local file into the command's options at parse time,
+            // and route reporting echoes options verbatim, so MCP rejects it; the
+            // response must not carry the file's contents
             ApplicationState state;
             File secretFile = File::getSpecialLocation(File::tempDirectory)
                                   .getChildFile("routemidi-mcp-jsf-test.js");
@@ -858,11 +859,11 @@ public:
             secretFile.deleteFile();
         }
 
-        beginTest("MCP blocks inline js so scripting cannot run shell or network from a client");
+        beginTest("MCP rejects inline js");
         {
-            // Util.command runs a shell, OSC opens sockets and Util.print writes
-            // to stdout, so inline js is a code-execution and exfiltration surface
-            // and must be rejected over MCP just like jsf; it stays on the CLI
+            // the scripting engine can run shell commands (Util.command), open
+            // network connections (OSC) and write to stdout, so MCP rejects js
+            // like jsf; scripting stays on the command line
             ApplicationState state;
             const var started = mcp(state, R"json({
                 "jsonrpc": "2.0", "id": 74, "method": "tools/call",
@@ -888,7 +889,7 @@ public:
             expectEquals(state.getRoutes()[0]->transforms.size(), 0);
         }
 
-        beginTest("MCP rejected calls do not poison the process exit code");
+        beginTest("MCP rejected calls leave the process exit code unchanged");
         {
             // a rejected tool call is a recovered session error: the server keeps
             // serving, so it must not mark the process for a non-zero exit
