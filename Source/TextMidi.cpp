@@ -285,6 +285,15 @@ void parseTextMidi(const StringArray& tokens, const Format& format, Array<MidiMe
             const int n = jlimit(0, 127, num(next()));
             output.add(MidiMessage::controllerEvent(channel, n, jlimit(0, 127, num(next()))));
         }
+        else if (tok == "control-change-14" || tok == "cc14")
+        {
+            // a 14-bit CC in the SendMIDI/ReceiveMIDI vocabulary: the value is
+            // sent as its MSB (controller 0-31) and LSB (32 higher) pair
+            const int n = jlimit(0, 31, num(next()));
+            const int v = jlimit(0, 16383, num(next()));
+            output.add(MidiMessage::controllerEvent(channel, n, (v >> 7) & 0x7f));
+            output.add(MidiMessage::controllerEvent(channel, n + 32, v & 0x7f));
+        }
         else if (tok == "program-change" || tok == "pc")      { output.add(MidiMessage::programChange(channel, jlimit(0, 127, num(next())))); }
         else if (tok == "channel-pressure" || tok == "cp")    { output.add(MidiMessage::channelPressureChange(channel, jlimit(0, 127, num(next())))); }
         else if (tok == "pitch-bend" || tok == "pb")          { output.add(MidiMessage::pitchWheel(channel, jlimit(0, 16383, num(next())))); }

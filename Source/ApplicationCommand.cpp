@@ -291,6 +291,7 @@ bool ApplicationCommand::isFilter() const
         case NOTE_RANGE:
         case VELOCITY_RANGE:
         case CONTROL_CHANGE_RANGE:
+        case CONTROL_CHANGE_14BIT_RANGE:
         case IN_SCALE:
         case MPE_MASTER:
         case MPE_MEMBER:
@@ -333,6 +334,7 @@ bool ApplicationCommand::isTransform() const
         case CONTROL_CHANGE_CURVE:
         case CONTROL_CHANGE_INVERT:
         case CONTROL_CHANGE_RESCALE:
+        case CONTROL_CHANGE_SET:
         case PROGRAM_CHANGE_MAP:
         case PROGRAM_CHANGE_ADD:
         case PITCH_BEND_ADD:
@@ -747,6 +749,15 @@ bool ApplicationCommand::transform(const ApplicationState& state, MidiMessage& m
                     : roundToInt(outLo + (v - inLo) * (double)(outHi - outLo) / (inHi - inLo));
                 msg = MidiMessage::controllerEvent(msg.getChannel(), msg.getControllerNumber(),
                                                    jlimit(0, 127, mapped));
+                msg.setTimeStamp(timestamp);
+            }
+            break;
+        case CONTROL_CHANGE_SET:
+            if (msg.isController() &&
+                msg.getControllerNumber() == copts_[0].value7)
+            {
+                msg = MidiMessage::controllerEvent(msg.getChannel(), msg.getControllerNumber(),
+                                                   copts_[1].value7);
                 msg.setTimeStamp(timestamp);
             }
             break;

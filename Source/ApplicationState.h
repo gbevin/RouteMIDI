@@ -62,7 +62,9 @@ public:
     // list instead of routes_ (see the MCP start_route tool)
     void parseParametersInto(OwnedArray<Route>& target, StringArray& parameters);
     String schemaJson() const;
-    bool passesFilters(Route& route, const MidiMessage& msg);
+    // the input carries the per-stream state the stateful filters need (the
+    // cc14range filter remembers each controller's MSB to assemble its value)
+    bool passesFilters(Route& route, RouteInput& input, const MidiMessage& msg);
     Array<MidiMessage> applyTransforms(Route& route, RouteInput& input, const MidiMessage& msg);
     void processMpe(Route& route, RouteInput& input, const MidiMessage& msg, Array<MidiMessage>& output);
     void processConverters(Route& route, RouteInput& input, const MidiMessage& msg, Array<MidiMessage>& output);

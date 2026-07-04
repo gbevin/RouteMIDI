@@ -78,6 +78,7 @@ enum CommandIndex
     NOTE_RANGE,
     VELOCITY_RANGE,
     CONTROL_CHANGE_RANGE,
+    CONTROL_CHANGE_14BIT_RANGE,
     IN_SCALE,
     MPE_MASTER,
     MPE_MEMBER,
@@ -112,6 +113,7 @@ enum CommandIndex
     CONTROL_CHANGE_CURVE,
     CONTROL_CHANGE_INVERT,
     CONTROL_CHANGE_RESCALE,
+    CONTROL_CHANGE_SET,
     PROGRAM_CHANGE_MAP,
     PROGRAM_CHANGE_ADD,
     PITCH_BEND_ADD,
@@ -124,14 +126,26 @@ enum CommandIndex
     CHANNEL_PRESSURE_CURVE,
     CHANNEL_PRESSURE_INVERT,
 
-    // RPN/NRPN value transforms (assembled in the converter stage, but grouped
-    // here with the other value transforms they mirror)
+    // 14-bit CC and RPN/NRPN value transforms (assembled in the converter
+    // stage, but grouped here with the other value transforms they mirror)
+    CC14_ADD,
+    CC14_SCALE,
+    CC14_CURVE,
+    CC14_INVERT,
+    CC14_RESCALE,
+    CC14_SET,
     NRPN_ADD,
     NRPN_SCALE,
     NRPN_CURVE,
+    NRPN_INVERT,
+    NRPN_RESCALE,
+    NRPN_SET,
     RPN_ADD,
     RPN_SCALE,
     RPN_CURVE,
+    RPN_INVERT,
+    RPN_RESCALE,
+    RPN_SET,
 
     JAVASCRIPT,
     JAVASCRIPT_FILE,

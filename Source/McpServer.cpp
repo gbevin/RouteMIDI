@@ -377,7 +377,7 @@ static void cleanupAfterCommandChange(Route& route, const ApplicationCommand& cm
     {
         route.mpeSplit = mpe::Splitter();
     }
-    if (cmd.command_ == CONVERT || conversion::isRpnTransform(cmd.command_))
+    if (cmd.command_ == CONVERT || conversion::isValueTransform(cmd.command_))
     {
         route.convertRules.clearQuick();
     }
@@ -413,12 +413,24 @@ static String collectProcessingCommands(const Array<ApplicationCommand>& table,
         switch (cmd.command_)
         {
             case CONVERT:
+            case CC14_ADD:
+            case CC14_SCALE:
+            case CC14_CURVE:
+            case CC14_INVERT:
+            case CC14_RESCALE:
+            case CC14_SET:
             case NRPN_ADD:
             case NRPN_SCALE:
             case NRPN_CURVE:
+            case NRPN_INVERT:
+            case NRPN_RESCALE:
+            case NRPN_SET:
             case RPN_ADD:
             case RPN_SCALE:
             case RPN_CURVE:
+            case RPN_INVERT:
+            case RPN_RESCALE:
+            case RPN_SET:
             case MPE_RELOCATE:
             case MPE_COLLAPSE:
             case MPE_EXPAND:
@@ -628,12 +640,24 @@ static String mcpCommandDenialReason(const ApplicationCommand& cmd)
         case NOT:
         // conversions and MPE operations
         case CONVERT:
+        case CC14_ADD:
+        case CC14_SCALE:
+        case CC14_CURVE:
+        case CC14_INVERT:
+        case CC14_RESCALE:
+        case CC14_SET:
         case NRPN_ADD:
         case NRPN_SCALE:
         case NRPN_CURVE:
+        case NRPN_INVERT:
+        case NRPN_RESCALE:
+        case NRPN_SET:
         case RPN_ADD:
         case RPN_SCALE:
         case RPN_CURVE:
+        case RPN_INVERT:
+        case RPN_RESCALE:
+        case RPN_SET:
         case MPE_RELOCATE:
         case MPE_COLLAPSE:
         case MPE_EXPAND:

@@ -77,6 +77,7 @@ ApplicationState::ApplicationState()
     commands_.add({"noterange", "note-range",             NOTE_RANGE,              2, {"low", "high"},            {"Pass notes within a note range (key split)"}});
     commands_.add({"velrange",  "velocity-range",         VELOCITY_RANGE,          2, {"low", "high"},            {"Pass note-ons within a velocity range (vel split)"}});
     commands_.add({"ccrange",   "control-change-range",   CONTROL_CHANGE_RANGE,    3, {"number", "low", "high"},  {"Pass a Control Change only when its value is in a range"}});
+    commands_.add({"cc14range", "control-change-14-range",CONTROL_CHANGE_14BIT_RANGE, 3, {"number", "low", "high"}, {"Pass a 14-bit CC only when its value is in a range (0-16383)"}});
     commands_.add({"inscale",   "in-scale",               IN_SCALE,                2, {"root", "scale"},          {"Pass notes that belong to a scale (root and name)"}});
     commands_.add({"mpemaster", "mpe-master",             MPE_MASTER,              1, {"zone[:n]"},               {"Pass the master channel of an MPE zone (e.g. lower)"}});
     commands_.add({"mpemember", "mpe-member",             MPE_MEMBER,              1, {"zone[:n]"},               {"Pass the member channels of an MPE zone (e.g. upper:7)"}});
@@ -110,6 +111,7 @@ ApplicationState::ApplicationState()
     commands_.add({"ccinvert",  "control-change-invert",  CONTROL_CHANGE_INVERT,   1, {"number"},                 {"Invert a controller's value (0-127 mirrored)"}});
     commands_.add({"ccrescale", "control-change-rescale", CONTROL_CHANGE_RESCALE,  5, {"number", "inlow", "inhigh", "outlow", "outhigh"},
                                                                                                                   {"Rescale a controller's value from one range onto another (a reversed output range inverts)"}});
+    commands_.add({"ccset",     "control-change-set",     CONTROL_CHANGE_SET,      2, {"number", "value"},        {"Set a fixed value for a controller (0-127)"}});
     commands_.add({"pcmap",     "program-change-map",     PROGRAM_CHANGE_MAP,      2, {"from", "to"},             {"Remap a Program Change number"}});
     commands_.add({"pcadd",     "program-change-add",     PROGRAM_CHANGE_ADD,      1, {"number"},                 {"Add an offset to Program Change number (clamped 0-127)"}});
     commands_.add({"pbadd",     "pitch-bend-add",         PITCH_BEND_ADD,          1, {"number"},                 {"Add an offset to Pitch Bend (clamped 0-16383)"}});
@@ -121,12 +123,27 @@ ApplicationState::ApplicationState()
     commands_.add({"cpset",     "channel-pressure-set",   CHANNEL_PRESSURE_SET,    1, {"number"},                 {"Set a fixed Channel Pressure value (0-127)"}});
     commands_.add({"cpcurve",   "channel-pressure-curve", CHANNEL_PRESSURE_CURVE,  1, {"gamma"},                  {"Apply a gamma curve to Channel Pressure"}});
     commands_.add({"cpinvert",  "channel-pressure-invert",CHANNEL_PRESSURE_INVERT, 0, {""},                       {"Invert Channel Pressure (0-127 mirrored)"}});
+    commands_.add({"cc14add",   "control-change-14-add",  CC14_ADD,                2, {"number", "value"},        {"Add an offset to a 14-bit CC value (clamped to its resolution)"}});
+    commands_.add({"cc14scale", "control-change-14-scale",CC14_SCALE,              2, {"number", "factor"},       {"Scale a 14-bit CC value by a factor (clamped to its resolution)"}});
+    commands_.add({"cc14curve", "control-change-14-curve",CC14_CURVE,              2, {"number", "gamma"},        {"Apply a gamma curve to a 14-bit CC value"}});
+    commands_.add({"cc14invert","control-change-14-invert",CC14_INVERT,            1, {"number"},                 {"Invert a 14-bit CC value (0-16383 mirrored)"}});
+    commands_.add({"cc14rescale","control-change-14-rescale",CC14_RESCALE,         5, {"number", "inlow", "inhigh", "outlow", "outhigh"},
+                                                                                                                  {"Rescale a 14-bit CC value from one range onto another (a reversed output range inverts)"}});
+    commands_.add({"cc14set",   "control-change-14-set",  CC14_SET,                2, {"number", "value"},        {"Set a fixed 14-bit CC value (0-16383)"}});
     commands_.add({"nrpnadd",   "nrpn-add",               NRPN_ADD,                2, {"param", "number"},        {"Add an offset to an NRPN value (clamped to its resolution)"}});
     commands_.add({"nrpnscale", "nrpn-scale",             NRPN_SCALE,              2, {"param", "factor"},        {"Scale an NRPN value by a factor (clamped to its resolution)"}});
     commands_.add({"nrpncurve", "nrpn-curve",             NRPN_CURVE,              2, {"param", "gamma"},         {"Apply a gamma curve to an NRPN value"}});
+    commands_.add({"nrpninvert","nrpn-invert",            NRPN_INVERT,             1, {"param"},                  {"Invert an NRPN value (mirrored in its resolution)"}});
+    commands_.add({"nrpnrescale","nrpn-rescale",          NRPN_RESCALE,            5, {"param", "inlow", "inhigh", "outlow", "outhigh"},
+                                                                                                                  {"Rescale an NRPN value from one range onto another (a reversed output range inverts)"}});
+    commands_.add({"nrpnset",   "nrpn-set",               NRPN_SET,                2, {"param", "value"},         {"Set a fixed NRPN value (scaled to its resolution)"}});
     commands_.add({"rpnadd",    "rpn-add",                RPN_ADD,                 2, {"param", "number"},        {"Add an offset to an RPN value (clamped to its resolution)"}});
     commands_.add({"rpnscale",  "rpn-scale",              RPN_SCALE,               2, {"param", "factor"},        {"Scale an RPN value by a factor (clamped to its resolution)"}});
     commands_.add({"rpncurve",  "rpn-curve",              RPN_CURVE,               2, {"param", "gamma"},         {"Apply a gamma curve to an RPN value"}});
+    commands_.add({"rpninvert", "rpn-invert",             RPN_INVERT,              1, {"param"},                  {"Invert an RPN value (mirrored in its resolution)"}});
+    commands_.add({"rpnrescale","rpn-rescale",            RPN_RESCALE,             5, {"param", "inlow", "inhigh", "outlow", "outhigh"},
+                                                                                                                  {"Rescale an RPN value from one range onto another (a reversed output range inverts)"}});
+    commands_.add({"rpnset",    "rpn-set",                RPN_SET,                 2, {"param", "value"},         {"Set a fixed RPN value (scaled to its resolution)"}});
     commands_.add({"js",        "javascript",             JAVASCRIPT,              1, {"code"},                   {"Transform each message with this script"}});
     commands_.add({"jsf",       "javascript-file",        JAVASCRIPT_FILE,         1, {"path"},                   {"Transform each message with the script in this file"}});
     commands_.add({"convert",   "",                       CONVERT,                 4, {"srctype", "[number]", "dsttype", "[number]"},
@@ -926,14 +943,27 @@ String ApplicationState::addProcessingCommand(Route& route, ApplicationCommand c
             route.mpeOps.add(cmd);
             return {};
         }
+        case CC14_ADD:
+        case CC14_SCALE:
+        case CC14_CURVE:
+        case CC14_INVERT:
+        case CC14_RESCALE:
+        case CC14_SET:
         case NRPN_ADD:
         case NRPN_SCALE:
         case NRPN_CURVE:
+        case NRPN_INVERT:
+        case NRPN_RESCALE:
+        case NRPN_SET:
         case RPN_ADD:
         case RPN_SCALE:
         case RPN_CURVE:
-            // RPN/NRPN value transforms are assembled and regenerated in the
-            // converter stage, so they live alongside the convert rules
+        case RPN_INVERT:
+        case RPN_RESCALE:
+        case RPN_SET:
+            // the 14-bit CC and RPN/NRPN value transforms are assembled and
+            // regenerated in the converter stage, so they live alongside the
+            // convert rules
             route.converters.add(cmd);
             route.convertRules.clearQuick();   // recompiled on the next message
             return {};
@@ -1201,7 +1231,7 @@ bool ApplicationState::processRouteMessage(Route& route, RouteInput& input, cons
         zoneReset = true;
     }
 
-    if (!passesFilters(route, msg))
+    if (!passesFilters(route, input, msg))
     {
         return zoneReset;
     }
@@ -1300,7 +1330,41 @@ void ApplicationState::processSplit(Route& route, const MidiMessage& msg, Array<
     mpe::split(route.mpeSplit, cmd.copts_[0].zone, targetCh, route.outputs.size(), msg, outMsgs, outPorts);
 }
 
-bool ApplicationState::passesFilters(Route& route, const MidiMessage& msg)
+// the cc14range filter: passes the MSB (controller 0-31) and LSB (32-63) halves
+// of a 14-bit CC whose assembled value is in range. It needs the input's MSB
+// memory, so it is matched here instead of in ApplicationCommand::matches. An
+// MSB half is judged with LSB 0 (the MIDI convention after an MSB change); an
+// LSB half is judged with the exact assembled value.
+static bool matchesCc14Range(const ApplicationCommand& cmd, RouteInput& input,
+                             const MidiMessage& msg, int channelLow, int channelHigh)
+{
+    if (!ApplicationCommand::checkChannel(msg, channelLow, channelHigh) || !msg.isController())
+    {
+        return false;
+    }
+
+    const int cc = msg.getControllerNumber();
+    const int n = cmd.copts_[0].value7 & 0x1f;
+    int value;
+    if (cc == n)
+    {
+        input.cc14RangeMsb[msg.getChannel() - 1][n] = (uint8) msg.getControllerValue();
+        value = msg.getControllerValue() << 7;
+    }
+    else if (cc == n + 32)
+    {
+        value = (input.cc14RangeMsb[msg.getChannel() - 1][n] << 7) | msg.getControllerValue();
+    }
+    else
+    {
+        return false;
+    }
+
+    return value >= jlimit(0, 16383, cmd.copts_[1].intValue) &&
+           value <= jlimit(0, 16383, cmd.copts_[2].intValue);
+}
+
+bool ApplicationState::passesFilters(Route& route, RouteInput& input, const MidiMessage& msg)
 {
     if (route.filters.isEmpty())
     {
@@ -1339,7 +1403,16 @@ bool ApplicationState::passesFilters(Route& route, const MidiMessage& msg)
         }
         else
         {
-            bool m = cmd.matches(*this, msg, channelLow, channelHigh);
+            bool m;
+            if (cmd.command_ == CONTROL_CHANGE_14BIT_RANGE)
+            {
+                cmd.ensureCompiled(*this);
+                m = matchesCc14Range(cmd, input, msg, channelLow, channelHigh);
+            }
+            else
+            {
+                m = cmd.matches(*this, msg, channelLow, channelHigh);
+            }
             if (cmd.negate_)
             {
                 negativeMatched = negativeMatched || m;
@@ -1541,15 +1614,27 @@ void ApplicationState::rebuildConvertRules(Route& route)
     for (const auto& cmd : route.converters)
     {
         conversion::Rule r;
-        if (conversion::isRpnTransform(cmd.command_))
+        if (conversion::isValueTransform(cmd.command_))
         {
             r.isTransform = true;
             r.op    = cmd.command_;
-            r.nrpn  = (cmd.command_ == NRPN_ADD || cmd.command_ == NRPN_SCALE || cmd.command_ == NRPN_CURVE);
+            r.nrpn  = (cmd.command_ == NRPN_ADD || cmd.command_ == NRPN_SCALE ||
+                       cmd.command_ == NRPN_CURVE || cmd.command_ == NRPN_INVERT ||
+                       cmd.command_ == NRPN_RESCALE || cmd.command_ == NRPN_SET);
             r.param = asDecOrHexIntValue(cmd.opts_[0]);
-            r.addAmount = asDecOrHexIntValue(cmd.opts_[1]);
-            r.factor    = cmd.opts_[1].getFloatValue();
-            r.gamma     = cmd.opts_[1].getDoubleValue();
+            if (cmd.command_ == CC14_RESCALE || cmd.command_ == NRPN_RESCALE || cmd.command_ == RPN_RESCALE)
+            {
+                r.inLo  = jlimit(0, 16383, asDecOrHexIntValue(cmd.opts_[1]));
+                r.inHi  = jlimit(0, 16383, asDecOrHexIntValue(cmd.opts_[2]));
+                r.outLo = jlimit(0, 16383, asDecOrHexIntValue(cmd.opts_[3]));
+                r.outHi = jlimit(0, 16383, asDecOrHexIntValue(cmd.opts_[4]));
+            }
+            else if (cmd.opts_.size() > 1)   // invert takes only the controller
+            {
+                r.addAmount = asDecOrHexIntValue(cmd.opts_[1]);
+                r.factor    = cmd.opts_[1].getFloatValue();
+                r.gamma     = cmd.opts_[1].getDoubleValue();
+            }
         }
         else
         {
@@ -1671,8 +1756,15 @@ void ApplicationState::printUsage()
     std::cout << std::endl;
     std::cout << "Usage: " << ProjectInfo::projectName << " [ commands ] [ programfile ] [ -- ]" << std::endl << std::endl
               << "Commands:" << std::endl << std::endl;
-    const int optionColumn = 12;       // where the option names start
-    const int descriptionColumn = 23;  // where the description starts
+    // the columns follow the longest command name, so long commands cannot
+    // push their options and description out of alignment
+    int longestCommand = 0;
+    for (auto&& cmd : commands_)
+    {
+        longestCommand = jmax(longestCommand, cmd.param_.length());
+    }
+    const int optionColumn = longestCommand + 3;      // where the option names start
+    const int descriptionColumn = optionColumn + 11;  // where the description starts
     bool firstSection = true;
     for (auto&& cmd : commands_)
     {
@@ -1712,7 +1804,7 @@ void ApplicationState::printUsage()
             String line;
             if (i == 0)
             {
-                line << "  " << cmd.param_.paddedRight(' ', 9) << " ";
+                line << "  " << cmd.param_.paddedRight(' ', optionColumn - 3) << " ";
             }
             else
             {
@@ -1734,11 +1826,22 @@ void ApplicationState::printUsage()
         }
     }
     std::cout << std::endl;
-    std::cout << "  -h  or  --help       Print Help (this message) and exit" << std::endl;
-    std::cout << "  --version            Print version information and exit" << std::endl;
-    std::cout << "  --schema json        Print machine-readable command JSON and exit [experimental]" << std::endl;
-    std::cout << "  --mcp                Run a stdio MCP server [experimental]" << std::endl;
-    std::cout << "  --                   Read commands from standard input until it's closed" << std::endl;
+    auto builtin = [&](const String& flag, const String& description)
+    {
+        // wrapped like the command descriptions, so no line passes 80 columns
+        const StringArray lines = wrapText(description, 80 - descriptionColumn);
+        for (int i = 0; i < lines.size(); ++i)
+        {
+            std::cout << (i == 0 ? ("  " + flag).paddedRight(' ', descriptionColumn)
+                                 : String().paddedRight(' ', descriptionColumn))
+                      << lines.getReference(i) << std::endl;
+        }
+    };
+    builtin("-h  or  --help", "Print Help (this message) and exit");
+    builtin("--version", "Print version information and exit");
+    builtin("--schema json", "Print machine-readable command JSON and exit [experimental]");
+    builtin("--mcp", "Run a stdio MCP server [experimental]");
+    builtin("--", "Read commands from standard input until it's closed");
     std::cout << std::endl;
     std::cout << "Use \"--schema json\" for command metadata for scripts, MCP servers and" << std::endl
               << "AI agents. Use \"--mcp\" to let MCP clients control RouteMIDI over stdio." << std::endl;

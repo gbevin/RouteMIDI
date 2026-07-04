@@ -232,7 +232,7 @@ static bool hasRpnRule(const Array<Rule>& rules)
 {
     for (const auto& r : rules)
     {
-        if (r.isTransform || r.src == Rpn || r.src == Nrpn)
+        if ((r.isTransform && isRpnTransform(r.op)) || r.src == Rpn || r.src == Nrpn)
         {
             return true;
         }
@@ -326,6 +326,83 @@ static void convertNonController(const Array<Rule>& rules, State& state,
     output.add(msg);
 }
 
+// applies one value-transform rule to a value in [0, maxValue]. The rescale
+// bounds are given at 14-bit resolution and are scaled down when the value is
+// 7-bit; the other operations work in the value's own resolution, like the
+// (N)RPN transforms always have (an add is clamped, not rescaled)
+static int applyValueTransform(const Rule& r, int value, int maxValue)
+{
+    switch (r.op)
+    {
+        case CC14_ADD:
+        case NRPN_ADD:
+        case RPN_ADD:
+            return jlimit(0, maxValue, value + r.addAmount);
+        case CC14_SCALE:
+        case NRPN_SCALE:
+        case RPN_SCALE:
+            return jlimit(0, maxValue, roundToInt(value * (float) r.factor));
+        case CC14_CURVE:
+        case NRPN_CURVE:
+        case RPN_CURVE:
+            return gammaCurve(value, maxValue, r.gamma);
+        case CC14_INVERT:
+        case NRPN_INVERT:
+        case RPN_INVERT:
+            return maxValue - value;
+        case CC14_SET:
+        case NRPN_SET:
+        case RPN_SET:
+            // the set value is 14-bit and scales down for a 7-bit value, like
+            // the rescale bounds
+            return jlimit(0, maxValue, (maxValue == 127) ? r.addAmount >> 7 : r.addAmount);
+        case CC14_RESCALE:
+        case NRPN_RESCALE:
+        case RPN_RESCALE:
+        {
+            const int shift = (maxValue == 127) ? 7 : 0;
+            int inLo  = r.inLo  >> shift, inHi  = r.inHi  >> shift;
+            int outLo = r.outLo >> shift, outHi = r.outHi >> shift;
+            if (inLo > inHi)
+            {
+                // a reversed input range keeps its stated endpoint mapping
+                std::swap(inLo, inHi);
+                std::swap(outLo, outHi);
+            }
+            const int v = jlimit(inLo, inHi, value);
+            const int mapped = inHi == inLo
+                ? outLo
+                : roundToInt(outLo + (v - inLo) * (double)(outHi - outLo) / (inHi - inLo));
+            return jlimit(0, maxValue, mapped);
+        }
+        default:
+            return value;
+    }
+}
+
+// emit a 14-bit CC value as its MSB/LSB controller pair (or the MSB alone when
+// the value only has 7-bit resolution), the framing the cc14 value transforms
+// regenerate after modifying a value
+static void emitCc14(Array<MidiMessage>& out, int channel, int msbController,
+                     int value, bool is14Bit, double timestamp)
+{
+    auto add = [&](int cc, int v)
+    {
+        MidiMessage m = MidiMessage::controllerEvent(channel, cc, v);
+        m.setTimeStamp(timestamp);
+        out.add(m);
+    };
+    if (is14Bit)
+    {
+        add(msbController, (value >> 7) & 0x7f);
+        add(msbController + 32, value & 0x7f);
+    }
+    else
+    {
+        add(msbController, value & 0x7f);
+    }
+}
+
 // the RPN/NRPN controller set (6, 38, 96-101), reached only while a parameter
 // selection is in progress. A parameter targeted by a rule is intercepted - its
 // constituent CCs, and the null that closes it, are consumed and replaced by the
@@ -349,7 +426,7 @@ static void convertRpnSet(const Array<Rule>& rules, State& state,
             {
                 return true;
             }
-            if (r.isTransform && r.nrpn == isNRPN && r.param == param)
+            if (r.isTransform && isRpnTransform(r.op) && r.nrpn == isNRPN && r.param == param)
             {
                 return true;
             }
@@ -494,28 +571,12 @@ static void convertRpnSet(const Array<Rule>& rules, State& state,
             const int maxValue = (bits == 14) ? 16383 : 127;
             for (const auto& r : rules)
             {
-                if (! r.isTransform || r.nrpn != nrpn || r.param != param)
+                if (! r.isTransform || ! isRpnTransform(r.op) || r.nrpn != nrpn || r.param != param)
                 {
                     continue;
                 }
                 transformed = true;
-                switch (r.op)
-                {
-                    case NRPN_ADD:
-                    case RPN_ADD:
-                        newValue = jlimit(0, maxValue, newValue + r.addAmount);
-                        break;
-                    case NRPN_SCALE:
-                    case RPN_SCALE:
-                        newValue = jlimit(0, maxValue, roundToInt(newValue * (float) r.factor));
-                        break;
-                    case NRPN_CURVE:
-                    case RPN_CURVE:
-                        newValue = gammaCurve(newValue, maxValue, r.gamma);
-                        break;
-                    default:
-                        break;
-                }
+                newValue = applyValueTransform(r, newValue, maxValue);
             }
 
             if (transformed)
@@ -560,25 +621,55 @@ static bool convertCc(const Array<Rule>& rules, State& state,
         const bool isLsb = (cc >= 32);
         const int n = isLsb ? cc - 32 : cc;
 
-        bool targeted = false;
+        bool convertTargeted = false;
+        bool transformTargeted = false;
         for (const auto& r : rules)
         {
-            if (! r.isTransform && r.src == Cc14 && (r.srcNum & 0x1f) == n) { targeted = true; break; }
+            if (! r.isTransform && r.src == Cc14 && (r.srcNum & 0x1f) == n)
+            {
+                convertTargeted = true;
+            }
+            if (r.isTransform && isCc14Transform(r.op) && (r.param & 0x1f) == n)
+            {
+                transformTargeted = true;
+            }
         }
 
-        if (targeted)
+        if (convertTargeted || transformTargeted)
         {
+            // a completed value converts through every matching rule, or, when
+            // no convert rule claims the controller, is transformed in place and
+            // regenerated as the same 14-bit CC (mirroring the (N)RPN transforms)
+            auto emitValue = [&](int value, int bits)
+            {
+                if (convertTargeted)
+                {
+                    for (const auto& r : rules)
+                    {
+                        if (! r.isTransform && r.src == Cc14 && (r.srcNum & 0x1f) == n)
+                        {
+                            emit(output, ch, value, bits, r.dst, r.dstNum, r.method, ts);
+                        }
+                    }
+                    return;
+                }
+                const int maxValue = (bits == 14) ? 16383 : 127;
+                int newValue = value;
+                for (const auto& r : rules)
+                {
+                    if (r.isTransform && isCc14Transform(r.op) && (r.param & 0x1f) == n)
+                    {
+                        newValue = applyValueTransform(r, newValue, maxValue);
+                    }
+                }
+                emitCc14(output, ch, n, newValue, bits == 14, ts);
+            };
+
             if (isLsb)
             {
                 state.cc14LsbSeen[ch - 1][n] = true;
                 const int msb = state.ccMsbValid[ch - 1][n] ? state.ccMsb[ch - 1][n] : 0;
-                for (const auto& r : rules)
-                {
-                    if (! r.isTransform && r.src == Cc14 && (r.srcNum & 0x1f) == n)
-                    {
-                        emit(output, ch, (msb << 7) | val, 14, r.dst, r.dstNum, r.method, ts);
-                    }
-                }
+                emitValue((msb << 7) | val, 14);
             }
             else
             {
@@ -590,13 +681,7 @@ static bool convertCc(const Array<Rule>& rules, State& state,
                 }
                 else
                 {
-                    for (const auto& r : rules)
-                    {
-                        if (! r.isTransform && r.src == Cc14 && (r.srcNum & 0x1f) == n)
-                        {
-                            emit(output, ch, val, 7, r.dst, r.dstNum, r.method, ts);
-                        }
-                    }
+                    emitValue(val, 7);
                 }
             }
             return true;

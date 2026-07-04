@@ -549,6 +549,14 @@ public:
             expect(makeCommand(CONTROL_CHANGE_SCALE, {"7", "0.5"}).transform(state, m));
             expectEquals(m.getControllerValue(), 50);
 
+            // ccset pins a controller to a fixed value
+            m = MidiMessage::controllerEvent(1, 7, 100);
+            expect(makeCommand(CONTROL_CHANGE_SET, {"7", "64"}).transform(state, m));
+            expectEquals(m.getControllerValue(), 64);
+            m = MidiMessage::controllerEvent(1, 8, 100);
+            expect(makeCommand(CONTROL_CHANGE_SET, {"7", "64"}).transform(state, m));
+            expectEquals(m.getControllerValue(), 100);   // a different CC is untouched
+
             // ccinvert mirrors the 0-127 value range
             m = MidiMessage::controllerEvent(1, 7, 100);
             expect(makeCommand(CONTROL_CHANGE_INVERT, {"7"}).transform(state, m));

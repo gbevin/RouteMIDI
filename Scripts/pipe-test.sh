@@ -104,6 +104,18 @@ EXPECTED='channel  1   control-change    11    20
 channel  1   control-change    11   100'
 run "ccrescale range mapping" in - ccrescale 11 0 127 20 100 out -
 
+# --- a 14-bit CC value transform pairs MSB/LSB and regenerates the pair ----------
+# the input uses the SendMIDI/ReceiveMIDI "cc14" token, which the codec expands
+# to the controller's MSB/LSB pair
+INPUT='channel 1 cc14 7 8000
+channel 1 cc14 7 8000'
+EXPECTED='channel  1   control-change     7   127
+channel  1   control-change     7    70
+channel  1   control-change    39    40
+channel  1   control-change     7    70
+channel  1   control-change    39    40'
+run "cc14add value transform" in - cc14add 7 1000 out -
+
 # --- a conversion turns one message type into another ---------------------------
 INPUT='channel 1 control-change 7 127
 channel 1 control-change 7 64
@@ -149,6 +161,17 @@ if [ "$(printf '%s\n' "$MCP_OUT" | wc -l | tr -d ' ')" = "7" ] \
 else
     echo "FAIL mcp handshake and route lifecycle"
     echo "--- actual ---------"; printf '%s\n' "$MCP_OUT"
+    echo "--------------------"
+    failures=$((failures+1))
+fi
+
+# --- the help text stays within 80 columns ---------------------------------------
+WIDE_LINES="$("$BIN" --help 2>&1 | tr -d '\r' | awk 'length > 80')"
+if [ -z "$WIDE_LINES" ]; then
+    echo "ok   help text fits in 80 columns"
+else
+    echo "FAIL help text fits in 80 columns"
+    echo "--- lines over 80 --"; printf '%s\n' "$WIDE_LINES"
     echo "--------------------"
     failures=$((failures+1))
 fi

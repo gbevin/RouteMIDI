@@ -91,6 +91,7 @@ static const char* commandStage(CommandIndex command)
         case NOTE_RANGE:
         case VELOCITY_RANGE:
         case CONTROL_CHANGE_RANGE:
+        case CONTROL_CHANGE_14BIT_RANGE:
         case IN_SCALE:
         case MPE_MASTER:
         case MPE_MEMBER:
@@ -125,6 +126,7 @@ static const char* commandStage(CommandIndex command)
         case CONTROL_CHANGE_CURVE:
         case CONTROL_CHANGE_INVERT:
         case CONTROL_CHANGE_RESCALE:
+        case CONTROL_CHANGE_SET:
         case PROGRAM_CHANGE_MAP:
         case PROGRAM_CHANGE_ADD:
         case PITCH_BEND_ADD:
@@ -141,14 +143,26 @@ static const char* commandStage(CommandIndex command)
             return "transforms";
 
         case CONVERT:
+        case CC14_ADD:
+        case CC14_SCALE:
+        case CC14_CURVE:
+        case CC14_INVERT:
+        case CC14_RESCALE:
+        case CC14_SET:
         case NRPN_ADD:
         case NRPN_SCALE:
         case NRPN_CURVE:
+        case NRPN_INVERT:
+        case NRPN_RESCALE:
+        case NRPN_SET:
         case RPN_ADD:
         case RPN_SCALE:
         case RPN_CURVE:
-            // the RPN/NRPN value transforms are assembled in the converter
-            // stage, so the route-editing tools address them there
+        case RPN_INVERT:
+        case RPN_RESCALE:
+        case RPN_SET:
+            // the 14-bit CC and RPN/NRPN value transforms are assembled in the
+            // converter stage, so the route-editing tools address them there
             return "conversions";
 
         case MPE_RELOCATE:

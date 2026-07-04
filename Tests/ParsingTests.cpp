@@ -1277,6 +1277,37 @@ public:
             })json"));
         }
 
+        beginTest("Text MIDI codec parses the SendMIDI cc14 token as an MSB/LSB pair");
+        {
+            ApplicationState state;
+            auto parseLine = [&state](const String& line)
+            {
+                StringArray tokens;
+                tokens.addTokens(line, " ", "");
+                tokens.removeEmptyStrings(true);
+                Array<MidiMessage> parsed;
+                state.parseTextMidi(tokens, parsed);
+                return parsed;
+            };
+
+            // the token SendMIDI sends and ReceiveMIDI's cc14 mode prints
+            auto pair = parseLine("channel 3 cc14 7 8000");
+            expectEquals(pair.size(), 2);
+            expect(pair[0].isController());
+            expectEquals(pair[0].getChannel(), 3);
+            expectEquals(pair[0].getControllerNumber(), 7);
+            expectEquals(pair[0].getControllerValue(), 8000 >> 7);
+            expectEquals(pair[1].getControllerNumber(), 39);
+            expectEquals(pair[1].getControllerValue(), 8000 & 0x7f);
+
+            // the long form parses too, and out-of-range arguments clamp
+            auto longForm = parseLine("control-change-14 40 20000");
+            expectEquals(longForm.size(), 2);
+            expectEquals(longForm[0].getControllerNumber(), 31);   // 40 clamps to 31
+            expectEquals(longForm[0].getControllerValue(), 127);   // 20000 clamps to 16383
+            expectEquals(longForm[1].getControllerValue(), 127);
+        }
+
         beginTest("Text MIDI codec round-trips through messageToText/parseTextMidi");
         {
             ApplicationState state;
@@ -1372,7 +1403,7 @@ public:
             auto run = [&state, &route, &input](const MidiMessage& msg)
             {
                 Array<MidiMessage> out;
-                if (! state.passesFilters(route, msg))
+                if (! state.passesFilters(route, input, msg))
                 {
                     return out;
                 }

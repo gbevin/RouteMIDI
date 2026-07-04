@@ -42,154 +42,191 @@ To use it, simply type "routemidi" or "routemidi.exe" on the command line and fo
 These are all the supported commands:
 ```
 Routing and ports:
-  in        name       Add a MIDI input (- for stdin text); a new route starts
-                       after outputs
-  out       name       Add a MIDI output to the route (- for stdout text)
-  vin       (name)     Add a virtual MIDI input to the route (Linux/macOS)
-  vout      (name)     Add a virtual MIDI output to the route (Linux/macOS)
-  list                 List the available MIDI input and output ports
-  panic                Send all-notes-off on disconnect, exit and zone change
+  in          name       Add a MIDI input (- for stdin text); a new route starts
+                         after outputs
+  out         name       Add a MIDI output to the route (- for stdout text)
+  vin         (name)     Add a virtual MIDI input to the route (Linux/macOS)
+  vout        (name)     Add a virtual MIDI output to the route (Linux/macOS)
+  list                   List the available MIDI input and output ports
+  panic                  Send all-notes-off on disconnect, exit and zone change
 
 Configuration:
-  file      path       Load commands from the specified program file
-  dec                  Interpret the next numbers as decimals by default
-  hex                  Interpret the next numbers as hexadecimals by default
-  omc       number     Set octave for middle C, defaults to 3
+  file        path       Load commands from the specified program file
+  dec                    Interpret the next numbers as decimals by default
+  hex                    Interpret the next numbers as hexadecimals by default
+  omc         number     Set octave for middle C, defaults to 3
 
 Monitoring:
-  nn                   Monitor notes as numbers instead of names
-  ts                   Prefix monitored messages with a timestamp
-  mon                  Print each routed message (quiet by default)
-  src                  Prefix monitored messages with the input port name
+  nn                     Monitor notes as numbers instead of names
+  ts                     Prefix monitored messages with a timestamp
+  mon                    Print each routed message (quiet by default)
+  src                    Prefix monitored messages with the input port name
 
 Filters:
-  not                  Negate the next filter, blocking matching messages
-  ch        number     Restrict the route to a MIDI channel (1-16)
-  voice                Pass all Channel Voice messages
-  note                 Pass all Note messages
-  on        (note)     Pass Note On, optionally for note (0-127)
-  off       (note)     Pass Note Off, optionally for note (0-127)
-  pp        (note)     Pass Poly Pressure, optionally for note (0-127)
-  cc        (number)   Pass Control Change, optionally for controller (0-127)
-  cc14      (number)   Pass 14-bit CC, optionally for MSB controller (0-31)
-  nrpn                 Pass NRPN traffic (CC 6, 38, 98, 99)
-  rpn                  Pass RPN traffic (CC 6, 38, 100, 101)
-  pc        (number)   Pass Program Change, optionally for program (0-127)
-  cp                   Pass Channel Pressure
-  pb                   Pass Pitch Bend
-  sr                   Pass all System Real-Time messages
-  clock                Pass Timing Clock
-  start                Pass Start
-  stop                 Pass Stop
-  cont                 Pass Continue
-  as                   Pass Active Sensing
-  rst                  Pass Reset
-  sc                   Pass all System Common messages
-  syx                  Pass System Exclusive
-  syf       path       Capture routed System Exclusive to a .syx file
-  tc                   Pass MIDI Time Code Quarter Frame
-  spp                  Pass Song Position Pointer
-  ss                   Pass Song Select
-  tun                  Pass Tune Request
-  noterange low high   Pass notes within a note range (key split)
-  velrange  low high   Pass note-ons within a velocity range (vel split)
-  ccrange   number low Pass a Control Change only when its value is in a range
-            high
-  inscale   root scale Pass notes that belong to a scale (root and name)
-  mpemaster zone[:n]   Pass the master channel of an MPE zone (e.g. lower)
-  mpemember zone[:n]   Pass the member channels of an MPE zone (e.g. upper:7)
-  mpezone   zone[:n]   Pass a whole MPE zone (its master and member channels)
+  not                    Negate the next filter, blocking matching messages
+  ch          number     Restrict the route to a MIDI channel (1-16)
+  voice                  Pass all Channel Voice messages
+  note                   Pass all Note messages
+  on          (note)     Pass Note On, optionally for note (0-127)
+  off         (note)     Pass Note Off, optionally for note (0-127)
+  pp          (note)     Pass Poly Pressure, optionally for note (0-127)
+  cc          (number)   Pass Control Change, optionally for controller (0-127)
+  cc14        (number)   Pass 14-bit CC, optionally for MSB controller (0-31)
+  nrpn                   Pass NRPN traffic (CC 6, 38, 98, 99)
+  rpn                    Pass RPN traffic (CC 6, 38, 100, 101)
+  pc          (number)   Pass Program Change, optionally for program (0-127)
+  cp                     Pass Channel Pressure
+  pb                     Pass Pitch Bend
+  sr                     Pass all System Real-Time messages
+  clock                  Pass Timing Clock
+  start                  Pass Start
+  stop                   Pass Stop
+  cont                   Pass Continue
+  as                     Pass Active Sensing
+  rst                    Pass Reset
+  sc                     Pass all System Common messages
+  syx                    Pass System Exclusive
+  syf         path       Capture routed System Exclusive to a .syx file
+  tc                     Pass MIDI Time Code Quarter Frame
+  spp                    Pass Song Position Pointer
+  ss                     Pass Song Select
+  tun                    Pass Tune Request
+  noterange   low high   Pass notes within a note range (key split)
+  velrange    low high   Pass note-ons within a velocity range (vel split)
+  ccrange     number low Pass a Control Change only when its value is in a range
+              high
+  cc14range   number low Pass a 14-bit CC only when its value is in a range
+              high       (0-16383)
+  inscale     root scale Pass notes that belong to a scale (root and name)
+  mpemaster   zone[:n]   Pass the master channel of an MPE zone (e.g. lower)
+  mpemember   zone[:n]   Pass the member channels of an MPE zone (e.g. upper:7)
+  mpezone     zone[:n]   Pass a whole MPE zone (its master and member channels)
 
 Transforms:
-  chmap     from to    Remap channel-voice messages from one channel to another
-  chset     number     Force all channel-voice messages onto a channel
-  chadd     number     Add N to the channel, wrapping 1-16 (may be negative)
-  transp    semitones  Transpose notes by N semitones (out-of-range dropped)
-  dtransp   root scale Transpose within a scale by N scale steps (stays in key)
-            steps
-  notemap   from to    Remap a specific note number to another
-  scale     root scale Snap notes to the nearest note of a scale (root, name)
-  chord     intervals  Stack notes at the given semitone intervals (a chord)
-  latch     (mode)     Keep notes on after release; toggle (default) or hold
-  mono      (priority) Force monophony; priority last (default), low or high
-  sustain              Apply the sustain pedal (CC 64) to the notes themselves
-  sost                 Apply the sostenuto pedal (CC 66) to the notes themselves
-  notecc    note cc    Turn a note into a Control Change (velocity as value)
-  ccnote    cc note    Turn a Control Change into a note (64+ on, else off)
-  notepc    note       Turn a note-on into a Program Change (note-off dropped)
-            program
-  velscale  factor     Scale note-on velocity by a factor (clamped 1-127)
-  velset    number     Set a fixed note-on velocity (1-127)
-  veladd    number     Add an offset to note-on velocity (clamped 1-127)
-  velcurve  gamma      Apply a gamma curve to note-on velocity (1-127)
-  velclip   min max    Clamp note-on velocity into a min-max range
-  velcomp   amount     Squeeze note-on velocity toward the mid-range (0-1)
-  velinvert            Invert note-on velocity (soft becomes loud)
-  ccmap     from to    Remap a Control Change controller number
-  ccadd     number     Add an offset to a controller's value (clamped 0-127)
-            value
-  ccscale   number     Scale a controller's value by a factor (clamped 0-127)
-            factor
-  cccurve   number     Apply a gamma curve to a controller's value
-            gamma
-  ccinvert  number     Invert a controller's value (0-127 mirrored)
-  ccrescale number     Rescale a controller's value from one range onto another
-            inlow      (a reversed output range inverts)
-            inhigh
-            outlow
-            outhigh
-  pcmap     from to    Remap a Program Change number
-  pcadd     number     Add an offset to Program Change number (clamped 0-127)
-  pbadd     number     Add an offset to Pitch Bend (clamped 0-16383)
-  pbscale   factor     Scale Pitch Bend around center by a factor (0-16383)
-  pbset     number     Set a fixed Pitch Bend value (0-16383)
-  pbinvert             Invert Pitch Bend around the center (up becomes down)
-  cpadd     number     Add an offset to Channel Pressure (clamped 0-127)
-  cpscale   factor     Scale Channel Pressure by a factor (clamped 0-127)
-  cpset     number     Set a fixed Channel Pressure value (0-127)
-  cpcurve   gamma      Apply a gamma curve to Channel Pressure
-  cpinvert             Invert Channel Pressure (0-127 mirrored)
-  nrpnadd   param      Add an offset to an NRPN value (clamped to its
-            number     resolution)
-  nrpnscale param      Scale an NRPN value by a factor (clamped to its
-            factor     resolution)
-  nrpncurve param      Apply a gamma curve to an NRPN value
-            gamma
-  rpnadd    param      Add an offset to an RPN value (clamped to its resolution)
-            number
-  rpnscale  param      Scale an RPN value by a factor (clamped to its
-            factor     resolution)
-  rpncurve  param      Apply a gamma curve to an RPN value
-            gamma
-  js        code       Transform each message with this script
-  jsf       path       Transform each message with the script in this file
+  chmap       from to    Remap channel-voice messages from one channel to
+                         another
+  chset       number     Force all channel-voice messages onto a channel
+  chadd       number     Add N to the channel, wrapping 1-16 (may be negative)
+  transp      semitones  Transpose notes by N semitones (out-of-range dropped)
+  dtransp     root scale Transpose within a scale by N scale steps (stays in
+              steps      key)
+  notemap     from to    Remap a specific note number to another
+  scale       root scale Snap notes to the nearest note of a scale (root, name)
+  chord       intervals  Stack notes at the given semitone intervals (a chord)
+  latch       (mode)     Keep notes on after release; toggle (default) or hold
+  mono        (priority) Force monophony; priority last (default), low or high
+  sustain                Apply the sustain pedal (CC 64) to the notes themselves
+  sost                   Apply the sostenuto pedal (CC 66) to the notes
+                         themselves
+  notecc      note cc    Turn a note into a Control Change (velocity as value)
+  ccnote      cc note    Turn a Control Change into a note (64+ on, else off)
+  notepc      note       Turn a note-on into a Program Change (note-off dropped)
+              program
+  velscale    factor     Scale note-on velocity by a factor (clamped 1-127)
+  velset      number     Set a fixed note-on velocity (1-127)
+  veladd      number     Add an offset to note-on velocity (clamped 1-127)
+  velcurve    gamma      Apply a gamma curve to note-on velocity (1-127)
+  velclip     min max    Clamp note-on velocity into a min-max range
+  velcomp     amount     Squeeze note-on velocity toward the mid-range (0-1)
+  velinvert              Invert note-on velocity (soft becomes loud)
+  ccmap       from to    Remap a Control Change controller number
+  ccadd       number     Add an offset to a controller's value (clamped 0-127)
+              value
+  ccscale     number     Scale a controller's value by a factor (clamped 0-127)
+              factor
+  cccurve     number     Apply a gamma curve to a controller's value
+              gamma
+  ccinvert    number     Invert a controller's value (0-127 mirrored)
+  ccrescale   number     Rescale a controller's value from one range onto
+              inlow      another (a reversed output range inverts)
+              inhigh
+              outlow
+              outhigh
+  ccset       number     Set a fixed value for a controller (0-127)
+              value
+  pcmap       from to    Remap a Program Change number
+  pcadd       number     Add an offset to Program Change number (clamped 0-127)
+  pbadd       number     Add an offset to Pitch Bend (clamped 0-16383)
+  pbscale     factor     Scale Pitch Bend around center by a factor (0-16383)
+  pbset       number     Set a fixed Pitch Bend value (0-16383)
+  pbinvert               Invert Pitch Bend around the center (up becomes down)
+  cpadd       number     Add an offset to Channel Pressure (clamped 0-127)
+  cpscale     factor     Scale Channel Pressure by a factor (clamped 0-127)
+  cpset       number     Set a fixed Channel Pressure value (0-127)
+  cpcurve     gamma      Apply a gamma curve to Channel Pressure
+  cpinvert               Invert Channel Pressure (0-127 mirrored)
+  cc14add     number     Add an offset to a 14-bit CC value (clamped to its
+              value      resolution)
+  cc14scale   number     Scale a 14-bit CC value by a factor (clamped to its
+              factor     resolution)
+  cc14curve   number     Apply a gamma curve to a 14-bit CC value
+              gamma
+  cc14invert  number     Invert a 14-bit CC value (0-16383 mirrored)
+  cc14rescale number     Rescale a 14-bit CC value from one range onto another
+              inlow      (a reversed output range inverts)
+              inhigh
+              outlow
+              outhigh
+  cc14set     number     Set a fixed 14-bit CC value (0-16383)
+              value
+  nrpnadd     param      Add an offset to an NRPN value (clamped to its
+              number     resolution)
+  nrpnscale   param      Scale an NRPN value by a factor (clamped to its
+              factor     resolution)
+  nrpncurve   param      Apply a gamma curve to an NRPN value
+              gamma
+  nrpninvert  param      Invert an NRPN value (mirrored in its resolution)
+  nrpnrescale param      Rescale an NRPN value from one range onto another (a
+              inlow      reversed output range inverts)
+              inhigh
+              outlow
+              outhigh
+  nrpnset     param      Set a fixed NRPN value (scaled to its resolution)
+              value
+  rpnadd      param      Add an offset to an RPN value (clamped to its
+              number     resolution)
+  rpnscale    param      Scale an RPN value by a factor (clamped to its
+              factor     resolution)
+  rpncurve    param      Apply a gamma curve to an RPN value
+              gamma
+  rpninvert   param      Invert an RPN value (mirrored in its resolution)
+  rpnrescale  param      Rescale an RPN value from one range onto another (a
+              inlow      reversed output range inverts)
+              inhigh
+              outlow
+              outhigh
+  rpnset      param      Set a fixed RPN value (scaled to its resolution)
+              value
+  js          code       Transform each message with this script
+  jsf         path       Transform each message with the script in this file
 
 Conversion:
-  convert   srctype    Convert a value between cc, cc14, rpn, nrpn, pb, cp, pc &
-            [number]   pp. Types cc, cc14, rpn and nrpn take a controller or
-            dsttype    parameter number and pp a note (optional on a source,
-            [number]   meaning any note), while pb, cp and pc take none; the
-                       value is rescaled to the destination resolution
+  convert     srctype    Convert a value between cc, cc14, rpn, nrpn, pb, cp, pc
+              [number]   & pp. Types cc, cc14, rpn and nrpn take a controller or
+              dsttype    parameter number and pp a note (optional on a source,
+              [number]   meaning any note), while pb, cp and pc take none; the
+                         value is rescaled to the destination resolution
 
 MPE routing:
-  mpe       zone[:n]   Relocate an MPE stream between zones (e.g. lower upper),
-            zone[:n]   remapping channels
-  mpemono   zone[:n]   Collapse an MPE zone onto a single channel for non-MPE
-            channel    gear (e.g. upper 1)
-  mpexp     channel    Spread a channel's notes across an MPE zone's member
-            zone[:n]   channels (e.g. 1 lower)
-  mpesplit  zone[:n]   Distribute an MPE zone's voices over the output ports,
-            (channel)  one per port, each rechanneled to channel (default 1)
-  mpebend   zone[:n]   Rescale member-channel pitch bend from one semitone range
-            from to    to another
-  mpesens   zone[:n]   Declare a member-channel pitch bend range (RPN 0) for
-            semitones  synths that honor it
+  mpe         zone[:n]   Relocate an MPE stream between zones (e.g. lower
+              zone[:n]   upper), remapping channels
+  mpemono     zone[:n]   Collapse an MPE zone onto a single channel for non-MPE
+              channel    gear (e.g. upper 1)
+  mpexp       channel    Spread a channel's notes across an MPE zone's member
+              zone[:n]   channels (e.g. 1 lower)
+  mpesplit    zone[:n]   Distribute an MPE zone's voices over the output ports,
+              (channel)  one per port, each rechanneled to channel (default 1)
+  mpebend     zone[:n]   Rescale member-channel pitch bend from one semitone
+              from to    range to another
+  mpesens     zone[:n]   Declare a member-channel pitch bend range (RPN 0) for
+              semitones  synths that honor it
 
-  -h  or  --help       Print Help (this message) and exit
-  --version            Print version information and exit
-  --schema json        Print machine-readable command JSON and exit [experimental]
-  --mcp                Run a stdio MCP server [experimental]
-  --                   Read commands from standard input until it's closed
+  -h  or  --help         Print Help (this message) and exit
+  --version              Print version information and exit
+  --schema json          Print machine-readable command JSON and exit
+                         [experimental]
+  --mcp                  Run a stdio MCP server [experimental]
+  --                     Read commands from standard input until it's closed
 ```
 
 Use `--schema json` for command metadata for scripts, MCP servers and
@@ -207,17 +244,21 @@ Alternatively, you can use the following long versions of the commands:
   channel-pressure pitch-bend system-realtime continue active-sensing reset
   system-common system-exclusive system-exclusive-file time-code song-position
   song-select tune-request note-range velocity-range control-change-range
-  in-scale mpe-master mpe-member mpe-zone channel-map channel-set channel-add
-  transpose diatonic-transpose note-map sustain-pedal sostenuto-pedal
-  note-to-control-change control-change-to-note note-to-program-change
-  velocity-scale velocity-set velocity-add velocity-curve velocity-clip
-  velocity-compress velocity-invert control-change-map control-change-add
-  control-change-scale control-change-curve control-change-invert
-  control-change-rescale program-change-map program-change-add pitch-bend-add
+  control-change-14-range in-scale mpe-master mpe-member mpe-zone channel-map
+  channel-set channel-add transpose diatonic-transpose note-map sustain-pedal
+  sostenuto-pedal note-to-control-change control-change-to-note
+  note-to-program-change velocity-scale velocity-set velocity-add
+  velocity-curve velocity-clip velocity-compress velocity-invert
+  control-change-map control-change-add control-change-scale
+  control-change-curve control-change-invert control-change-rescale
+  control-change-set program-change-map program-change-add pitch-bend-add
   pitch-bend-scale pitch-bend-set pitch-bend-invert channel-pressure-add
   channel-pressure-scale channel-pressure-set channel-pressure-curve
-  channel-pressure-invert nrpn-add nrpn-scale nrpn-curve rpn-add rpn-scale
-  rpn-curve javascript javascript-file mpe-mono mpe-expand mpe-split mpe-bend
+  channel-pressure-invert control-change-14-add control-change-14-scale
+  control-change-14-curve control-change-14-invert control-change-14-rescale
+  control-change-14-set nrpn-add nrpn-scale nrpn-curve nrpn-invert nrpn-rescale
+  nrpn-set rpn-add rpn-scale rpn-curve rpn-invert rpn-rescale rpn-set
+  javascript javascript-file mpe-mono mpe-expand mpe-split mpe-bend
   mpe-sensitivity
 ```
 
@@ -276,7 +317,7 @@ routemidi in "Keyboard" ch 1..4 out "Synth"         # only channels 1-4
 
 The `noterange` and `velrange` filters pass notes within a note or velocity range, which (combined with the multi-route model) makes keyboard and velocity splits easy. Unlike `on lo..hi` (which matches only note-ons), `noterange` matches note-ons, note-offs and poly pressure together, and `velrange` always passes note-offs so a velocity split can't leave notes stuck.
 
-The `ccrange` filter is the same idea for a controller: it passes a Control Change only when its value falls within a `low high` window, so `ccrange 1 64 127` lets the modulation wheel through only in its upper half. As always, `not ccrange 1 64 127` inverts it (blocking that window and passing everything else).
+The `ccrange` filter is the same idea for a controller: it passes a Control Change only when its value falls within a `low high` window, so `ccrange 1 64 127` lets the modulation wheel through only in its upper half. As always, `not ccrange 1 64 127` inverts it (blocking that window and passing everything else). `cc14range` does the same for a 14-bit CC with a 0-16383 window: it remembers the controller's MSB per channel, judges each LSB with the exact assembled value (an MSB half on its own counts as value MSBx128), and passes or blocks both halves of the pair.
 
 The `cc14`, `nrpn` and `rpn` filters match the constituent Control Change messages of a 14-bit CC, an NRPN or an RPN. `cc14` without a number passes every 14-bit-capable controller (MSB 0-31 together with its LSB 32-63), or with a number just that MSB controller and its LSB. `nrpn` passes the NRPN traffic (CC 98, 99 plus the data-entry CC 6, 38) and `rpn` the RPN traffic (CC 100, 101 plus CC 6, 38).
 
@@ -289,6 +330,7 @@ routemidi in "Keyboard" ch 1 cc 1 out "Synth"       # only CC 1 on channel 1
 routemidi in "Knobs" rpn out "Synth"                # only RPN traffic
 routemidi in "Keyboard" inscale C major out "Synth" # only notes in C major
 routemidi in "Wheel" ccrange 1 64 127 out "Synth"   # mod wheel only in its top half
+routemidi in "Fader" cc14range 7 8192 16383 out "A" # 14-bit fader, upper half only
 # key split: bottom half to a bass, top half to a lead
 routemidi in "Keyboard" noterange C-2 B2 out "Bass" \
           in "Keyboard" noterange C3 G8 out "Lead"
@@ -333,7 +375,7 @@ routemidi in "Pedal" ccinvert 11 out "Synth"            # reverse an expression 
 routemidi in "Keyboard" pbinvert out "Synth"            # bend up becomes bend down
 ```
 
-`ccrescale` maps a controller's input range onto a different output range: it takes the controller number followed by `inlow inhigh outlow outhigh`, clamps the incoming value into the input range and rescales it linearly onto the output range. That calibrates a controller that never quite reaches its extremes, tames one that is too sensitive, or offsets its response; reversing the output bounds inverts the response at the same time.
+`ccrescale` maps a controller's input range onto a different output range: it takes the controller number followed by `inlow inhigh outlow outhigh`, clamps the incoming value into the input range and rescales it linearly onto the output range. That calibrates a controller that never quite reaches its extremes, tames one that is too sensitive, or offsets its response; reversing the output bounds inverts the response at the same time. All of these value transforms also exist for 14-bit CCs and (N)RPNs (`cc14add`, `rpnscale`, ...); those live in the [conversion stage](#transforming-14-bit-cc-rpn-and-nrpn-values) because their values span several MIDI messages.
 
 ```
 routemidi in "Pedal" ccrescale 11 20 108 0 127 out "Synth"   # use the pedal's real travel
@@ -473,17 +515,22 @@ Notable details:
 * **CC 6 and 38 do double duty** in MIDI: inside an (N)RPN parameter selection they are data entry, outside one they are the halves of a plain 14-bit CC. The converter tracks the selection, so a device's genuine (N)RPN work (a Pitch Bend Sensitivity declaration, an MPE Configuration Message) is never hijacked by a `cc14 6` rule, and bare CC 6/38 pairs still convert even when the same route also has `rpn`/`nrpn` rules.
 * A device streaming **MSB+LSB pairs** (a 14-bit CC, or 14-bit (N)RPN data) converts to exactly **one destination value per pair** once its pairing has been observed; a sender that only ever transmits the MSB keeps converting on every MSB.
 
-### Transforming RPN and NRPN values
+### Transforming 14-bit CC, RPN and NRPN values
 
-You can also modify an RPN or NRPN value in place, the same way `ccadd`/`ccscale`/`cccurve` modify a Control Change. `rpnadd`/`nrpnadd`, `rpnscale`/`nrpnscale` and `rpncurve`/`nrpncurve` each take the parameter number followed by the offset, factor or gamma, reassemble the (N)RPN from its constituent CCs, apply the change to the assembled value, and regenerate it. The value is clamped to its own resolution (14-bit when a data-entry LSB is present, otherwise 7-bit). Parameter *remapping* doesn't need a dedicated command: `convert nrpn 245 nrpn 1000` re-emits NRPN 245 as NRPN 1000.
+You can also modify a 14-bit CC, RPN or NRPN value in place, the same way `ccadd`/`ccscale`/`cccurve` modify a Control Change. `rpnadd`/`nrpnadd`, `rpnscale`/`nrpnscale` and `rpncurve`/`nrpncurve` each take the parameter number followed by the offset, factor or gamma, reassemble the (N)RPN from its constituent CCs, apply the change to the assembled value, and regenerate it. The value is clamped to its own resolution (14-bit when a data-entry LSB is present, otherwise 7-bit). Parameter *remapping* doesn't need a dedicated command: `convert nrpn 245 nrpn 1000` re-emits NRPN 245 as NRPN 1000.
+
+The `cc14add`, `cc14scale` and `cc14curve` transforms do the same for a 14-bit Control Change (an MSB controller 0-31 paired with its LSB 32 higher), pairing the two halves the same way `convert` does. Every family also has the mirror, range-remap and fixed-value of the 7-bit `ccinvert`/`ccrescale`/`ccset`: `cc14invert`/`cc14rescale`/`cc14set`, `rpninvert`/`rpnrescale`/`rpnset` and `nrpninvert`/`nrpnrescale`/`nrpnset`. The rescale bounds and set values are 14-bit (0-16383) and a reversed output range inverts the response; on a 7-bit value (no data-entry LSB) they scale down accordingly. Remapping a 14-bit controller is again a conversion: `convert cc14 7 cc14 11`.
 
 ```
 routemidi in "Synth" nrpnscale 1000 0.5 out "Synth"   # halve NRPN 1000's value
 routemidi in "Synth" rpnadd 0 -2048 out "Synth"       # lower RPN 0 (bend range)
 routemidi in "Synth" nrpncurve 74 2.0 out "Synth"     # finer control low down
+routemidi in "Synth" nrpninvert 1000 out "Synth"      # reverse NRPN 1000's response
+routemidi in "Fader" cc14scale 7 0.5 out "Mixer"      # halve a 14-bit CC 7/39 pair
+routemidi in "Pedal" cc14rescale 11 1300 15000 0 16383 out "Synth"  # full travel
 ```
 
-Like the conversions, these transforms take over the whole RPN controller set on the route, so avoid filtering out CC 6, 38 and 96-101 on the same route.
+Like the conversions, the (N)RPN transforms take over the whole RPN controller set on the route, so avoid filtering out CC 6, 38 and 96-101 on the same route; a `cc14` transform similarly claims both halves of its controller pair.
 
 ## MPE
 
@@ -616,11 +663,12 @@ routemidi in "Keyboard" panic out "Synth"
 
 ## Text streams
 
-An input or output port named `-` is a text stream instead of a real MIDI port. `out -` writes each forwarded message to standard output in the same text format as ReceiveMIDI, and `in -` reads that same format from standard input. This lets RouteMIDI sit in a pipeline with SendMIDI, ReceiveMIDI, or any program that speaks the format:
+An input or output port named `-` is a text stream instead of a real MIDI port. `out -` writes each forwarded message to standard output in the same text format as ReceiveMIDI, and `in -` reads that same format from standard input. This lets RouteMIDI sit in a pipeline with SendMIDI, ReceiveMIDI, or any program that speaks the format. The `cc14` token from that shared vocabulary is accepted too: `cc14 7 8000` reads as the controller's MSB/LSB pair, so ReceiveMIDI's `cc14` display mode pipes straight in.
 
 ```
 receivemidi dev "Keyboard" | routemidi in - transp 12 out - | sendmidi dev "Synth"
 echo "channel 1 note-on 60 100" | routemidi in - chset 2 out -
+echo "channel 1 cc14 7 8000" | routemidi in - cc14invert 7 out -
 ```
 
 ## Capturing System Exclusive

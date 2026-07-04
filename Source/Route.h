@@ -40,6 +40,11 @@ struct RouteInput
     // 14-bit CC pairing are stateful per incoming MIDI stream
     conversion::State conv;
 
+    // last MSB seen per channel and MSB controller (0-31), so the cc14range
+    // filter can assemble the 14-bit value its range test needs (its own
+    // memory, separate from the converter stage's pairing state)
+    uint8 cc14RangeMsb[16][32] {};
+
     // per-zone state (indexed [0] = Lower, [1] = Upper) so a Lower-zone and an
     // Upper-zone operation can run on the same input without sharing state
     mpe::Allocator mpeAlloc[2];           // voice allocation state for MPE expansion

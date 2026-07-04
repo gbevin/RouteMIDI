@@ -603,11 +603,48 @@ public:
             expectEquals(rpn.value, 8000);
         }
 
+        beginTest("nrpninvert and rpninvert mirror a value in its resolution");
+        {
+            auto nrpn14 = runConverterCommand(state, NRPN_INVERT, {"1000"}, rpnInput(1, 1000, 4000, true, true));
+            expect(parseLastRpn(nrpn14, rpn));
+            expect(rpn.isNRPN);
+            expectEquals(rpn.parameterNumber, 1000);
+            expectEquals(rpn.value, 12383);                      // 16383 - 4000
+
+            // a 7-bit frame mirrors in the 0-127 range
+            auto rpn7 = runConverterCommand(state, RPN_INVERT, {"5"}, rpnInput(1, 5, 100, false, false));
+            expect(parseLastRpn(rpn7, rpn));
+            expect(! rpn.isNRPN);
+            expectEquals(rpn.value, 27);                         // 127 - 100
+        }
+
+        beginTest("nrpnrescale and rpnrescale map a value range onto another");
+        {
+            auto squeezed = runConverterCommand(state, NRPN_RESCALE,
+                                                {"1000", "0", "16383", "4096", "12287"},
+                                                rpnInput(1, 1000, 0, true, true));
+            expect(parseLastRpn(squeezed, rpn));
+            expectEquals(rpn.value, 4096);
+
+            // reversed output bounds invert; out-of-range input clamps
+            auto inverted = runConverterCommand(state, RPN_RESCALE,
+                                                {"5", "1000", "16383", "16383", "0"},
+                                                rpnInput(1, 5, 100, false, true));
+            expect(parseLastRpn(inverted, rpn));
+            expectEquals(rpn.value, 16383);                      // clamped to inlow
+        }
+
         beginTest("an NRPN transform does not touch RPNs (and vice versa)");
         {
             // nrpnadd must ignore an RPN with the same parameter number
             auto out = runConverterCommand(state, NRPN_ADD, {"5", "100"}, rpnInput(1, 5, 8000, false, true));
             expect(parseLastRpn(out, rpn));
+            expect(! rpn.isNRPN);
+            expectEquals(rpn.value, 8000);   // unchanged
+
+            // the same family separation holds for the invert transforms
+            auto inv = runConverterCommand(state, NRPN_INVERT, {"5"}, rpnInput(1, 5, 8000, false, true));
+            expect(parseLastRpn(inv, rpn));
             expect(! rpn.isNRPN);
             expectEquals(rpn.value, 8000);   // unchanged
         }
@@ -746,6 +783,140 @@ public:
             expect(rpn.isNRPN);                                  // the bare pair converted
             expectEquals(rpn.parameterNumber, 6);
             expectEquals(rpn.value, (44 << 7) | 8);
+        }
+
+        beginTest("cc14add offsets a 14-bit CC pair and regenerates it at full resolution");
+        {
+            Array<MidiMessage> in;
+            in.addArray(cc14Input(1, 7, 8000));                  // pair 1: learning
+            in.addArray(cc14Input(1, 7, 8000));                  // pair 2
+            auto out = runConverterCommand(state, CC14_ADD, {"7", "1000"}, in);
+
+            // once pairing is learned each pair regenerates once as MSB+LSB
+            expectEquals(countController(out, 7, (9000 >> 7) & 0x7f), 2);
+            expectEquals(countController(out, 39, 9000 & 0x7f), 2);
+            // pair 1's MSB half regenerates a clamped 7-bit value while pairing
+            // is not yet learned (the same warm-up as the (N)RPN transforms)
+            expectEquals(countController(out, 7, 127), 1);
+            expectEquals(out.size(), 5);
+
+            // the offset clamps to the 14-bit resolution
+            auto clamped = runConverterCommand(state, CC14_ADD, {"7", "10000"},
+                                               cc14Input(1, 7, 16000));
+            expectEquals(lastCC(clamped, 7), 127);
+            expectEquals(lastCC(clamped, 39), 127);
+        }
+
+        beginTest("cc14invert mirrors a 14-bit CC value");
+        {
+            Array<MidiMessage> in;
+            in.addArray(cc14Input(1, 7, 0));
+            in.addArray(cc14Input(1, 7, 16383));
+            in.addArray(cc14Input(1, 7, 8000));
+            auto out = runConverterCommand(state, CC14_INVERT, {"7"}, in);
+
+            expectEquals(countController(out, 7, 127), 2);       // 0 -> 16383 (and warm-up MSB 0 -> 127)
+            expectEquals(countController(out, 39, 127), 1);
+            expectEquals(countController(out, 7, 0), 1);         // 16383 -> 0
+            expectEquals(countController(out, 39, 0), 1);
+            expectEquals(lastCC(out, 7), (8383 >> 7) & 0x7f);    // 8000 -> 8383
+            expectEquals(lastCC(out, 39), 8383 & 0x7f);
+        }
+
+        beginTest("cc14rescale maps a 14-bit CC range onto another, reversibly");
+        {
+            // full range squeezed into 4096..12287
+            Array<MidiMessage> in;
+            in.addArray(cc14Input(1, 7, 0));
+            in.addArray(cc14Input(1, 7, 16383));
+            auto out = runConverterCommand(state, CC14_RESCALE,
+                                           {"7", "0", "16383", "4096", "12287"}, in);
+            expectEquals(countController(out, 7, 32), 2);        // 0 -> 4096 (and its warm-up MSB)
+            expectEquals(countController(out, 39, 0), 1);
+            expectEquals(lastCC(out, 7), (12287 >> 7) & 0x7f);   // 16383 -> 12287
+            expectEquals(lastCC(out, 39), 12287 & 0x7f);
+
+            // reversed output bounds invert; out-of-range input clamps
+            Array<MidiMessage> low;
+            low.addArray(cc14Input(1, 7, 0));
+            low.addArray(cc14Input(1, 7, 100));
+            auto inverted = runConverterCommand(state, CC14_RESCALE,
+                                                {"7", "1000", "16383", "16383", "0"}, low);
+            expectEquals(lastCC(inverted, 7), 127);              // clamped to inlow -> 16383
+            expectEquals(lastCC(inverted, 39), 127);
+        }
+
+        beginTest("cc14set, nrpnset and rpnset pin a value, scaled to its resolution");
+        {
+            // a 14-bit pair is pinned to the exact value
+            Array<MidiMessage> in;
+            in.addArray(cc14Input(1, 7, 100));                   // pair 1: learning
+            in.addArray(cc14Input(1, 7, 12000));                 // pair 2
+            auto out = runConverterCommand(state, CC14_SET, {"7", "8000"}, in);
+            expectEquals(lastCC(out, 7), 8000 >> 7);
+            expectEquals(lastCC(out, 39), 8000 & 0x7f);
+            // the warm-up MSB half pins at 7-bit resolution (the value >> 7)
+            expectEquals(countController(out, 7, 8000 >> 7), 3);
+
+            // an (N)RPN frame is pinned the same way
+            auto nrpn = runConverterCommand(state, NRPN_SET, {"1000", "8000"},
+                                            rpnInput(1, 1000, 100, true, true));
+            expect(parseLastRpn(nrpn, rpn));
+            expect(rpn.isNRPN);
+            expectEquals(rpn.value, 8000);
+
+            // a 7-bit RPN frame pins to the scaled-down value
+            auto rpn7 = runConverterCommand(state, RPN_SET, {"5", "8000"},
+                                            rpnInput(1, 5, 100, false, false));
+            expect(parseLastRpn(rpn7, rpn));
+            expect(! rpn.isNRPN);
+            expectEquals(rpn.value, 8000 >> 7);
+        }
+
+        beginTest("a cc14 transform leaves other controllers and (N)RPN work alone");
+        {
+            Array<MidiMessage> in;
+            in.add(MidiMessage::controllerEvent(1, 8, 100));     // unrelated 7-bit CC
+            in.add(MidiMessage::controllerEvent(1, 101, 0));     // RPN 0 select
+            in.add(MidiMessage::controllerEvent(1, 100, 0));
+            in.add(MidiMessage::controllerEvent(1, 6, 24));      // sensitivity: protected
+            in.add(MidiMessage::controllerEvent(1, 101, 127));   // closing null
+            in.add(MidiMessage::controllerEvent(1, 100, 127));
+            auto out = runConverterCommand(state, CC14_ADD, {"6", "1000"}, in);
+
+            expectEquals(countController(out, 8, 100), 1);
+            expectEquals(countController(out, 6, 24), 1);        // RPN data survived
+            expectEquals(countController(out, 101, 0), 1);
+            expectEquals(countController(out, 100, 0), 1);
+            expectEquals(countController(out, 101, 127), 1);
+            expectEquals(countController(out, 100, 127), 1);
+        }
+
+        beginTest("a cc14 transform does not intercept (N)RPN parameters with the same number");
+        {
+            // cc14add on controller 7 must not touch NRPN parameter 7
+            auto out = runConverterCommand(state, CC14_ADD, {"7", "1000"},
+                                           rpnInput(1, 7, 8000, true, true));
+            expect(parseLastRpn(out, rpn));
+            expect(rpn.isNRPN);
+            expectEquals(rpn.parameterNumber, 7);
+            expectEquals(rpn.value, 8000);                       // untouched
+        }
+
+        beginTest("a convert rule claims a controller ahead of a cc14 transform");
+        {
+            // like the (N)RPN stage, conversions win: the pair converts and the
+            // transform does not also regenerate it
+            Array<std::pair<CommandIndex, StringArray>> cmds;
+            cmds.add({ CONVERT, {"cc14", "7", "pb", "0"} });
+            cmds.add({ CC14_ADD, {"7", "1000"} });
+
+            Array<MidiMessage> in;
+            in.addArray(cc14Input(1, 7, 8000));
+            auto out = runConverters(state, cmds, in);
+
+            expectEquals(lastPitchWheel(out), 8000);
+            expectEquals(countController(out, 7, (9000 >> 7) & 0x7f), 0);
         }
 
         beginTest("data increment/decrement of an intercepted parameter is consumed");

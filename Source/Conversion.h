@@ -74,11 +74,27 @@ bitscaling::ScaleMethod scaleMethodFor(Type srcType, int srcNum, Type dstType, i
 // (concave), gamma > 1 attenuates them (convex), gamma 1 is linear
 int gammaCurve(int value, int maxValue, double gamma);
 
-// true for the six RPN/NRPN value-transform commands handled in the converter stage
+// true for the RPN/NRPN value-transform commands handled in the converter stage
 inline bool isRpnTransform(CommandIndex c)
 {
     return c == NRPN_ADD || c == NRPN_SCALE || c == NRPN_CURVE ||
-           c == RPN_ADD  || c == RPN_SCALE  || c == RPN_CURVE;
+           c == NRPN_INVERT || c == NRPN_RESCALE || c == NRPN_SET ||
+           c == RPN_ADD  || c == RPN_SCALE  || c == RPN_CURVE ||
+           c == RPN_INVERT || c == RPN_RESCALE || c == RPN_SET;
+}
+
+// true for the 14-bit CC value-transform commands, which need the converter
+// stage's stateful MSB/LSB pairing just like the (N)RPN transforms
+inline bool isCc14Transform(CommandIndex c)
+{
+    return c == CC14_ADD || c == CC14_SCALE || c == CC14_CURVE ||
+           c == CC14_INVERT || c == CC14_RESCALE || c == CC14_SET;
+}
+
+// true for every value-transform command that lives in the converter stage
+inline bool isValueTransform(CommandIndex c)
+{
+    return isRpnTransform(c) || isCc14Transform(c);
 }
 
 // emit a complete (N)RPN transmission: the parameter select and data entry
@@ -107,13 +123,16 @@ struct Rule
     int  srcBits = 7;                     // resolution of the source value
     bitscaling::ScaleMethod method = bitscaling::MinCenterMax;
 
-    // transform fields (add/scale/curve on an rpn or nrpn parameter)
-    CommandIndex op = CONVERT;            // NRPN_ADD/SCALE/CURVE or RPN_ADD/SCALE/CURVE
-    bool   nrpn = false;                  // transform targets an NRPN (vs RPN) parameter
-    int    param = 0;                     // parameter number the transform acts on
+    // transform fields (add/scale/curve/invert/rescale on a 14-bit CC or an
+    // rpn/nrpn parameter)
+    CommandIndex op = CONVERT;            // a CC14_*, NRPN_* or RPN_* transform
+    bool   nrpn = false;                  // an (N)RPN transform targets an NRPN (vs RPN)
+    int    param = 0;                     // parameter or MSB controller the transform acts on
     int    addAmount = 0;                 // add offset
     double factor = 1.0;                  // scale factor
     double gamma = 1.0;                   // curve gamma
+    int    inLo = 0, inHi = 16383;        // rescale input range (14-bit resolution)
+    int    outLo = 0, outHi = 16383;      // rescale output range (14-bit resolution)
 };
 
 // Per-input state for the "any note" poly-pressure collapse (convert pp -> a

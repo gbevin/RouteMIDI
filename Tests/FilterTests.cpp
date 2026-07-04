@@ -29,6 +29,7 @@ public:
     void runTest() override
     {
         ApplicationState state;
+        RouteInput input;   // per-input state for the stateful filters (cc14range)
 
         beginTest("Type filters match the right messages");
         {
@@ -66,16 +67,16 @@ public:
         beginTest("No filters passes everything");
         {
             Route route;
-            expect(state.passesFilters(route, MidiMessage::noteOn(1, 60, (uint8)100)));
-            expect(state.passesFilters(route, MidiMessage::midiClock()));
+            expect(state.passesFilters(route, input, MidiMessage::noteOn(1, 60, (uint8)100)));
+            expect(state.passesFilters(route, input, MidiMessage::midiClock()));
         }
 
         beginTest("Whitelist: only listed types pass");
         {
             Route route;
             route.filters.add(makeCommand(NOTE));
-            expect(  state.passesFilters(route, MidiMessage::noteOn(1, 60, (uint8)100)));
-            expect(! state.passesFilters(route, MidiMessage::controllerEvent(1, 7, 100)));
+            expect(  state.passesFilters(route, input, MidiMessage::noteOn(1, 60, (uint8)100)));
+            expect(! state.passesFilters(route, input, MidiMessage::controllerEvent(1, 7, 100)));
         }
 
         beginTest("Multiple positive filters are OR-combined");
@@ -83,9 +84,9 @@ public:
             Route route;
             route.filters.add(makeCommand(NOTE));
             route.filters.add(makeCommand(CONTROL_CHANGE));
-            expect(state.passesFilters(route, MidiMessage::noteOn(1, 60, (uint8)100)));
-            expect(state.passesFilters(route, MidiMessage::controllerEvent(1, 7, 100)));
-            expect(! state.passesFilters(route, MidiMessage::midiClock()));
+            expect(state.passesFilters(route, input, MidiMessage::noteOn(1, 60, (uint8)100)));
+            expect(state.passesFilters(route, input, MidiMessage::controllerEvent(1, 7, 100)));
+            expect(! state.passesFilters(route, input, MidiMessage::midiClock()));
         }
 
         beginTest("'not' blacklists matching messages");
@@ -94,16 +95,16 @@ public:
             auto blockClock = makeCommand(CLOCK);
             blockClock.negate_ = true;
             route.filters.add(blockClock);
-            expect(! state.passesFilters(route, MidiMessage::midiClock()));
-            expect(  state.passesFilters(route, MidiMessage::noteOn(1, 60, (uint8)100)));
+            expect(! state.passesFilters(route, input, MidiMessage::midiClock()));
+            expect(  state.passesFilters(route, input, MidiMessage::noteOn(1, 60, (uint8)100)));
         }
 
         beginTest("Channel filter restricts the route");
         {
             Route route;
             route.filters.add(makeCommand(CHANNEL, {"1"}));
-            expect(  state.passesFilters(route, MidiMessage::noteOn(1, 60, (uint8)100)));
-            expect(! state.passesFilters(route, MidiMessage::noteOn(2, 60, (uint8)100)));
+            expect(  state.passesFilters(route, input, MidiMessage::noteOn(1, 60, (uint8)100)));
+            expect(! state.passesFilters(route, input, MidiMessage::noteOn(2, 60, (uint8)100)));
         }
 
         beginTest("Channel filter provides context for type filters");
@@ -111,9 +112,9 @@ public:
             Route route;
             route.filters.add(makeCommand(CHANNEL, {"1"}));
             route.filters.add(makeCommand(NOTE));
-            expect(  state.passesFilters(route, MidiMessage::noteOn(1, 60, (uint8)100)));
-            expect(! state.passesFilters(route, MidiMessage::noteOn(2, 60, (uint8)100)));
-            expect(! state.passesFilters(route, MidiMessage::controllerEvent(1, 7, 100)));
+            expect(  state.passesFilters(route, input, MidiMessage::noteOn(1, 60, (uint8)100)));
+            expect(! state.passesFilters(route, input, MidiMessage::noteOn(2, 60, (uint8)100)));
+            expect(! state.passesFilters(route, input, MidiMessage::controllerEvent(1, 7, 100)));
         }
 
         beginTest("Whitelist and blacklist combine");
@@ -123,63 +124,95 @@ public:
             auto blockCC = makeCommand(CONTROL_CHANGE);
             blockCC.negate_ = true;
             route.filters.add(blockCC);
-            expect(  state.passesFilters(route, MidiMessage::noteOn(1, 60, (uint8)100)));
-            expect(! state.passesFilters(route, MidiMessage::controllerEvent(1, 7, 100)));
+            expect(  state.passesFilters(route, input, MidiMessage::noteOn(1, 60, (uint8)100)));
+            expect(! state.passesFilters(route, input, MidiMessage::controllerEvent(1, 7, 100)));
         }
 
         beginTest("noterange passes only notes within the note range (key split)");
         {
             Route route;
             route.filters.add(makeCommand(NOTE_RANGE, {"60", "72"}));
-            expect(  state.passesFilters(route, MidiMessage::noteOn(1, 60, (uint8)100)));
-            expect(  state.passesFilters(route, MidiMessage::noteOn(1, 72, (uint8)100)));
-            expect(  state.passesFilters(route, MidiMessage::noteOff(1, 65, (uint8)0)));
-            expect(! state.passesFilters(route, MidiMessage::noteOn(1, 59, (uint8)100)));
-            expect(! state.passesFilters(route, MidiMessage::noteOn(1, 73, (uint8)100)));
-            expect(! state.passesFilters(route, MidiMessage::controllerEvent(1, 7, 100)));
+            expect(  state.passesFilters(route, input, MidiMessage::noteOn(1, 60, (uint8)100)));
+            expect(  state.passesFilters(route, input, MidiMessage::noteOn(1, 72, (uint8)100)));
+            expect(  state.passesFilters(route, input, MidiMessage::noteOff(1, 65, (uint8)0)));
+            expect(! state.passesFilters(route, input, MidiMessage::noteOn(1, 59, (uint8)100)));
+            expect(! state.passesFilters(route, input, MidiMessage::noteOn(1, 73, (uint8)100)));
+            expect(! state.passesFilters(route, input, MidiMessage::controllerEvent(1, 7, 100)));
         }
 
         beginTest("velrange filters note-ons by velocity, always passing note-offs");
         {
             Route route;
             route.filters.add(makeCommand(VELOCITY_RANGE, {"64", "127"}));
-            expect(  state.passesFilters(route, MidiMessage::noteOn(1, 60, (uint8)100)));
-            expect(  state.passesFilters(route, MidiMessage::noteOn(1, 60, (uint8)64)));
-            expect(! state.passesFilters(route, MidiMessage::noteOn(1, 60, (uint8)40)));
+            expect(  state.passesFilters(route, input, MidiMessage::noteOn(1, 60, (uint8)100)));
+            expect(  state.passesFilters(route, input, MidiMessage::noteOn(1, 60, (uint8)64)));
+            expect(! state.passesFilters(route, input, MidiMessage::noteOn(1, 60, (uint8)40)));
             // note-offs always pass so a velocity split can't leave notes stuck
-            expect(  state.passesFilters(route, MidiMessage::noteOff(1, 60, (uint8)0)));
-            expect(! state.passesFilters(route, MidiMessage::controllerEvent(1, 7, 100)));
+            expect(  state.passesFilters(route, input, MidiMessage::noteOff(1, 60, (uint8)0)));
+            expect(! state.passesFilters(route, input, MidiMessage::controllerEvent(1, 7, 100)));
         }
 
         beginTest("ccrange passes a controller only within a value range");
         {
             Route route;
             route.filters.add(makeCommand(CONTROL_CHANGE_RANGE, {"1", "64", "127"}));
-            expect(  state.passesFilters(route, MidiMessage::controllerEvent(1, 1, 100)));  // in range
-            expect(  state.passesFilters(route, MidiMessage::controllerEvent(1, 1, 64)));   // lower bound
-            expect(  state.passesFilters(route, MidiMessage::controllerEvent(1, 1, 127)));  // upper bound
-            expect(! state.passesFilters(route, MidiMessage::controllerEvent(1, 1, 63)));   // below range
-            expect(! state.passesFilters(route, MidiMessage::controllerEvent(1, 7, 100)));  // a different CC
-            expect(! state.passesFilters(route, MidiMessage::noteOn(1, 60, (uint8)100)));   // a non-CC
+            expect(  state.passesFilters(route, input, MidiMessage::controllerEvent(1, 1, 100)));  // in range
+            expect(  state.passesFilters(route, input, MidiMessage::controllerEvent(1, 1, 64)));   // lower bound
+            expect(  state.passesFilters(route, input, MidiMessage::controllerEvent(1, 1, 127)));  // upper bound
+            expect(! state.passesFilters(route, input, MidiMessage::controllerEvent(1, 1, 63)));   // below range
+            expect(! state.passesFilters(route, input, MidiMessage::controllerEvent(1, 7, 100)));  // a different CC
+            expect(! state.passesFilters(route, input, MidiMessage::noteOn(1, 60, (uint8)100)));   // a non-CC
+        }
+
+        beginTest("cc14range passes a 14-bit CC pair only within a value range");
+        {
+            // controller 7 (MSB) pairs with 39 (LSB); the range is 0-16383
+            Route route;
+            RouteInput pairing;   // fresh MSB memory for this test
+            route.filters.add(makeCommand(CONTROL_CHANGE_14BIT_RANGE, {"7", "8000", "9000"}));
+
+            // an in-range pair: the MSB half is judged as MSB<<7, the LSB half
+            // with the exact assembled value
+            expect(  state.passesFilters(route, pairing, MidiMessage::controllerEvent(1, 7, 65)));   // 8320
+            expect(  state.passesFilters(route, pairing, MidiMessage::controllerEvent(1, 39, 64)));  // 8384
+
+            // an out-of-range pair: both halves are blocked
+            expect(! state.passesFilters(route, pairing, MidiMessage::controllerEvent(1, 7, 20)));   // 2560
+            expect(! state.passesFilters(route, pairing, MidiMessage::controllerEvent(1, 39, 0)));   // 2560
+
+            // the LSB decides with the remembered MSB: 65 << 7 | 127 = 8447 in
+            // range, while an LSB pushing past the bound is blocked
+            expect(  state.passesFilters(route, pairing, MidiMessage::controllerEvent(1, 7, 65)));
+            expect(  state.passesFilters(route, pairing, MidiMessage::controllerEvent(1, 39, 127))); // 8447
+            expect(  state.passesFilters(route, pairing, MidiMessage::controllerEvent(1, 7, 70)));   // 8960
+            expect(! state.passesFilters(route, pairing, MidiMessage::controllerEvent(1, 39, 41)));  // 9001
+
+            // other controllers and non-CC messages don't match
+            expect(! state.passesFilters(route, pairing, MidiMessage::controllerEvent(1, 8, 65)));
+            expect(! state.passesFilters(route, pairing, MidiMessage::controllerEvent(1, 74, 65)));
+            expect(! state.passesFilters(route, pairing, MidiMessage::noteOn(1, 60, (uint8)100)));
+
+            // the MSB memory is per channel: channel 2 still assumes MSB 0
+            expect(! state.passesFilters(route, pairing, MidiMessage::controllerEvent(2, 39, 64)));  // 64
         }
 
         beginTest("inscale passes only notes that belong to the key");
         {
             Route route;
             route.filters.add(makeCommand(IN_SCALE, {"C", "major"}));
-            expect(  state.passesFilters(route, MidiMessage::noteOn(1, 60, (uint8)100)));   // C
-            expect(  state.passesFilters(route, MidiMessage::noteOn(1, 62, (uint8)100)));   // D
-            expect(! state.passesFilters(route, MidiMessage::noteOn(1, 61, (uint8)100)));   // C#
-            expect(! state.passesFilters(route, MidiMessage::noteOn(1, 66, (uint8)100)));   // F#
-            expect(  state.passesFilters(route, MidiMessage::noteOff(1, 60, (uint8)0)));    // in-key off
-            expect(! state.passesFilters(route, MidiMessage::noteOff(1, 61, (uint8)0)));    // out-of-key off
-            expect(! state.passesFilters(route, MidiMessage::controllerEvent(1, 7, 100)));  // non-note
+            expect(  state.passesFilters(route, input, MidiMessage::noteOn(1, 60, (uint8)100)));   // C
+            expect(  state.passesFilters(route, input, MidiMessage::noteOn(1, 62, (uint8)100)));   // D
+            expect(! state.passesFilters(route, input, MidiMessage::noteOn(1, 61, (uint8)100)));   // C#
+            expect(! state.passesFilters(route, input, MidiMessage::noteOn(1, 66, (uint8)100)));   // F#
+            expect(  state.passesFilters(route, input, MidiMessage::noteOff(1, 60, (uint8)0)));    // in-key off
+            expect(! state.passesFilters(route, input, MidiMessage::noteOff(1, 61, (uint8)0)));    // out-of-key off
+            expect(! state.passesFilters(route, input, MidiMessage::controllerEvent(1, 7, 100)));  // non-note
 
             // the root and scale matter: F# belongs to G major
             Route g;
             g.filters.add(makeCommand(IN_SCALE, {"G", "major"}));
-            expect(  state.passesFilters(g, MidiMessage::noteOn(1, 66, (uint8)100)));       // F#
-            expect(! state.passesFilters(g, MidiMessage::noteOn(1, 65, (uint8)100)));       // F natural
+            expect(  state.passesFilters(g, input, MidiMessage::noteOn(1, 66, (uint8)100)));  // F#
+            expect(! state.passesFilters(g, input, MidiMessage::noteOn(1, 65, (uint8)100)));  // F natural
         }
 
         beginTest("'not inscale' passes only notes outside the key");
@@ -188,8 +221,8 @@ public:
             ApplicationCommand cmd = makeCommand(IN_SCALE, {"C", "major"});
             cmd.negate_ = true;
             route.filters.add(cmd);
-            expect(! state.passesFilters(route, MidiMessage::noteOn(1, 60, (uint8)100)));   // C in key, blocked
-            expect(  state.passesFilters(route, MidiMessage::noteOn(1, 61, (uint8)100)));   // C# out of key, passes
+            expect(! state.passesFilters(route, input, MidiMessage::noteOn(1, 60, (uint8)100)));   // C in key, blocked
+            expect(  state.passesFilters(route, input, MidiMessage::noteOn(1, 61, (uint8)100)));   // C# out of key, passes
         }
 
         beginTest("cc14 matches an MSB/LSB controller pair");
@@ -250,15 +283,15 @@ public:
             Route route;
             route.filters.add(makeCommand(CHANNEL, {"1..4"}));
             route.filters.add(makeCommand(NOTE));
-            expect(  state.passesFilters(route, MidiMessage::noteOn(1, 60, (uint8)100)));
-            expect(  state.passesFilters(route, MidiMessage::noteOn(4, 60, (uint8)100)));
-            expect(! state.passesFilters(route, MidiMessage::noteOn(5, 60, (uint8)100)));
+            expect(  state.passesFilters(route, input, MidiMessage::noteOn(1, 60, (uint8)100)));
+            expect(  state.passesFilters(route, input, MidiMessage::noteOn(4, 60, (uint8)100)));
+            expect(! state.passesFilters(route, input, MidiMessage::noteOn(5, 60, (uint8)100)));
 
             // a channel range with no type filter gates on its own
             Route chOnly;
             chOnly.filters.add(makeCommand(CHANNEL, {"10..12"}));
-            expect(  state.passesFilters(chOnly, MidiMessage::controllerEvent(11, 7, 0)));
-            expect(! state.passesFilters(chOnly, MidiMessage::controllerEvent(9, 7, 0)));
+            expect(  state.passesFilters(chOnly, input, MidiMessage::controllerEvent(11, 7, 0)));
+            expect(! state.passesFilters(chOnly, input, MidiMessage::controllerEvent(9, 7, 0)));
         }
 
         beginTest("nrpn and rpn match their constituent controllers");

@@ -98,6 +98,7 @@ One message per line, an optional `channel <1-16>` prefix, then the type:
 channel 1 note-on C3 100
 channel 1 note-off 60 0
 channel 2 control-change 74 64
+channel 1 cc14 7 8000
 channel 1 pitch-bend 8192
 channel 1 poly-pressure C3 90
 midi-clock
