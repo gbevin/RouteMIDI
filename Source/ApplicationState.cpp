@@ -112,17 +112,6 @@ ApplicationState::ApplicationState()
     commands_.add({"ccrescale", "control-change-rescale", CONTROL_CHANGE_RESCALE,  5, {"number", "inlow", "inhigh", "outlow", "outhigh"},
                                                                                                                   {"Rescale a controller's value from one range onto another (a reversed output range inverts)"}});
     commands_.add({"ccset",     "control-change-set",     CONTROL_CHANGE_SET,      2, {"number", "value"},        {"Set a fixed value for a controller (0-127)"}});
-    commands_.add({"pcmap",     "program-change-map",     PROGRAM_CHANGE_MAP,      2, {"from", "to"},             {"Remap a Program Change number"}});
-    commands_.add({"pcadd",     "program-change-add",     PROGRAM_CHANGE_ADD,      1, {"number"},                 {"Add an offset to Program Change number (clamped 0-127)"}});
-    commands_.add({"pbadd",     "pitch-bend-add",         PITCH_BEND_ADD,          1, {"number"},                 {"Add an offset to Pitch Bend (clamped 0-16383)"}});
-    commands_.add({"pbscale",   "pitch-bend-scale",       PITCH_BEND_SCALE,        1, {"factor"},                 {"Scale Pitch Bend around center by a factor (0-16383)"}});
-    commands_.add({"pbset",     "pitch-bend-set",         PITCH_BEND_SET,          1, {"number"},                 {"Set a fixed Pitch Bend value (0-16383)"}});
-    commands_.add({"pbinvert",  "pitch-bend-invert",      PITCH_BEND_INVERT,       0, {""},                       {"Invert Pitch Bend around the center (up becomes down)"}});
-    commands_.add({"cpadd",     "channel-pressure-add",   CHANNEL_PRESSURE_ADD,    1, {"number"},                 {"Add an offset to Channel Pressure (clamped 0-127)"}});
-    commands_.add({"cpscale",   "channel-pressure-scale", CHANNEL_PRESSURE_SCALE,  1, {"factor"},                 {"Scale Channel Pressure by a factor (clamped 0-127)"}});
-    commands_.add({"cpset",     "channel-pressure-set",   CHANNEL_PRESSURE_SET,    1, {"number"},                 {"Set a fixed Channel Pressure value (0-127)"}});
-    commands_.add({"cpcurve",   "channel-pressure-curve", CHANNEL_PRESSURE_CURVE,  1, {"gamma"},                  {"Apply a gamma curve to Channel Pressure"}});
-    commands_.add({"cpinvert",  "channel-pressure-invert",CHANNEL_PRESSURE_INVERT, 0, {""},                       {"Invert Channel Pressure (0-127 mirrored)"}});
     commands_.add({"cc14add",   "control-change-14-add",  CC14_ADD,                2, {"number", "value"},        {"Add an offset to a 14-bit CC value (clamped to its resolution)"}});
     commands_.add({"cc14scale", "control-change-14-scale",CC14_SCALE,              2, {"number", "factor"},       {"Scale a 14-bit CC value by a factor (clamped to its resolution)"}});
     commands_.add({"cc14curve", "control-change-14-curve",CC14_CURVE,              2, {"number", "gamma"},        {"Apply a gamma curve to a 14-bit CC value"}});
@@ -144,16 +133,27 @@ ApplicationState::ApplicationState()
     commands_.add({"rpnrescale","rpn-rescale",            RPN_RESCALE,             5, {"param", "inlow", "inhigh", "outlow", "outhigh"},
                                                                                                                   {"Rescale an RPN value from one range onto another (a reversed output range inverts)"}});
     commands_.add({"rpnset",    "rpn-set",                RPN_SET,                 2, {"param", "value"},         {"Set a fixed RPN value (scaled to its resolution)"}});
+    commands_.add({"pcmap",     "program-change-map",     PROGRAM_CHANGE_MAP,      2, {"from", "to"},             {"Remap a Program Change number"}});
+    commands_.add({"pcadd",     "program-change-add",     PROGRAM_CHANGE_ADD,      1, {"number"},                 {"Add an offset to Program Change number (clamped 0-127)"}});
+    commands_.add({"cpadd",     "channel-pressure-add",   CHANNEL_PRESSURE_ADD,    1, {"number"},                 {"Add an offset to Channel Pressure (clamped 0-127)"}});
+    commands_.add({"cpscale",   "channel-pressure-scale", CHANNEL_PRESSURE_SCALE,  1, {"factor"},                 {"Scale Channel Pressure by a factor (clamped 0-127)"}});
+    commands_.add({"cpset",     "channel-pressure-set",   CHANNEL_PRESSURE_SET,    1, {"number"},                 {"Set a fixed Channel Pressure value (0-127)"}});
+    commands_.add({"cpcurve",   "channel-pressure-curve", CHANNEL_PRESSURE_CURVE,  1, {"gamma"},                  {"Apply a gamma curve to Channel Pressure"}});
+    commands_.add({"cpinvert",  "channel-pressure-invert",CHANNEL_PRESSURE_INVERT, 0, {""},                       {"Invert Channel Pressure (0-127 mirrored)"}});
+    commands_.add({"pbadd",     "pitch-bend-add",         PITCH_BEND_ADD,          1, {"number"},                 {"Add an offset to Pitch Bend (clamped 0-16383)"}});
+    commands_.add({"pbscale",   "pitch-bend-scale",       PITCH_BEND_SCALE,        1, {"factor"},                 {"Scale Pitch Bend around center by a factor (0-16383)"}});
+    commands_.add({"pbset",     "pitch-bend-set",         PITCH_BEND_SET,          1, {"number"},                 {"Set a fixed Pitch Bend value (0-16383)"}});
+    commands_.add({"pbinvert",  "pitch-bend-invert",      PITCH_BEND_INVERT,       0, {""},                       {"Invert Pitch Bend around the center (up becomes down)"}});
     commands_.add({"js",        "javascript",             JAVASCRIPT,              1, {"code"},                   {"Transform each message with this script"}});
     commands_.add({"jsf",       "javascript-file",        JAVASCRIPT_FILE,         1, {"path"},                   {"Transform each message with the script in this file"}});
-    commands_.add({"convert",   "",                       CONVERT,                 4, {"srctype", "[number]", "dsttype", "[number]"},
-                                                                                                                  {"Convert a value between cc, cc14, rpn, nrpn, pb, cp, pc & pp. Types cc, cc14, rpn and nrpn take a controller or parameter number and pp a note (optional on a source, meaning any note), while pb, cp and pc take none; the value is rescaled to the destination resolution"}, "Conversion"});
     commands_.add({"mpe",       "",                       MPE_RELOCATE,            2, {"zone[:n]", "zone[:n]"},   {"Relocate an MPE stream between zones (e.g. lower upper), remapping channels"}, "MPE routing"});
     commands_.add({"mpemono",   "mpe-mono",               MPE_COLLAPSE,            2, {"zone[:n]", "channel"},    {"Collapse an MPE zone onto a single channel for non-MPE gear (e.g. upper 1)"}});
     commands_.add({"mpexp",     "mpe-expand",             MPE_EXPAND,              2, {"channel", "zone[:n]"},    {"Spread a channel's notes across an MPE zone's member channels (e.g. 1 lower)"}});
     commands_.add({"mpesplit",  "mpe-split",              MPE_SPLIT,              -1, {"zone[:n]", "(channel)"},  {"Distribute an MPE zone's voices over the output ports, one per port, each rechanneled to channel (default 1)"}});
     commands_.add({"mpebend",   "mpe-bend",               MPE_BEND,                3, {"zone[:n]", "from", "to"}, {"Rescale member-channel pitch bend from one semitone range to another"}});
     commands_.add({"mpesens",   "mpe-sensitivity",        MPE_SENS,                2, {"zone[:n]", "semitones"},  {"Declare a member-channel pitch bend range (RPN 0) for synths that honor it"}});
+    commands_.add({"convert",   "",                       CONVERT,                 4, {"srctype", "[number]", "dsttype", "[number]"},
+                                                                                                                  {"Convert a value between cc, cc14, rpn, nrpn, pb, cp, pc & pp. Types cc, cc14, rpn and nrpn take a controller or parameter number and pp a note (optional on a source, meaning any note), while pb, cp and pc take none; the value is rescaled to the destination resolution"}, "Conversion"});
 
     pendingNegate_ = false;
     useHexadecimalsByDefault_ = false;

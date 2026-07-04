@@ -144,17 +144,6 @@ Transforms:
               outhigh
   ccset       number     Set a fixed value for a controller (0-127)
               value
-  pcmap       from to    Remap a Program Change number
-  pcadd       number     Add an offset to Program Change number (clamped 0-127)
-  pbadd       number     Add an offset to Pitch Bend (clamped 0-16383)
-  pbscale     factor     Scale Pitch Bend around center by a factor (0-16383)
-  pbset       number     Set a fixed Pitch Bend value (0-16383)
-  pbinvert               Invert Pitch Bend around the center (up becomes down)
-  cpadd       number     Add an offset to Channel Pressure (clamped 0-127)
-  cpscale     factor     Scale Channel Pressure by a factor (clamped 0-127)
-  cpset       number     Set a fixed Channel Pressure value (0-127)
-  cpcurve     gamma      Apply a gamma curve to Channel Pressure
-  cpinvert               Invert Channel Pressure (0-127 mirrored)
   cc14add     number     Add an offset to a 14-bit CC value (clamped to its
               value      resolution)
   cc14scale   number     Scale a 14-bit CC value by a factor (clamped to its
@@ -197,15 +186,19 @@ Transforms:
               outhigh
   rpnset      param      Set a fixed RPN value (scaled to its resolution)
               value
+  pcmap       from to    Remap a Program Change number
+  pcadd       number     Add an offset to Program Change number (clamped 0-127)
+  cpadd       number     Add an offset to Channel Pressure (clamped 0-127)
+  cpscale     factor     Scale Channel Pressure by a factor (clamped 0-127)
+  cpset       number     Set a fixed Channel Pressure value (0-127)
+  cpcurve     gamma      Apply a gamma curve to Channel Pressure
+  cpinvert               Invert Channel Pressure (0-127 mirrored)
+  pbadd       number     Add an offset to Pitch Bend (clamped 0-16383)
+  pbscale     factor     Scale Pitch Bend around center by a factor (0-16383)
+  pbset       number     Set a fixed Pitch Bend value (0-16383)
+  pbinvert               Invert Pitch Bend around the center (up becomes down)
   js          code       Transform each message with this script
   jsf         path       Transform each message with the script in this file
-
-Conversion:
-  convert     srctype    Convert a value between cc, cc14, rpn, nrpn, pb, cp, pc
-              [number]   & pp. Types cc, cc14, rpn and nrpn take a controller or
-              dsttype    parameter number and pp a note (optional on a source,
-              [number]   meaning any note), while pb, cp and pc take none; the
-                         value is rescaled to the destination resolution
 
 MPE routing:
   mpe         zone[:n]   Relocate an MPE stream between zones (e.g. lower
@@ -220,6 +213,13 @@ MPE routing:
               from to    range to another
   mpesens     zone[:n]   Declare a member-channel pitch bend range (RPN 0) for
               semitones  synths that honor it
+
+Conversion:
+  convert     srctype    Convert a value between cc, cc14, rpn, nrpn, pb, cp, pc
+              [number]   & pp. Types cc, cc14, rpn and nrpn take a controller or
+              dsttype    parameter number and pp a note (optional on a source,
+              [number]   meaning any note), while pb, cp and pc take none; the
+                         value is rescaled to the destination resolution
 
   -h  or  --help         Print Help (this message) and exit
   --version              Print version information and exit
@@ -251,15 +251,15 @@ Alternatively, you can use the following long versions of the commands:
   velocity-curve velocity-clip velocity-compress velocity-invert
   control-change-map control-change-add control-change-scale
   control-change-curve control-change-invert control-change-rescale
-  control-change-set program-change-map program-change-add pitch-bend-add
-  pitch-bend-scale pitch-bend-set pitch-bend-invert channel-pressure-add
-  channel-pressure-scale channel-pressure-set channel-pressure-curve
-  channel-pressure-invert control-change-14-add control-change-14-scale
+  control-change-set control-change-14-add control-change-14-scale
   control-change-14-curve control-change-14-invert control-change-14-rescale
   control-change-14-set nrpn-add nrpn-scale nrpn-curve nrpn-invert nrpn-rescale
   nrpn-set rpn-add rpn-scale rpn-curve rpn-invert rpn-rescale rpn-set
-  javascript javascript-file mpe-mono mpe-expand mpe-split mpe-bend
-  mpe-sensitivity
+  program-change-map program-change-add channel-pressure-add
+  channel-pressure-scale channel-pressure-set channel-pressure-curve
+  channel-pressure-invert pitch-bend-add pitch-bend-scale pitch-bend-set
+  pitch-bend-invert javascript javascript-file mpe-mono mpe-expand mpe-split
+  mpe-bend mpe-sensitivity
 ```
 
 ## Routes
@@ -292,7 +292,7 @@ Each message a route receives flows through the route's processing stages in a *
 1. **Filters** decide whether the message passes at all.
 2. **Transforms** (including `js` scripts) modify it, applied in the order they were written.
 3. **MPE operations** (`mpe`, `mpemono`, `mpexp`, `mpebend`, `mpesens`) rechannel, fold or expand it, in the order they were written.
-4. **Conversions** (`convert` and the RPN/NRPN value transforms) reassemble and convert controller values.
+4. **Conversions** (`convert` and the 14-bit CC/RPN/NRPN value transforms) reassemble and convert controller values.
 5. The result goes to every output of the route (or is distributed across them by `mpesplit`).
 
 Only the relative order *within* the transform stage and *within* the MPE stage matters: a `transp` always runs before an `mpemono`, even when it is written after it.

@@ -34,7 +34,7 @@ The tool calls themselves, however, are treated as untrusted. An AI client can
 be steered by prompt injection from the content it is processing, so the server
 grants capability by an explicit **allow-list**: routing (`in`, `out`, `vin`,
 `vout`, `panic`), the number settings (`dec`, `hex`, `omc`) and the message
-filters, transforms, conversions and MPE operations. Everything else is
+filters, transforms, MPE operations and conversions. Everything else is
 rejected with a reason, and a rejected call is **atomic**: no route is started,
 and session settings and the process exit code are rolled back.
 

@@ -128,7 +128,7 @@ channel  1   note-on           C4 100
 
 ## Docs
 
-- [README](https://raw.githubusercontent.com/gbevin/RouteMIDI/master/README.md): the full manual: every command, filter semantics, transforms, conversions, MPE routing and the text MIDI format
+- [README](https://raw.githubusercontent.com/gbevin/RouteMIDI/master/README.md): the full manual: every command, filter semantics, transforms, MPE routing, conversions and the text MIDI format
 - [AI.md](https://raw.githubusercontent.com/gbevin/RouteMIDI/master/AI.md): driving RouteMIDI from AI tools and scripts: the generation contract, the `--schema json` metadata, the `--mcp` MCP server and its security model (experimental and fast-moving)
 - [JAVASCRIPT.md](https://raw.githubusercontent.com/gbevin/RouteMIDI/master/JAVASCRIPT.md): the per-message JavaScript API (accessors, send functions, OSC, persistent state)
 
