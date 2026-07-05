@@ -34,21 +34,20 @@ enum CommandIndex
     LIST,
     PANIC,
 
-    // global configuration
+    // configuration
     TXTFILE,
     DECIMAL,
     HEXADECIMAL,
     OCTAVE_MIDDLE_C,
+
+    // monitoring
     NOTE_NUMBERS,
     TIMESTAMP,
     MONITOR,
     MONITOR_SOURCE,
-    SYSEX_FILE,
-
-    // filter modifier
-    NOT,
 
     // filters
+    NOT,
     CHANNEL,
     VOICE,
     NOTE,
@@ -71,6 +70,7 @@ enum CommandIndex
     RESET,
     SYSTEM_COMMON,
     SYSTEM_EXCLUSIVE,
+    SYSEX_FILE,
     TIME_CODE,
     SONG_POSITION,
     SONG_SELECT,
@@ -114,20 +114,6 @@ enum CommandIndex
     CONTROL_CHANGE_INVERT,
     CONTROL_CHANGE_RESCALE,
     CONTROL_CHANGE_SET,
-    PROGRAM_CHANGE_MAP,
-    PROGRAM_CHANGE_ADD,
-    PITCH_BEND_ADD,
-    PITCH_BEND_SCALE,
-    PITCH_BEND_SET,
-    PITCH_BEND_INVERT,
-    CHANNEL_PRESSURE_ADD,
-    CHANNEL_PRESSURE_SCALE,
-    CHANNEL_PRESSURE_SET,
-    CHANNEL_PRESSURE_CURVE,
-    CHANNEL_PRESSURE_INVERT,
-
-    // 14-bit CC and RPN/NRPN value transforms (assembled in the converter
-    // stage, but grouped here with the other value transforms they mirror)
     CC14_ADD,
     CC14_SCALE,
     CC14_CURVE,
@@ -146,21 +132,30 @@ enum CommandIndex
     RPN_INVERT,
     RPN_RESCALE,
     RPN_SET,
-
+    PROGRAM_CHANGE_MAP,
+    PROGRAM_CHANGE_ADD,
+    CHANNEL_PRESSURE_ADD,
+    CHANNEL_PRESSURE_SCALE,
+    CHANNEL_PRESSURE_SET,
+    CHANNEL_PRESSURE_CURVE,
+    CHANNEL_PRESSURE_INVERT,
+    PITCH_BEND_ADD,
+    PITCH_BEND_SCALE,
+    PITCH_BEND_SET,
+    PITCH_BEND_INVERT,
     JAVASCRIPT,
     JAVASCRIPT_FILE,
 
-    // converters (7-bit CC, 14-bit CC, RPN and NRPN inter-conversion)
-    CONVERT,
-
-    // MPE zone routing (relocate between zones, collapse to one channel, expand
-    // a single channel into a zone, split voices across output ports)
+    // MPE routing
     MPE_RELOCATE,
     MPE_COLLAPSE,
     MPE_EXPAND,
     MPE_SPLIT,
     MPE_BEND,
-    MPE_SENS
+    MPE_SENS,
+
+    // conversion
+    CONVERT,
 };
 
 class ApplicationState;
