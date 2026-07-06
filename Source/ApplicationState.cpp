@@ -26,9 +26,125 @@
 #include "ScriptOscClass.h"
 #include "ScriptUtilClass.h"
 
+#include <cstdlib>
+#if JUCE_WINDOWS
+ #include <windows.h>
+ #include <io.h>
+ #ifndef ENABLE_VIRTUAL_TERMINAL_PROCESSING
+  #define ENABLE_VIRTUAL_TERMINAL_PROCESSING 0x0004
+ #endif
+#else
+ #include <unistd.h>
+#endif
+
 static const int DEFAULT_OCTAVE_MIDDLE_C = 3;
 static const String DEFAULT_VIRTUAL_IN_NAME = "RouteMIDI In";
 static const String DEFAULT_VIRTUAL_OUT_NAME = "RouteMIDI Out";
+
+// Optional ANSI color for the help text. It is emitted only when standard
+// output is an interactive terminal that is expected to understand the codes,
+// so any redirected or piped output stays plain and byte-for-byte as before.
+// Color is disabled when NO_COLOR is set or TERM is "dumb", and forced on by
+// CLICOLOR_FORCE. On Windows the console's virtual terminal processing is
+// turned on first (Windows 10+); if it can't be enabled, output stays plain.
+namespace ansi
+{
+    static const char* const reset = "\x1b[0m";
+
+    // Each role carries a 24-bit truecolor code matching the palette on the
+    // uwyn.com terminal mockup, and a nearest 16-color code for terminals that
+    // don't advertise truecolor. Descriptions and the version banner are left in
+    // the terminal's default foreground on purpose, so they stay legible on both
+    // dark and light backgrounds without needing to know which one it is.
+    struct Role { const char* truecolor; const char* basic; };
+    static const Role label   { "38;2;232;121;76",  "33" };   // terracotta: Usage/Commands/section headers
+    static const Role command { "38;2;109;188;128", "32" };   // sage green: command and flag names
+    static const Role option  { "38;2;126;167;205", "34" };   // steel blue: option placeholders and the URL
+
+    static bool computeEnabled()
+    {
+        if (std::getenv("NO_COLOR") != nullptr)
+        {
+            return false;   // a hard user opt-out; wins over CLICOLOR_FORCE
+        }
+        const char* force = std::getenv("CLICOLOR_FORCE");
+        const bool forced = force != nullptr && String(force) != "0";
+
+       #if JUCE_WINDOWS
+        const bool tty = _isatty(_fileno(stdout)) != 0;
+        if (! forced && ! tty)
+        {
+            return false;   // piped or redirected and not forced: plain text
+        }
+        // writing to a real console, the escapes only render once virtual
+        // terminal processing is on (Windows 10+); if that can't be enabled the
+        // codes would print literally, so fall back to plain. Piped output
+        // (reached only via CLICOLOR_FORCE) needs no console mode - the codes
+        // are just bytes the consumer handles.
+        if (tty)
+        {
+            HANDLE out = GetStdHandle(STD_OUTPUT_HANDLE);
+            DWORD mode = 0;
+            if (out == INVALID_HANDLE_VALUE || out == nullptr
+                || ! GetConsoleMode(out, &mode)
+                || ! SetConsoleMode(out, mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING))
+            {
+                return false;
+            }
+        }
+        return true;
+       #else
+        if (forced)
+        {
+            return true;   // explicitly forced, even when not a terminal
+        }
+        if (isatty(fileno(stdout)) == 0)
+        {
+            return false;   // piped or redirected: emit plain text
+        }
+        const char* term = std::getenv("TERM");
+        if (term != nullptr && String(term) == "dumb")
+        {
+            return false;
+        }
+        return true;
+       #endif
+    }
+
+    static bool enabled()
+    {
+        static const bool value = computeEnabled();
+        return value;
+    }
+
+    // truecolor when the terminal advertises it, otherwise the 16-color palette
+    static bool trueColor()
+    {
+        static const bool value = []
+        {
+            const char* ct = std::getenv("COLORTERM");
+            return ct != nullptr && (String(ct).containsIgnoreCase("truecolor")
+                                     || String(ct).containsIgnoreCase("24bit"));
+        }();
+        return value;
+    }
+
+    // wraps text in the role's color, or returns it unchanged when color is
+    // off (or the role has no 16-color equivalent on a non-truecolor terminal)
+    static String paint(const Role& role, const String& text)
+    {
+        if (! enabled() || text.isEmpty())
+        {
+            return text;
+        }
+        const char* code = trueColor() ? role.truecolor : role.basic;
+        if (code == nullptr || *code == '\0')
+        {
+            return text;
+        }
+        return "\x1b[" + String(code) + "m" + text + reset;
+    }
+}
 
 ApplicationState::ApplicationState()
 {
@@ -1696,7 +1812,7 @@ textmidi::Format ApplicationState::textFormat() const
 void ApplicationState::printVersion()
 {
     std::cout << ProjectInfo::projectName << " v" << ProjectInfo::versionString << std::endl;
-    std::cout << "https://github.com/gbevin/RouteMIDI" << std::endl;
+    std::cout << ansi::paint(ansi::option, "https://github.com/gbevin/RouteMIDI") << std::endl;
 }
 
 String ApplicationState::schemaJson() const
@@ -1754,8 +1870,8 @@ void ApplicationState::printUsage()
 {
     printVersion();
     std::cout << std::endl;
-    std::cout << "Usage: " << ProjectInfo::projectName << " [ commands ] [ programfile ] [ -- ]" << std::endl << std::endl
-              << "Commands:" << std::endl << std::endl;
+    std::cout << ansi::paint(ansi::label, "Usage:") << " " << ProjectInfo::projectName << " [ commands ] [ programfile ] [ -- ]" << std::endl << std::endl
+              << ansi::paint(ansi::label, "Commands:") << std::endl << std::endl;
     // the columns follow the longest command name, so long commands cannot
     // push their options and description out of alignment
     int longestCommand = 0;
@@ -1775,7 +1891,7 @@ void ApplicationState::printUsage()
             {
                 std::cout << std::endl;
             }
-            std::cout << cmd.section_ << ":" << std::endl;
+            std::cout << ansi::paint(ansi::label, cmd.section_ + ":") << std::endl;
             firstSection = false;
         }
 
@@ -1801,28 +1917,42 @@ void ApplicationState::printUsage()
 
         for (int i = 0; i < jmax(1, options.size(), descriptionLines.size()); ++i)
         {
-            String line;
+            // build the row piece by piece, tracking the visible column so the
+            // color codes never enter the padding maths (padding is spaced out
+            // to the plain-text column, then the span is painted)
+            String out;
+            int col = 0;
+            auto padTo = [&](int target)
+            {
+                if (target > col)
+                {
+                    out << String::repeatedString(" ", target - col);
+                    col = target;
+                }
+            };
+
             if (i == 0)
             {
-                line << "  " << cmd.param_.paddedRight(' ', optionColumn - 3) << " ";
+                out << "  ";
+                col += 2;
+                out << ansi::paint(ansi::command, cmd.param_);
+                col += cmd.param_.length();
             }
-            else
-            {
-                line = String().paddedRight(' ', optionColumn);
-            }
+            padTo(optionColumn);
 
-            if (i < options.size())
+            if (i < options.size() && options.getReference(i).isNotEmpty())
             {
-                line << options.getReference(i);
+                out << ansi::paint(ansi::option, options.getReference(i));
+                col += options.getReference(i).length();
             }
 
             if (i < descriptionLines.size())
             {
-                line = line.paddedRight(' ', descriptionColumn);
-                line << descriptionLines.getReference(i);
+                padTo(descriptionColumn);
+                out << descriptionLines.getReference(i);   // description in the default color
             }
 
-            std::cout << line.trimEnd() << std::endl;
+            std::cout << out << std::endl;
         }
     }
     std::cout << std::endl;
@@ -1832,64 +1962,135 @@ void ApplicationState::printUsage()
         const StringArray lines = wrapText(description, 80 - descriptionColumn);
         for (int i = 0; i < lines.size(); ++i)
         {
-            std::cout << (i == 0 ? ("  " + flag).paddedRight(' ', descriptionColumn)
-                                 : String().paddedRight(' ', descriptionColumn))
-                      << lines.getReference(i) << std::endl;
+            String out;
+            int col = 0;
+            if (i == 0)
+            {
+                out << "  " << ansi::paint(ansi::command, flag);
+                col += 2 + flag.length();
+            }
+            if (descriptionColumn > col)
+            {
+                out << String::repeatedString(" ", descriptionColumn - col);
+            }
+            std::cout << out << lines.getReference(i) << std::endl;
         }
     };
+    std::cout << ansi::paint(ansi::label, "Options:") << std::endl;
     builtin("-h  or  --help", "Print Help (this message) and exit");
     builtin("--version", "Print version information and exit");
     builtin("--schema json", "Print machine-readable command JSON and exit [experimental]");
     builtin("--mcp", "Run a stdio MCP server [experimental]");
     builtin("--", "Read commands from standard input until it's closed");
     std::cout << std::endl;
-    std::cout << "Use \"--schema json\" for command metadata for scripts, MCP servers and" << std::endl
-              << "AI agents. Use \"--mcp\" to let MCP clients control RouteMIDI over stdio." << std::endl;
+
+    // tints the command and flag names referenced in the trailing notes, so the
+    // block after the table isn't a wall of monochrome; the sentences stay in
+    // the default foreground. These lines aren't column-aligned, so the codes
+    // can sit inline freely. Only a whole quoted command name, or a "--" flag,
+    // is tinted; example values like "lo..hi" or "lower" stay neutral.
+    auto isCommandName = [this](const String& token)
+    {
+        for (auto&& cmd : commands_)
+        {
+            if (cmd.param_ == token || (cmd.altParam_.isNotEmpty() && cmd.altParam_ == token))
+            {
+                return true;
+            }
+        }
+        return false;
+    };
+    auto note = [&isCommandName](const String& text)
+    {
+        if (! ansi::enabled())
+        {
+            return text;
+        }
+        String out;
+        int i = 0;
+        while (i < text.length())
+        {
+            const int open = text.indexOfChar(i, '"');
+            if (open < 0)
+            {
+                out << text.substring(i);
+                break;
+            }
+            const int close = text.indexOfChar(open + 1, '"');
+            if (close < 0)
+            {
+                out << text.substring(i);
+                break;
+            }
+            const String inner = text.substring(open + 1, close);
+            const bool tint = inner.startsWith("--")
+                              || (! inner.containsChar(' ') && isCommandName(inner));
+            out << text.substring(i, open + 1)
+                << (tint ? ansi::paint(ansi::command, inner) : inner) << "\"";
+            i = close + 1;
+        }
+        return out;
+    };
+
+    std::cout << note("Use \"--schema json\" for command metadata for scripts, MCP servers and") << std::endl
+              << note("AI agents. Use \"--mcp\" to let MCP clients control RouteMIDI over stdio.") << std::endl;
     std::cout << "These two features are experimental and fast-moving: their JSON and the MCP" << std::endl
               << "tools may change between releases. See AI.md for details." << std::endl;
     std::cout << std::endl;
-    std::cout << "Alternatively, you can use the following long versions of the commands:" << std::endl;
+    std::cout << ansi::paint(ansi::label, "Long command names:") << std::endl << std::endl;
+    std::cout << "Each command can also be written with its long name instead of the short one:" << std::endl << std::endl;
     String line = " ";
+    int visible = 1;
     for (auto&& cmd : commands_)
     {
-        if (cmd.altParam_.isNotEmpty())
+        if (cmd.altParam_.isEmpty())
         {
-            if (line.length() + cmd.altParam_.length() + 1 >= 80)
-            {
-                std::cout << line << std::endl;
-                line = " ";
-            }
-            line << " " << cmd.altParam_;
+            continue;
         }
+        if (visible + cmd.altParam_.length() + 1 >= 80)
+        {
+            std::cout << line << std::endl;
+            line = " ";
+            visible = 1;
+        }
+        line << " " << ansi::paint(ansi::command, cmd.altParam_);
+        visible += 1 + cmd.altParam_.length();
     }
     std::cout << line << std::endl << std::endl;
-    std::cout << "A route forwards every \"in\" (or \"vin\") port to every \"out\" (or \"vout\") port," << std::endl
-              << "so it can split, merge, or both. More \"in\" ports keep adding to the route" << std::endl
-              << "until an \"out\" is given; the next \"in\" after that begins a new route." << std::endl;
+    std::cout << ansi::paint(ansi::label, "Routes:") << std::endl << std::endl;
+    std::cout << note("A route forwards every \"in\" (or \"vin\") port to every \"out\" (or \"vout\") port,") << std::endl
+              << note("so it can split, merge, or both. More \"in\" ports keep adding to the route") << std::endl
+              << note("until an \"out\" is given; the next \"in\" after that begins a new route.") << std::endl;
     std::cout << std::endl;
+    std::cout << ansi::paint(ansi::label, "Filters and transforms:") << std::endl << std::endl;
     std::cout << "Filters select which messages may pass: with one or more positive filters only" << std::endl
-              << "matching messages are forwarded. Prefix a filter with \"not\" to block matches" << std::endl
+              << note("matching messages are forwarded. Prefix a filter with \"not\" to block matches") << std::endl
               << "instead. Transforms modify the messages that pass, in the order given." << std::endl;
     std::cout << std::endl;
+    std::cout << ansi::paint(ansi::label, "Numbers:") << std::endl << std::endl;
     std::cout << "By default, numbers are interpreted in the decimal system, this can be changed" << std::endl
-              << "to hexadecimal by sending the \"hex\" command. Additionally, by suffixing a" << std::endl
+              << note("to hexadecimal by sending the \"hex\" command. Additionally, by suffixing a") << std::endl
               << "number with \"M\" or \"H\", it will be interpreted as a decimal or hexadecimal" << std::endl
               << "respectively." << std::endl;
     std::cout << std::endl;
+    std::cout << ansi::paint(ansi::label, "Port names:") << std::endl << std::endl;
     std::cout << "The MIDI port names don't have to be an exact match." << std::endl;
     std::cout << "If RouteMIDI can't find the exact name that was specified, it will pick the" << std::endl
               << "first MIDI port that contains the provided text, irrespective of case." << std::endl;
     std::cout << std::endl;
+    std::cout << ansi::paint(ansi::label, "Note names:") << std::endl << std::endl;
     std::cout << "Where notes can be provided as arguments, they can also be written as note" << std::endl
               << "names, by default from C-2 to G8 which corresponds to note numbers 0 to 127." << std::endl
               << "By setting the octave for middle C, the note name range can be changed." << std::endl
               << "Sharps can be added by using the \"#\" symbol after the note letter, and flats" << std::endl
               << "by using the letter \"b\"." << std::endl;
     std::cout << std::endl;
-    std::cout << "The number that selects which message a filter matches (for \"ch\", \"on\"," << std::endl
-              << "\"off\", \"pp\", \"cc\", \"cc14\" and \"pc\") may be a single value or an inclusive" << std::endl
+    std::cout << ansi::paint(ansi::label, "Selectors and ranges:") << std::endl << std::endl;
+    std::cout << note("The number that selects which message a filter matches (for \"ch\", \"on\",") << std::endl
+              << note("\"off\", \"pp\", \"cc\", \"cc14\" and \"pc\") may be a single value or an inclusive") << std::endl
               << "range written as \"lo..hi\", for example \"cc 1..10\", \"on C3..C5\" or \"ch 1..4\"." << std::endl;
     std::cout << std::endl;
+    std::cout << ansi::paint(ansi::label, "MPE zones:") << std::endl << std::endl;
     std::cout << "The MPE commands take a zone written as \"<side>[:<members>]\", where the side" << std::endl
               << "is \"lower\" or \"upper\" (with master channel 1 or 16) and the optional member" << std::endl
               << "count is 1-15, defaulting to 15. For example \"lower\", \"upper:7\" or \"l:5\"." << std::endl;
