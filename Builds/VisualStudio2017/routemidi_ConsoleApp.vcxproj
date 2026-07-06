@@ -153,6 +153,7 @@
     <ClCompile Include="..\..\Source\Schema.cpp"/>
     <ClCompile Include="..\..\Source\Sustain.cpp"/>
     <ClCompile Include="..\..\Source\Mpe.cpp"/>
+    <ClCompile Include="..\..\Source\ParamSelection.cpp"/>
     <ClCompile Include="..\..\Source\Route.cpp"/>
     <ClCompile Include="..\..\Source\ScriptMidiMessageClass.cpp"/>
     <ClCompile Include="..\..\Source\ScriptOscClass.cpp"/>
@@ -1074,6 +1075,7 @@
     <ClInclude Include="..\..\Source\Schema.h"/>
     <ClInclude Include="..\..\Source\Sustain.h"/>
     <ClInclude Include="..\..\Source\Mpe.h"/>
+    <ClInclude Include="..\..\Source\ParamSelection.h"/>
     <ClInclude Include="..\..\Source\Route.h"/>
     <ClInclude Include="..\..\Source\ScriptMidiMessageClass.h"/>
     <ClInclude Include="..\..\Source\ScriptOscClass.h"/>

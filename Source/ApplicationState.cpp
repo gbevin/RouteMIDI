@@ -171,8 +171,8 @@ ApplicationState::ApplicationState()
     commands_.add({"pp",           "poly-pressure",              POLY_PRESSURE,              -1, {"(note)"},                 {"Pass Poly Pressure, optionally for note (0-127)"}});
     commands_.add({"cc",           "control-change",             CONTROL_CHANGE,             -1, {"(number)"},               {"Pass Control Change, optionally for controller (0-127)"}});
     commands_.add({"cc14",         "control-change-14",          CONTROL_CHANGE_14BIT,       -1, {"(number)"},               {"Pass 14-bit CC, optionally for MSB controller (0-31)"}});
-    commands_.add({"nrpn",         "",                           NRPN,                        0, {""},                       {"Pass NRPN traffic (CC 6, 38, 98, 99)"}});
-    commands_.add({"rpn",          "",                           RPN,                         0, {""},                       {"Pass RPN traffic (CC 6, 38, 100, 101)"}});
+    commands_.add({"nrpn",         "",                           NRPN,                       -1, {"(number)"},               {"Pass NRPN traffic, optionally for parameter (0-16383)"}});
+    commands_.add({"rpn",          "",                           RPN,                        -1, {"(number)"},               {"Pass RPN traffic, optionally for parameter (0-16383)"}});
     commands_.add({"pc",           "program-change",             PROGRAM_CHANGE,             -1, {"(number)"},               {"Pass Program Change, optionally for program (0-127)"}});
     commands_.add({"cp",           "channel-pressure",           CHANNEL_PRESSURE,            0, {""},                       {"Pass Channel Pressure"}});
     commands_.add({"pb",           "pitch-bend",                 PITCH_BEND,                  0, {""},                       {"Pass Pitch Bend"}});
@@ -1480,8 +1480,67 @@ static bool matchesCc14Range(const ApplicationCommand& cmd, RouteInput& input,
            value <= jlimit(0, 16383, cmd.copts_[2].intValue);
 }
 
+// the "nrpn N" / "rpn N" filters: pass only the traffic for parameter N. The
+// parameter is chosen by CC 99/98 (NRPN) or 101/100 (RPN) and its data arrives
+// on the shared CC 6/38, so the current selection - tracked per input in
+// passesFilters below - decides which parameter the data belongs to. A select
+// MSB passes as soon as it matches N's MSB; a stray one for a neighbouring
+// parameter is harmlessly overwritten downstream by the real select. A 127
+// select byte is (half of) the (N)RPN null that deselects the parameter: it is
+// framing rather than data (a complete transmission ends with it, see
+// conversion::emitRpn), so it always passes for the filter's select family and
+// the downstream selection state stays correct.
+static bool matchesRpnParam(const ApplicationCommand& cmd, RouteInput& input,
+                            const MidiMessage& msg, int channelLow, int channelHigh)
+{
+    if (!ApplicationCommand::checkChannel(msg, channelLow, channelHigh) || !msg.isController())
+    {
+        return false;
+    }
+
+    const bool nrpn = (cmd.command_ == NRPN);
+    const int param = jlimit(0, 16383, cmd.copts_[0].intValue);
+    const int cc = msg.getControllerNumber();
+    const int ch = msg.getChannel();
+    const int selectMsbCc = nrpn ? 99 : 101;
+    const int selectLsbCc = nrpn ? 98 : 100;
+
+    if (cc == selectMsbCc || cc == selectLsbCc)
+    {
+        if (msg.getControllerValue() == 127)
+        {
+            return true;   // the deselecting null passes as framing
+        }
+        if (cc == selectMsbCc)
+        {
+            return msg.getControllerValue() == (param >> 7);
+        }
+        // the select LSB completes the parameter: pass it while parameter N of
+        // the right type is the one selected
+        return input.rpnFilter.isNrpn(ch) == nrpn
+               && input.rpnFilter.param(ch) == param;
+    }
+    if (cc == 6 || cc == 38)
+    {
+        // CC 6/38 are the selected parameter's data; after a completed null the
+        // selection is ended and no parameter's data can match
+        return input.rpnFilter.isNrpn(ch) == nrpn
+               && input.rpnFilter.param(ch) == param;
+    }
+    return false;
+}
+
 bool ApplicationState::passesFilters(Route& route, RouteInput& input, const MidiMessage& msg)
 {
+    // keep the per-input (N)RPN parameter selection current for the "nrpn N" and
+    // "rpn N" filters, whether or not this message ends up passing. This runs
+    // even for a route without filters, so an "nrpn N" filter added later (over
+    // MCP) starts from the stream's actual selection instead of a blank one
+    if (msg.isController())
+    {
+        input.rpnFilter.trackSelect(msg.getChannel(), msg.getControllerNumber(), msg.getControllerValue());
+    }
+
     if (route.filters.isEmpty())
     {
         return true;
@@ -1524,6 +1583,11 @@ bool ApplicationState::passesFilters(Route& route, RouteInput& input, const Midi
             {
                 cmd.ensureCompiled(*this);
                 m = matchesCc14Range(cmd, input, msg, channelLow, channelHigh);
+            }
+            else if ((cmd.command_ == NRPN || cmd.command_ == RPN) && ! cmd.opts_.isEmpty())
+            {
+                cmd.ensureCompiled(*this);
+                m = matchesRpnParam(cmd, input, msg, channelLow, channelHigh);
             }
             else
             {

@@ -232,6 +232,9 @@
     <ClCompile Include="..\..\..\Source\Mpe.cpp">
       <Filter>RouteMIDITests\Source</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\Source\ParamSelection.cpp">
+      <Filter>RouteMIDITests\Source</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\Source\Route.cpp">
       <Filter>RouteMIDITests\Source</Filter>
     </ClCompile>
@@ -1267,6 +1270,9 @@
       <Filter>RouteMIDITests\Source</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\Source\Mpe.h">
+      <Filter>RouteMIDITests\Source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Source\ParamSelection.h">
       <Filter>RouteMIDITests\Source</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\Source\Route.h">

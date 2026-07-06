@@ -201,7 +201,10 @@ struct ApplicationCommand
     // returns whether the message matches this filter (channel-aware for voice
     // messages); only meaningful when isFilter() is true and command_ != CHANNEL.
     // The channel context can be a single channel or an inclusive range; a low
-    // of 0 means "any channel".
+    // of 0 means "any channel". The stateful filters are matched in
+    // ApplicationState::passesFilters instead, where the per-input state lives:
+    // cc14range always, and nrpn/rpn when they carry a parameter number (here
+    // NRPN/RPN ignore any options and match all their traffic).
     bool matches(const ApplicationState& state, const MidiMessage& msg, int channel) const;
     bool matches(const ApplicationState& state, const MidiMessage& msg, int channelLow, int channelHigh) const;
 

@@ -172,7 +172,7 @@ routemidi [settings] in|vin <port> [commands ...] out|vout <port> [out ...] [in 
 
 **Argument parsing traps**
 
-* **Optional** arguments (the `on`/`off`/`pp`/`cc`/`cc14`/`pc` selectors, `latch` mode, `mono` priority, `vin`/`vout` names, `mpesplit` channel) end at the first token that spells a RouteMIDI command name: `on clock` is a note-on filter with *no* note plus a `clock` filter, not "note-on for a note called clock". Never place a value or port name that spells a command word in an optional position.
+* **Optional** arguments (the `on`/`off`/`pp`/`cc`/`cc14`/`nrpn`/`rpn`/`pc` selectors, `latch` mode, `mono` priority, `vin`/`vout` names, `mpesplit` channel) end at the first token that spells a RouteMIDI command name: `on clock` is a note-on filter with *no* note plus a `clock` filter, not "note-on for a note called clock". Never place a value or port name that spells a command word in an optional position.
 * **Fixed** arguments are the opposite: they are taken literally even when they spell a command name, so `in cc` names a port "cc" and `convert`'s type words parse fine.
 * `convert` is variable-length (`srctype [num] dsttype [num]`): `cc`, `cc14`, `rpn` and `nrpn` need a number, `pb`, `cp` and `pc` take none, and `pp` needs a note as a destination but may omit it as a source (meaning "any note").
 

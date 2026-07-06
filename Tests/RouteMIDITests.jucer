@@ -27,6 +27,8 @@
       <FILE id="src016" name="Mono.h" compile="0" resource="0" file="../Source/Mono.h"/>
       <FILE id="scp013" name="Mpe.cpp" compile="1" resource="0" file="../Source/Mpe.cpp"/>
       <FILE id="src013" name="Mpe.h" compile="0" resource="0" file="../Source/Mpe.h"/>
+      <FILE id="scp022" name="ParamSelection.cpp" compile="1" resource="0" file="../Source/ParamSelection.cpp"/>
+      <FILE id="src022" name="ParamSelection.h" compile="0" resource="0" file="../Source/ParamSelection.h"/>
       <FILE id="scp006" name="Route.cpp" compile="1" resource="0" file="../Source/Route.cpp"/>
       <FILE id="src006" name="Route.h" compile="0" resource="0" file="../Source/Route.h"/>
       <FILE id="src007" name="ScriptMidiMessageClass.cpp" compile="1" resource="0"

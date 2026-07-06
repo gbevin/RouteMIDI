@@ -190,9 +190,6 @@ State::State()
 {
     for (int c = 0; c < 16; ++c)
     {
-        selMsb[c] = -1;
-        selLsb[c] = -1;
-        selNrpn[c] = false;
         valMsb[c] = -1;
         rpn14Param[c][0] = -1;
         rpn14Param[c][1] = -1;
@@ -201,24 +198,8 @@ State::State()
 
 void State::trackSelect(int ch, int cc, int value)
 {
-    if (cc == 99 || cc == 101) selMsb[ch - 1] = value;
-    else                       selLsb[ch - 1] = value;
-    selNrpn[ch - 1] = (cc == 98 || cc == 99);
+    selection.trackSelect(ch, cc, value);
     valMsb[ch - 1] = -1;   // a (re)selection starts a fresh data-entry value
-}
-
-bool State::selectionActive(int ch) const
-{
-    // at least one real (non-127) select byte, not closed by a completed null
-    const int msb = selMsb[ch - 1];
-    const int lsb = selLsb[ch - 1];
-    return (msb >= 0 && msb < 127) || (lsb >= 0 && lsb < 127);
-}
-
-int State::selectedParam(int ch) const
-{
-    return (selMsb[ch - 1] >= 0 && selLsb[ch - 1] >= 0)
-         ? ((selMsb[ch - 1] << 7) | selLsb[ch - 1]) : -1;
 }
 
 //==============================================================================

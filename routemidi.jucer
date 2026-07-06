@@ -34,6 +34,8 @@
       <FILE id="sst001" name="Sustain.h" compile="0" resource="0" file="Source/Sustain.h"/>
       <FILE id="mpe002" name="Mpe.cpp" compile="1" resource="0" file="Source/Mpe.cpp"/>
       <FILE id="mpe001" name="Mpe.h" compile="0" resource="0" file="Source/Mpe.h"/>
+      <FILE id="psl002" name="ParamSelection.cpp" compile="1" resource="0" file="Source/ParamSelection.cpp"/>
+      <FILE id="psl001" name="ParamSelection.h" compile="0" resource="0" file="Source/ParamSelection.h"/>
       <FILE id="rte002" name="Route.cpp" compile="1" resource="0" file="Source/Route.cpp"/>
       <FILE id="lNEBkp" name="Route.h" compile="0" resource="0" file="Source/Route.h"/>
       <FILE id="M3By28" name="ScriptMidiMessageClass.cpp" compile="1" resource="0"

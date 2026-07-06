@@ -44,6 +44,7 @@
 		D771D8E54E276B98FD0A33B7 /* ConnectionTests.cpp */ = {isa = PBXBuildFile; fileRef = 65924251E6EE3E1631ABD10F; };
 		E29C9A1EF5BB8D1D3B6C498C /* CoreMIDI.framework */ = {isa = PBXBuildFile; fileRef = 9747DCCAE168EAC78BEF151F; };
 		E98F5C4DF0B5289D8508BF5E /* include_juce_data_structures.mm */ = {isa = PBXBuildFile; fileRef = CBCAA55F0C1ECBC887A0D89C; };
+		EECA3D96BFC965B8F3AF97C2 /* ParamSelection.cpp */ = {isa = PBXBuildFile; fileRef = CD0B28CB8892DB26AFCD1964; };
 		EF5C33AB30F8678B376DADD6 /* IOKit.framework */ = {isa = PBXBuildFile; fileRef = A2FAC055DFF5612A0E6DF715; };
 		F2921EFC236753D9737CE864 /* FilterTests.cpp */ = {isa = PBXBuildFile; fileRef = B42D5AC1744E0CB58FC6E8FC; };
 		F4F38ADABAA8E6527F1034FA /* ScriptUtilClass.cpp */ = {isa = PBXBuildFile; fileRef = A5EA823F7FEA65B96789F545; };
@@ -88,6 +89,7 @@
 		8550CDB432C879D848FB56A8 /* juce_events */ /* juce_events */ = {isa = PBXFileReference; lastKnownFileType = folder; name = juce_events; path = ../../../JuceLibraryCode/modules/juce_events; sourceTree = SOURCE_ROOT; };
 		858C4E14EDB3116872760EF7 /* include_juce_audio_basics.mm */ /* include_juce_audio_basics.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = include_juce_audio_basics.mm; path = ../../JuceLibraryCode/include_juce_audio_basics.mm; sourceTree = SOURCE_ROOT; };
 		87F102E2EC0E8251A8E360CD /* TestRunner.cpp */ /* TestRunner.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = TestRunner.cpp; path = ../../TestRunner.cpp; sourceTree = SOURCE_ROOT; };
+		89A128BF6EF0C088BFD9EBA7 /* ParamSelection.h */ /* ParamSelection.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ParamSelection.h; path = ../../../Source/ParamSelection.h; sourceTree = SOURCE_ROOT; };
 		8C407C921E9D90D075A9F113 /* Cocoa.framework */ /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = System/Library/Frameworks/Cocoa.framework; sourceTree = SDKROOT; };
 		8D7FE2DBDB22E423320F9B00 /* ParsingTests.cpp */ /* ParsingTests.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = ParsingTests.cpp; path = ../../ParsingTests.cpp; sourceTree = SOURCE_ROOT; };
 		9152E34078D29A8AAE5EA0CB /* Accelerate.framework */ /* Accelerate.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Accelerate.framework; path = System/Library/Frameworks/Accelerate.framework; sourceTree = SDKROOT; };
@@ -111,6 +113,7 @@
 		BD7E02A8D06EAE2E568F40AF /* ApplicationState.h */ /* ApplicationState.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ApplicationState.h; path = ../../../Source/ApplicationState.h; sourceTree = SOURCE_ROOT; };
 		C4565C4CAD211D9D0F83914B /* TestHelpers.h */ /* TestHelpers.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = TestHelpers.h; path = ../../TestHelpers.h; sourceTree = SOURCE_ROOT; };
 		CBCAA55F0C1ECBC887A0D89C /* include_juce_data_structures.mm */ /* include_juce_data_structures.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = include_juce_data_structures.mm; path = ../../JuceLibraryCode/include_juce_data_structures.mm; sourceTree = SOURCE_ROOT; };
+		CD0B28CB8892DB26AFCD1964 /* ParamSelection.cpp */ /* ParamSelection.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = ParamSelection.cpp; path = ../../../Source/ParamSelection.cpp; sourceTree = SOURCE_ROOT; };
 		D0F544FD7B5F5B984731B658 /* ScriptMidiMessageClass.h */ /* ScriptMidiMessageClass.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ScriptMidiMessageClass.h; path = ../../../Source/ScriptMidiMessageClass.h; sourceTree = SOURCE_ROOT; };
 		D6B79E3760FBDA15756D3F4B /* juce_midi_ci */ /* juce_midi_ci */ = {isa = PBXFileReference; lastKnownFileType = folder; name = juce_midi_ci; path = ../../../JuceLibraryCode/modules/juce_midi_ci; sourceTree = SOURCE_ROOT; };
 		D7A4B858CA8DB24D5E8AC351 /* ApplicationCommand.cpp */ /* ApplicationCommand.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = ApplicationCommand.cpp; path = ../../../Source/ApplicationCommand.cpp; sourceTree = SOURCE_ROOT; };
@@ -200,6 +203,8 @@
 				72E9C82602A4CA1128EC1E47,
 				138310665B1A17D8E7369EE5,
 				623DB344C4CFD3EB80F45955,
+				CD0B28CB8892DB26AFCD1964,
+				89A128BF6EF0C088BFD9EBA7,
 				9F5AEB82081E9A38F1264736,
 				7599A4D720B561530820F5F1,
 				15000DBCB5EC2B5BA4195BCC,
@@ -350,6 +355,7 @@
 				A3B9BC5C447988F23E5790DC,
 				88355088AF136AABF19AA0A7,
 				2D657955D4DAE23E5C6873D0,
+				EECA3D96BFC965B8F3AF97C2,
 				96AAA8BFCB702B88FCDAFAC3,
 				82DF81C1BC6991A526BF18D8,
 				A7FA9EC6C18D00912F9249DE,

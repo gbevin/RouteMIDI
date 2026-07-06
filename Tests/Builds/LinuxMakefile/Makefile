@@ -80,6 +80,7 @@ OBJECTS_CONSOLEAPP := \
   $(JUCE_OBJDIR)/Latch_d69170d4.o \
   $(JUCE_OBJDIR)/Mono_cdd7cedd.o \
   $(JUCE_OBJDIR)/Mpe_31077172.o \
+  $(JUCE_OBJDIR)/ParamSelection_3b4bb39.o \
   $(JUCE_OBJDIR)/Route_503ad659.o \
   $(JUCE_OBJDIR)/ScriptMidiMessageClass_3119217.o \
   $(JUCE_OBJDIR)/ScriptOscClass_3ed124de.o \
@@ -156,6 +157,11 @@ $(JUCE_OBJDIR)/Mono_cdd7cedd.o: ../../../Source/Mono.cpp
 $(JUCE_OBJDIR)/Mpe_31077172.o: ../../../Source/Mpe.cpp
 	-$(V_AT)mkdir -p $(@D)
 	@echo "Compiling Mpe.cpp"
+	$(V_AT)$(CXX) $(JUCE_CXXFLAGS) $(JUCE_CPPFLAGS_CONSOLEAPP) $(JUCE_CFLAGS_CONSOLEAPP) -o "$@" -c "$<"
+
+$(JUCE_OBJDIR)/ParamSelection_3b4bb39.o: ../../../Source/ParamSelection.cpp
+	-$(V_AT)mkdir -p $(@D)
+	@echo "Compiling ParamSelection.cpp"
 	$(V_AT)$(CXX) $(JUCE_CXXFLAGS) $(JUCE_CPPFLAGS_CONSOLEAPP) $(JUCE_CFLAGS_CONSOLEAPP) -o "$@" -c "$<"
 
 $(JUCE_OBJDIR)/Route_503ad659.o: ../../../Source/Route.cpp

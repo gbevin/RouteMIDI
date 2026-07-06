@@ -73,7 +73,7 @@ names and protocol version may change between RouteMIDI releases)
 
 **Optional argument traps**
 
-- Optional arguments (`on`/`off`/`pp`/`cc`/`cc14`/`pc` selectors, `latch` mode,
+- Optional arguments (`on`/`off`/`pp`/`cc`/`cc14`/`nrpn`/`rpn`/`pc` selectors, `latch` mode,
   `mono` priority, `vin`/`vout` names, `mpesplit` channel) end at the first
   token that spells a RouteMIDI command name: `on clock` is a note-on filter
   with NO note plus a clock filter, not "note-on for a note called clock".

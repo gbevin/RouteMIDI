@@ -313,6 +313,243 @@ public:
             expect(  nrpn.matches(state, MidiMessage::controllerEvent(1, 38, 0), 0));
             expect(  rpn.matches(state, MidiMessage::controllerEvent(1, 38, 0), 0));
         }
+
+        beginTest("nrpn/rpn filter by a specific parameter number");
+        {
+            // nrpn 1000 (MSB 7, LSB 104): pass only that parameter's select and
+            // its shared data-entry controllers, tracking the selection per input
+            Route route;
+            RouteInput sel;
+            route.filters.add(makeCommand(NRPN, {"1000"}));
+
+            expect(  state.passesFilters(route, sel, MidiMessage::controllerEvent(1, 99, 7)));    // select MSB
+            expect(  state.passesFilters(route, sel, MidiMessage::controllerEvent(1, 98, 104)));  // select LSB
+            expect(  state.passesFilters(route, sel, MidiMessage::controllerEvent(1, 6, 50)));    // data MSB
+            expect(  state.passesFilters(route, sel, MidiMessage::controllerEvent(1, 38, 20)));   // data LSB
+
+            // selecting a neighbouring parameter blocks its select and data
+            expect(! state.passesFilters(route, sel, MidiMessage::controllerEvent(1, 99, 5)));    // other MSB
+            expect(! state.passesFilters(route, sel, MidiMessage::controllerEvent(1, 98, 5)));    // completes 645, not 1000
+            expect(! state.passesFilters(route, sel, MidiMessage::controllerEvent(1, 6, 99)));    // its data blocked
+
+            // an RPN with the same number is different traffic and stays blocked
+            expect(! state.passesFilters(route, sel, MidiMessage::controllerEvent(1, 101, 7)));   // RPN MSB
+            expect(! state.passesFilters(route, sel, MidiMessage::controllerEvent(1, 100, 104))); // RPN 1000, but RPN
+            expect(! state.passesFilters(route, sel, MidiMessage::controllerEvent(1, 6, 50)));    // RPN data, not NRPN
+
+            // rpn 0, the pitch-bend-sensitivity parameter
+            Route r;
+            RouteInput rs;
+            r.filters.add(makeCommand(RPN, {"0"}));
+            expect(  state.passesFilters(r, rs, MidiMessage::controllerEvent(1, 101, 0)));  // RPN 0 MSB
+            expect(  state.passesFilters(r, rs, MidiMessage::controllerEvent(1, 100, 0)));  // RPN 0 LSB
+            expect(  state.passesFilters(r, rs, MidiMessage::controllerEvent(1, 6, 12)));   // its data passes
+            // NRPN 0 is a different selection, so its data is blocked by rpn 0
+            expect(! state.passesFilters(r, rs, MidiMessage::controllerEvent(1, 99, 0)));
+            expect(! state.passesFilters(r, rs, MidiMessage::controllerEvent(1, 98, 0)));
+            expect(! state.passesFilters(r, rs, MidiMessage::controllerEvent(1, 6, 12)));
+
+            // the selection is per channel: channel 2 has none of channel 1's
+            Route c;
+            RouteInput cs;
+            c.filters.add(makeCommand(NRPN, {"1000"}));
+            expect(  state.passesFilters(c, cs, MidiMessage::controllerEvent(1, 99, 7)));
+            expect(  state.passesFilters(c, cs, MidiMessage::controllerEvent(1, 98, 104)));
+            expect(  state.passesFilters(c, cs, MidiMessage::controllerEvent(1, 6, 50)));   // channel 1 data passes
+            expect(! state.passesFilters(c, cs, MidiMessage::controllerEvent(2, 6, 50)));   // channel 2 has no selection
+        }
+
+        beginTest("the (N)RPN null passes as deselect framing and ends the selection");
+        {
+            // a complete RPN transmission ends with the 127/127 null (the same
+            // framing conversion::emitRpn generates); a parameter filter passes
+            // the null so the downstream deselection stays intact
+            Route route;
+            RouteInput in;
+            route.filters.add(makeCommand(RPN, {"0"}));
+
+            expect(  state.passesFilters(route, in, MidiMessage::controllerEvent(1, 101, 0)));    // select RPN 0
+            expect(  state.passesFilters(route, in, MidiMessage::controllerEvent(1, 100, 0)));
+            expect(  state.passesFilters(route, in, MidiMessage::controllerEvent(1, 6, 12)));     // its data
+            expect(  state.passesFilters(route, in, MidiMessage::controllerEvent(1, 101, 127)));  // closing null MSB
+            expect(  state.passesFilters(route, in, MidiMessage::controllerEvent(1, 100, 127)));  // closing null LSB
+
+            // the completed null ended the selection: no parameter's data matches
+            expect(! state.passesFilters(route, in, MidiMessage::controllerEvent(1, 6, 12)));
+            expect(! state.passesFilters(route, in, MidiMessage::controllerEvent(1, 38, 1)));
+
+            // the null of the other select family stays blocked (rpn vs nrpn)
+            expect(! state.passesFilters(route, in, MidiMessage::controllerEvent(1, 99, 127)));
+            expect(! state.passesFilters(route, in, MidiMessage::controllerEvent(1, 98, 127)));
+
+            // a parameter whose select bytes include 127 is still matchable:
+            // nrpn 127 is MSB 0 with LSB 127, which is not the completed null
+            Route edge;
+            RouteInput es;
+            edge.filters.add(makeCommand(NRPN, {"127"}));
+            expect(  state.passesFilters(edge, es, MidiMessage::controllerEvent(1, 99, 0)));      // select MSB
+            expect(  state.passesFilters(edge, es, MidiMessage::controllerEvent(1, 98, 127)));    // select LSB
+            expect(  state.passesFilters(edge, es, MidiMessage::controllerEvent(1, 6, 30)));      // its data
+        }
+
+        beginTest("the (N)RPN selection is tracked before any filter exists");
+        {
+            // a route can start without filters and gain an "nrpn N" filter over
+            // MCP later; the selection made in the meantime must already be known
+            Route route;
+            RouteInput in;
+            expect(  state.passesFilters(route, in, MidiMessage::controllerEvent(1, 99, 7)));     // no filters: passes
+            expect(  state.passesFilters(route, in, MidiMessage::controllerEvent(1, 98, 104)));   // and is tracked
+
+            route.filters.add(makeCommand(NRPN, {"1000"}));
+            expect(  state.passesFilters(route, in, MidiMessage::controllerEvent(1, 6, 50)));     // data matches at once
+        }
+
+        beginTest("several nrpn parameters whitelist together");
+        {
+            // filters OR-combine, so nrpn 1000 + nrpn 2000 passes both parameters
+            Route route;
+            RouteInput in;
+            route.filters.add(makeCommand(NRPN, {"1000"}));   // MSB 7,  LSB 104
+            route.filters.add(makeCommand(NRPN, {"2000"}));   // MSB 15, LSB 80
+
+            expect(  state.passesFilters(route, in, MidiMessage::controllerEvent(1, 99, 7)));    // NRPN 1000
+            expect(  state.passesFilters(route, in, MidiMessage::controllerEvent(1, 98, 104)));
+            expect(  state.passesFilters(route, in, MidiMessage::controllerEvent(1, 6, 10)));
+            expect(  state.passesFilters(route, in, MidiMessage::controllerEvent(1, 99, 15)));   // NRPN 2000
+            expect(  state.passesFilters(route, in, MidiMessage::controllerEvent(1, 98, 80)));
+            expect(  state.passesFilters(route, in, MidiMessage::controllerEvent(1, 6, 20)));
+            expect(! state.passesFilters(route, in, MidiMessage::controllerEvent(1, 99, 23)));   // NRPN 3000, neither
+            expect(! state.passesFilters(route, in, MidiMessage::controllerEvent(1, 98, 56)));
+            expect(! state.passesFilters(route, in, MidiMessage::controllerEvent(1, 6, 30)));
+        }
+
+        beginTest("nrpn and rpn parameter filters share CC 6/38 by selection");
+        {
+            // nrpn 1000 + rpn 0: the shared data entry follows whichever was
+            // selected last, even when the two are interleaved
+            Route route;
+            RouteInput in;
+            route.filters.add(makeCommand(NRPN, {"1000"}));
+            route.filters.add(makeCommand(RPN, {"0"}));
+
+            expect(  state.passesFilters(route, in, MidiMessage::controllerEvent(1, 99, 7)));    // NRPN 1000
+            expect(  state.passesFilters(route, in, MidiMessage::controllerEvent(1, 98, 104)));
+            expect(  state.passesFilters(route, in, MidiMessage::controllerEvent(1, 6, 11)));    // NRPN 1000 data
+            expect(  state.passesFilters(route, in, MidiMessage::controllerEvent(1, 101, 0)));   // switch to RPN 0
+            expect(  state.passesFilters(route, in, MidiMessage::controllerEvent(1, 100, 0)));
+            expect(  state.passesFilters(route, in, MidiMessage::controllerEvent(1, 6, 12)));    // now RPN 0 data
+
+            // interleave a fresh NRPN 1000 select, then an RPN 0 select before data:
+            // the data belongs to RPN 0, the selection that stuck
+            expect(  state.passesFilters(route, in, MidiMessage::controllerEvent(1, 99, 7)));
+            expect(  state.passesFilters(route, in, MidiMessage::controllerEvent(1, 98, 104)));
+            expect(  state.passesFilters(route, in, MidiMessage::controllerEvent(1, 101, 0)));
+            expect(  state.passesFilters(route, in, MidiMessage::controllerEvent(1, 100, 0)));
+            expect(  state.passesFilters(route, in, MidiMessage::controllerEvent(1, 6, 9)));      // RPN 0 data
+
+            // a parameter neither filter wants is blocked
+            expect(! state.passesFilters(route, in, MidiMessage::controllerEvent(1, 99, 15)));    // NRPN 2000
+            expect(! state.passesFilters(route, in, MidiMessage::controllerEvent(1, 98, 80)));
+            expect(! state.passesFilters(route, in, MidiMessage::controllerEvent(1, 6, 5)));
+        }
+
+        beginTest("nrpn parameter filter coexists with plain CC and cc14 without cross-talk");
+        {
+            // nrpn 1000 + cc 7 + cc14 10: each passes its own traffic, and the
+            // unrelated CC / 14-bit messages don't corrupt the (N)RPN selection
+            Route route;
+            RouteInput in;
+            route.filters.add(makeCommand(NRPN, {"1000"}));
+            route.filters.add(makeCommand(CONTROL_CHANGE, {"7"}));
+            route.filters.add(makeCommand(CONTROL_CHANGE_14BIT, {"10"}));   // CC 10 + CC 42
+
+            expect(  state.passesFilters(route, in, MidiMessage::controllerEvent(1, 7, 64)));    // plain CC 7
+            expect(! state.passesFilters(route, in, MidiMessage::controllerEvent(1, 8, 64)));    // CC 8 blocked
+            expect(  state.passesFilters(route, in, MidiMessage::controllerEvent(1, 10, 100)));  // cc14 10 MSB
+            expect(  state.passesFilters(route, in, MidiMessage::controllerEvent(1, 42, 20)));   // cc14 10 LSB
+
+            // select NRPN 1000, then push CC 7 and a cc14 10 completion between the
+            // select and its data; the data still passes as NRPN 1000
+            expect(  state.passesFilters(route, in, MidiMessage::controllerEvent(1, 99, 7)));
+            expect(  state.passesFilters(route, in, MidiMessage::controllerEvent(1, 98, 104)));
+            expect(  state.passesFilters(route, in, MidiMessage::controllerEvent(1, 7, 70)));     // unrelated CC
+            expect(  state.passesFilters(route, in, MidiMessage::controllerEvent(1, 10, 90)));    // unrelated cc14
+            expect(  state.passesFilters(route, in, MidiMessage::controllerEvent(1, 42, 30)));
+            expect(  state.passesFilters(route, in, MidiMessage::controllerEvent(1, 6, 15)));     // NRPN 1000 data
+            expect(  state.passesFilters(route, in, MidiMessage::controllerEvent(1, 38, 25)));
+
+            // a different NRPN's data is still blocked despite the coexisting filters
+            expect(! state.passesFilters(route, in, MidiMessage::controllerEvent(1, 99, 15)));    // select NRPN 2000
+            expect(! state.passesFilters(route, in, MidiMessage::controllerEvent(1, 98, 80)));
+            expect(! state.passesFilters(route, in, MidiMessage::controllerEvent(1, 6, 5)));
+        }
+
+        beginTest("a cc14 filter on CC 6 claims the shared data entry unconditionally");
+        {
+            // cc14 6 uses CC 6/38, which overlap the (N)RPN data entry; being a
+            // positive filter it passes them whatever parameter is selected, so
+            // combined with nrpn 1000 the data always passes (whitelist OR)
+            Route route;
+            RouteInput in;
+            route.filters.add(makeCommand(NRPN, {"1000"}));
+            route.filters.add(makeCommand(CONTROL_CHANGE_14BIT, {"6"}));
+
+            expect(! state.passesFilters(route, in, MidiMessage::controllerEvent(1, 99, 15)));   // select NRPN 2000
+            expect(! state.passesFilters(route, in, MidiMessage::controllerEvent(1, 98, 80)));
+            expect(  state.passesFilters(route, in, MidiMessage::controllerEvent(1, 6, 30)));    // passes via cc14 6
+            expect(  state.passesFilters(route, in, MidiMessage::controllerEvent(1, 38, 40)));   // passes via cc14 6
+        }
+
+        beginTest("negated nrpn/rpn parameter filters block just that parameter");
+        {
+            // "not nrpn 1000" alone blocks only NRPN 1000, passing everything else
+            {
+                Route route;
+                RouteInput in;
+                ApplicationCommand notN = makeCommand(NRPN, {"1000"});
+                notN.negate_ = true;
+                route.filters.add(notN);
+                expect(! state.passesFilters(route, in, MidiMessage::controllerEvent(1, 99, 7)));    // NRPN 1000 blocked
+                expect(! state.passesFilters(route, in, MidiMessage::controllerEvent(1, 98, 104)));
+                expect(! state.passesFilters(route, in, MidiMessage::controllerEvent(1, 6, 10)));
+                expect(  state.passesFilters(route, in, MidiMessage::controllerEvent(1, 99, 15)));    // NRPN 2000 passes
+                expect(  state.passesFilters(route, in, MidiMessage::controllerEvent(1, 98, 80)));
+                expect(  state.passesFilters(route, in, MidiMessage::controllerEvent(1, 6, 20)));
+                expect(  state.passesFilters(route, in, MidiMessage::noteOn(1, 60, (uint8)100)));      // notes pass
+            }
+
+            // "nrpn" plus "not nrpn 1000" passes every NRPN parameter except 1000
+            {
+                Route route;
+                RouteInput in;
+                route.filters.add(makeCommand(NRPN));
+                ApplicationCommand notN = makeCommand(NRPN, {"1000"});
+                notN.negate_ = true;
+                route.filters.add(notN);
+                expect(  state.passesFilters(route, in, MidiMessage::controllerEvent(1, 99, 15)));    // NRPN 2000 passes
+                expect(  state.passesFilters(route, in, MidiMessage::controllerEvent(1, 98, 80)));
+                expect(  state.passesFilters(route, in, MidiMessage::controllerEvent(1, 6, 20)));
+                expect(! state.passesFilters(route, in, MidiMessage::controllerEvent(1, 99, 7)));      // NRPN 1000 blocked
+                expect(! state.passesFilters(route, in, MidiMessage::controllerEvent(1, 98, 104)));
+                expect(! state.passesFilters(route, in, MidiMessage::controllerEvent(1, 6, 10)));
+                expect(! state.passesFilters(route, in, MidiMessage::noteOn(1, 60, (uint8)100)));      // positive nrpn excludes notes
+            }
+
+            // "not rpn 0" blocks the pitch-bend-sensitivity RPN, passes NRPN and notes
+            {
+                Route route;
+                RouteInput in;
+                ApplicationCommand notR = makeCommand(RPN, {"0"});
+                notR.negate_ = true;
+                route.filters.add(notR);
+                expect(! state.passesFilters(route, in, MidiMessage::controllerEvent(1, 101, 0)));   // RPN 0 blocked
+                expect(! state.passesFilters(route, in, MidiMessage::controllerEvent(1, 100, 0)));
+                expect(! state.passesFilters(route, in, MidiMessage::controllerEvent(1, 6, 12)));
+                expect(  state.passesFilters(route, in, MidiMessage::controllerEvent(1, 99, 7)));      // NRPN traffic passes
+                expect(  state.passesFilters(route, in, MidiMessage::noteOn(1, 60, (uint8)100)));
+            }
+        }
     }
 };
 

@@ -72,8 +72,8 @@ Filters:
   pp          (note)     Pass Poly Pressure, optionally for note (0-127)
   cc          (number)   Pass Control Change, optionally for controller (0-127)
   cc14        (number)   Pass 14-bit CC, optionally for MSB controller (0-31)
-  nrpn                   Pass NRPN traffic (CC 6, 38, 98, 99)
-  rpn                    Pass RPN traffic (CC 6, 38, 100, 101)
+  nrpn        (number)   Pass NRPN traffic, optionally for parameter (0-16383)
+  rpn         (number)   Pass RPN traffic, optionally for parameter (0-16383)
   pc          (number)   Pass Program Change, optionally for program (0-127)
   cp                     Pass Channel Pressure
   pb                     Pass Pitch Bend
@@ -315,7 +315,7 @@ The `noterange` and `velrange` filters pass notes within a note or velocity rang
 
 The `ccrange` filter is the same idea for a controller: it passes a Control Change only when its value falls within a `low high` window, so `ccrange 1 64 127` lets the modulation wheel through only in its upper half. As always, `not ccrange 1 64 127` inverts it (blocking that window and passing everything else). `cc14range` does the same for a 14-bit CC with a 0-16383 window: it remembers the controller's MSB per channel, judges each LSB with the exact assembled value (an MSB half on its own counts as value MSBx128), and passes or blocks both halves of the pair.
 
-The `cc14`, `nrpn` and `rpn` filters match the constituent Control Change messages of a 14-bit CC, an NRPN or an RPN. `cc14` without a number passes every 14-bit-capable controller (MSB 0-31 together with its LSB 32-63), or with a number just that MSB controller and its LSB. `nrpn` passes the NRPN traffic (CC 98, 99 plus the data-entry CC 6, 38) and `rpn` the RPN traffic (CC 100, 101 plus CC 6, 38).
+The `cc14`, `nrpn` and `rpn` filters match the constituent Control Change messages of a 14-bit CC, an NRPN or an RPN. `cc14` without a number passes every 14-bit-capable controller (MSB 0-31 together with its LSB 32-63), or with a number just that MSB controller and its LSB. `nrpn` passes the NRPN traffic (CC 98, 99 plus the data-entry CC 6, 38) and `rpn` the RPN traffic (CC 100, 101 plus CC 6, 38). Both also take an optional parameter number (0-16383) to pass only one parameter's traffic: RouteMIDI follows the parameter selection per channel, so the shared data-entry CC 6 and 38 are matched only while that parameter is the one selected (`nrpn 1000` isolates NRPN 1000, `rpn 0` the pitch-bend-sensitivity RPN). The deselecting (N)RPN null (select bytes of 127) always passes as framing and ends the selection, so a complete transmission keeps its closing null and nothing matches after it.
 
 The `inscale` filter passes only the notes that belong to a key, taking a root and a scale name from the [same list as the `scale` transform](#transforms). It's the filtering counterpart of `scale`: where `scale` bends stray notes onto the nearest scale note, `inscale` simply drops them (and `not inscale` keeps only the out-of-key notes). It matches note-ons, note-offs and poly pressure together, so a note that passes is always released.
 
@@ -324,6 +324,7 @@ routemidi in "Keyboard" note out "Synth"            # only note messages
 routemidi in "Keyboard" not clock out "Synth"       # everything except clock
 routemidi in "Keyboard" ch 1 cc 1 out "Synth"       # only CC 1 on channel 1
 routemidi in "Knobs" rpn out "Synth"                # only RPN traffic
+routemidi in "Knobs" nrpn 1000 out "Synth"          # only NRPN 1000's traffic
 routemidi in "Keyboard" inscale C major out "Synth" # only notes in C major
 routemidi in "Wheel" ccrange 1 64 127 out "Synth"   # mod wheel only in its top half
 routemidi in "Fader" cc14range 7 8192 16383 out "A" # 14-bit fader, upper half only

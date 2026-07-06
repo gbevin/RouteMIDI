@@ -241,6 +241,9 @@
     <ClCompile Include="..\..\Source\Mpe.cpp">
       <Filter>routemidi\Source</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Source\ParamSelection.cpp">
+      <Filter>routemidi\Source</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Source\Route.cpp">
       <Filter>routemidi\Source</Filter>
     </ClCompile>
@@ -1249,6 +1252,9 @@
       <Filter>routemidi\Source</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Source\Mpe.h">
+      <Filter>routemidi\Source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\ParamSelection.h">
       <Filter>routemidi\Source</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Source\Route.h">

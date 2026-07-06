@@ -22,6 +22,7 @@
 
 #include "ApplicationCommand.h"
 #include "BitScaling.h"
+#include "ParamSelection.h"
 
 // Inter-conversion between controller value types. cc, cc14, rpn and nrpn take a
 // number selecting which controller or parameter; pp takes a note number (which
@@ -174,17 +175,17 @@ struct State
     State();
 
     // --- (N)RPN parameter selection, tracked for every stream ----------------
-    // CC 99/101 carry the select MSB and 98/100 the LSB; a 127 byte clears its
-    // half, so a completed null (127/127) ends the selection. While a selection
-    // is active, CC 6/38/96/97 are (N)RPN data for the selected parameter;
-    // outside one they are plain (14-bit) controllers.
-    void trackSelect(int ch, int cc, int value);   // also resets the data-entry MSB
-    bool selectionActive(int ch) const;
-    int  selectedParam(int ch) const;              // -1 until both halves are known
-    bool selectionIsNrpn(int ch) const { return selNrpn[ch - 1]; }
+    // While a selection is active, CC 6/38/96/97 are (N)RPN data for the
+    // selected parameter; outside one they are plain (14-bit) controllers. The
+    // tracking itself lives in ParamSelection (shared with the nrpn/rpn
+    // parameter filters); trackSelect also resets the data-entry MSB, since a
+    // (re)selection starts a fresh data-entry value
+    void trackSelect(int ch, int cc, int value);
+    bool selectionActive(int ch) const { return selection.active(ch); }
+    int  selectedParam(int ch) const   { return selection.param(ch); }
+    bool selectionIsNrpn(int ch) const { return selection.isNrpn(ch); }
 
-    int  selMsb[16], selLsb[16];    // last select bytes seen, -1 = never
-    bool selNrpn[16];               // whether the selection came in via 98/99
+    ParamSelection selection;       // the stream's (N)RPN parameter selection
 
     // --- raw select CCs awaiting classification ------------------------------
     // buffered until their MSB+LSB pair is complete, then either dropped (the

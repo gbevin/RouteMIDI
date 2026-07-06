@@ -25,6 +25,7 @@
 #include "Latch.h"
 #include "Mono.h"
 #include "Mpe.h"
+#include "ParamSelection.h"
 #include "Sustain.h"
 
 // A single MIDI input port of a route.
@@ -44,6 +45,11 @@ struct RouteInput
     // filter can assemble the 14-bit value its range test needs (its own
     // memory, separate from the converter stage's pairing state)
     uint8 cc14RangeMsb[16][32] {};
+
+    // (N)RPN parameter selection for the "nrpn N" / "rpn N" filters (its own
+    // instance, separate from the converter stage's, because the filter stage
+    // observes the raw input stream and the converter the transformed one)
+    ParamSelection rpnFilter;
 
     // per-zone state (indexed [0] = Lower, [1] = Upper) so a Lower-zone and an
     // Upper-zone operation can run on the same input without sharing state
