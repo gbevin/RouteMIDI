@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<JUCERPROJECT id="RmTst1" name="RouteMIDITests" projectType="consoleapp" version="0.9.5"
+<JUCERPROJECT id="RmTst1" name="RouteMIDITests" projectType="consoleapp" version="0.9.6"
               bundleIdentifier="com.uwyn.routemiditests" includeBinaryInAppConfig="1"
               companyName="Uwyn" companyWebsite="http://www.uwyn.com" companyEmail="info@uwyn.com"
               displaySplashScreen="1" reportAppUsage="1" splashScreenColour="Dark"
