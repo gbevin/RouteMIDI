@@ -95,6 +95,11 @@ inherit the shell `PATH`, so a bare name wouldn't resolve for them):
   you can review it. Restart the client afterwards.
 - For **Claude Code**, `claude mcp add routemidi -- routemidi --mcp` registers the
   same server in one command.
+- For **Codex** (the CLI and IDE extension, which run local stdio servers like
+  this one), `codex mcp add routemidi -- routemidi --mcp` does the same. Its
+  configuration is TOML at `~/.codex/config.toml`, a different shape from the
+  `mcpServers` JSON above, so `--install-mcp` doesn't target it — its own command
+  is the reliable path.
 - For **Claude Desktop**, a per-platform MCP Bundle (`.mcpb`) is attached to each
   GitHub release; the user installs RouteMIDI by double-clicking it, with no
   configuration file to edit at all. The `extension/` folder holds the manifest
