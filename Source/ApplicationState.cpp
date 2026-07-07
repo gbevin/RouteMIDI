@@ -306,9 +306,11 @@ void ApplicationState::initialise(JUCEApplicationBase& app)
         app.systemRequestedQuit();
         return;
     }
-    else if (cmdLineParams.size() == 1 && cmdLineParams[0] == "--print-mcp-config")
+    else if (cmdLineParams[0] == "--print-mcp-config"
+             && (cmdLineParams.size() == 1 || cmdLineParams.size() == 2))
     {
-        printMcpConfig();
+        const String client = cmdLineParams.size() == 2 ? cmdLineParams[1] : String();
+        printMcpConfig(client);
         app.systemRequestedQuit();
         return;
     }
@@ -1848,9 +1850,18 @@ static String currentExecutablePath()
     return File::getSpecialLocation(File::currentExecutableFile).getFullPathName();
 }
 
-void ApplicationState::printMcpConfig()
+void ApplicationState::printMcpConfig(const String& client)
 {
-    std::cout << mcpconfig::serverBlock(currentExecutablePath()) << std::endl;
+    const String block = mcpconfig::serverBlock(currentExecutablePath(), client);
+    if (block.isEmpty())
+    {
+        std::cerr << "Unknown MCP client \"" << client << "\"; supported: "
+                  << mcpconfig::supportedClients().joinIntoString(", ") << std::endl;
+    }
+    else
+    {
+        std::cout << block << std::endl;
+    }
 }
 
 void ApplicationState::installMcpConfig(const String& client)
@@ -1860,11 +1871,10 @@ void ApplicationState::installMcpConfig(const String& client)
     if (result.wasOk())
     {
         std::cout << summary << std::endl;
-        std::cout << "Restart the client to pick up RouteMIDI." << std::endl;
     }
     else
     {
-        std::cerr << "Couldn't install the MCP configuration: "
+        std::cerr << "Couldn't set up the MCP configuration: "
                   << result.getErrorMessage() << std::endl;
     }
 }
@@ -2082,8 +2092,8 @@ void ApplicationState::printUsage()
               << note("AI agents. Use \"--mcp\" to let MCP clients control RouteMIDI over stdio.") << std::endl;
     std::cout << "These two features are experimental and fast-moving: their JSON and the MCP" << std::endl
               << "tools may change between releases. See AI.md for details." << std::endl;
-    std::cout << note("Run \"--install-mcp\" to add RouteMIDI to a local AI client (Claude Desktop,") << std::endl
-              << note("Cursor), or \"--print-mcp-config\" for the block to paste elsewhere.") << std::endl;
+    std::cout << note("Both take a client (e.g. \"cursor\", \"codex\"): \"--print-mcp-config\" prints the") << std::endl
+              << note("block in that client's format, \"--install-mcp\" sets it up. See AI.md.") << std::endl;
     std::cout << std::endl;
     std::cout << ansi::paint(ansi::label, "Long command names:") << std::endl << std::endl;
     std::cout << "Each command can also be written with its long name instead of the short one:" << std::endl << std::endl;

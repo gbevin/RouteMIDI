@@ -86,20 +86,20 @@ RouteMIDI can write this configuration for you, so `command` points at the
 absolute path of the running binary (GUI clients such as Claude Desktop don't
 inherit the shell `PATH`, so a bare name wouldn't resolve for them):
 
-- `routemidi --print-mcp-config` prints the block above with the path filled in,
-  to pipe or paste wherever a client wants it.
-- `routemidi --install-mcp <client>` merges the entry into a known client's
-  configuration file in place, creating it if needed and preserving any servers
-  already there. Supported clients are `claude-desktop` and `cursor`; it refuses
-  to touch a configuration file it can't parse, and reports the path it wrote so
-  you can review it. Restart the client afterwards.
-- For **Claude Code**, `claude mcp add routemidi -- routemidi --mcp` registers the
-  same server in one command.
-- For **Codex** (the CLI and IDE extension, which run local stdio servers like
-  this one), `codex mcp add routemidi -- routemidi --mcp` does the same. Its
-  configuration is TOML at `~/.codex/config.toml`, a different shape from the
-  `mcpServers` JSON above, so `--install-mcp` doesn't target it — its own command
-  is the reliable path.
+- `routemidi --print-mcp-config [client]` prints the entry in a client's own
+  format: the JSON block above by default (and for `claude-desktop`, `cursor` and
+  `claude-code`), or the TOML table for `codex`. Pipe or paste it wherever the
+  client wants it.
+- `routemidi --install-mcp <client>` sets a client up. For a JSON client
+  (`claude-desktop`, `cursor`) it merges the entry into the configuration file in
+  place, creating it if needed, preserving any servers already there, and refusing
+  to touch a file it can't parse; it reports the path so you can review it, then
+  restart the client. For a client that ships its own command (`codex`,
+  `claude-code`) it prints that command to run instead of editing an unfamiliar
+  file — `codex mcp add routemidi -- routemidi --mcp` and
+  `claude mcp add routemidi -- routemidi --mcp` respectively. RouteMIDI prints
+  Codex's TOML but doesn't rewrite it, since its config lives as TOML at
+  `~/.codex/config.toml`.
 - For **Claude Desktop**, a per-platform MCP Bundle (`.mcpb`) is attached to each
   GitHub release; the user installs RouteMIDI by double-clicking it, with no
   configuration file to edit at all. The `extension/` folder holds the manifest

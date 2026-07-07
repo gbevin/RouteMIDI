@@ -48,7 +48,7 @@ public:
     {
         const String exe = "/opt/homebrew/bin/routemidi";
 
-        beginTest("The server block names this binary running with --mcp");
+        beginTest("The default server block is JSON naming this binary with --mcp");
         {
             var block;
             const Result parsed = JSON::parse(mcpconfig::serverBlock(exe), block);
@@ -60,14 +60,61 @@ public:
             expectEquals(entry["args"][0].toString(), String("--mcp"));
         }
 
-        beginTest("Client names resolve to config paths, unknown ones don't");
+        beginTest("A JSON client gets the same JSON block");
+        {
+            expectEquals(mcpconfig::serverBlock(exe, "cursor"), mcpconfig::serverBlock(exe));
+            expectEquals(mcpconfig::serverBlock(exe, "claude-code"), mcpconfig::serverBlock(exe));
+        }
+
+        beginTest("Codex gets a TOML block in its own format");
+        {
+            const String block = mcpconfig::serverBlock(exe, "codex");
+            expect(block.contains("[mcp_servers.routemidi]"));
+            expect(block.contains("command = \"" + exe + "\""));
+            expect(block.contains("args = [\"--mcp\"]"));
+            // and it is TOML, not the JSON shape
+            expect(! block.contains("mcpServers"));
+        }
+
+        beginTest("A Windows path is escaped for the TOML basic string");
+        {
+            const String block = mcpconfig::serverBlock("C:\\Program Files\\routemidi.exe", "codex");
+            expect(block.contains("command = \"C:\\\\Program Files\\\\routemidi.exe\""));
+        }
+
+        beginTest("An unrecognized client yields no block");
+        {
+            expect(mcpconfig::serverBlock(exe, "nonesuch").isEmpty());
+        }
+
+        beginTest("Only JSON clients resolve to config paths");
         {
             expect(mcpconfig::configPathForClient("claude-desktop")
                        .getFileName() == "claude_desktop_config.json");
             expect(mcpconfig::configPathForClient("claude")
                        .getFileName() == "claude_desktop_config.json");
             expect(mcpconfig::configPathForClient("cursor").getFileName() == "mcp.json");
+            // clients managed by their own CLI have no file for us to write
+            expect(mcpconfig::configPathForClient("codex") == File());
+            expect(mcpconfig::configPathForClient("claude-code") == File());
             expect(mcpconfig::configPathForClient("nonesuch") == File());
+        }
+
+        beginTest("Installing a CLI-managed client reports its command, writes nothing");
+        {
+            String summary;
+            expect(mcpconfig::installToClient("codex", exe, summary).wasOk());
+            expect(summary.contains("codex mcp add routemidi -- routemidi --mcp"));
+
+            summary.clear();
+            expect(mcpconfig::installToClient("claude-code", exe, summary).wasOk());
+            expect(summary.contains("claude mcp add routemidi -- routemidi --mcp"));
+        }
+
+        beginTest("Installing an unknown client fails");
+        {
+            String summary;
+            expect(mcpconfig::installToClient("nonesuch", exe, summary).failed());
         }
 
         beginTest("Merging into a missing file creates the server entry");

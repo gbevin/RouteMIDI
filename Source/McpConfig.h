@@ -20,31 +20,40 @@
 
 #include "JuceHeader.h"
 
-// Helpers that let RouteMIDI register itself as an MCP server with the local
-// AI clients, so a user doesn't have to hand-edit JSON. --print-mcp-config
-// emits the block; --install-mcp merges it into a known client's config file.
+// Helpers that let RouteMIDI register itself as an MCP server with the local AI
+// clients, so a user doesn't have to hand-edit configuration. --print-mcp-config
+// emits the entry in a client's own format; --install-mcp either merges it into
+// a client's JSON configuration file or, for a client with its own command,
+// reports that command. Each known client declares its format and whether its
+// configuration is a JSON file RouteMIDI can safely round-trip or is managed by
+// the client's own CLI.
 namespace mcpconfig
 {
-    // the standalone "mcpServers" JSON block that points an MCP client at this
-    // binary running with --mcp, pretty-printed for pasting into a config file
-    String serverBlock(const String& exePath);
+    // The server entry that points an MCP client at this binary running with
+    // --mcp, in the given client's own configuration format, ready to paste. An
+    // empty client name yields the generic JSON "mcpServers" block. Returns an
+    // empty string for a client name that isn't recognized.
+    String serverBlock(const String& exePath, const String& client = {});
 
-    // the MCP clients --install-mcp knows how to write, for error messages and
-    // the help text
+    // Every client name --print-mcp-config and --install-mcp accept.
     StringArray supportedClients();
 
-    // the config file a client reads its MCP servers from, resolved for the
-    // current platform; an invalid File (see File::exists on the parent) when
-    // the client name isn't recognized
+    // The configuration file a JSON client reads its MCP servers from, resolved
+    // for the current platform; an invalid File (File()) for a client managed by
+    // its own CLI, or a name that isn't recognized.
     File configPathForClient(const String& client);
 
-    // merges a routemidi server entry into an MCP client config file in place,
-    // creating it if needed and preserving any servers already there. Fails
-    // without touching the file when it holds JSON that can't be parsed. On
-    // success, summary describes what changed for the user.
-    Result mergeConfigFile(const File& configFile, const String& exePath, String& summary);
-
-    // resolves the client's config path and merges the entry into it; fails with
-    // the list of supported clients when the name isn't recognized
+    // Performs --install-mcp for a client. For a JSON client it merges a
+    // routemidi entry into the configuration file in place, creating it if
+    // needed and preserving any servers already there. For a client with its own
+    // command it doesn't touch any file, filling summary with the command to run
+    // instead. Fails without writing anything for an unrecognized client or when
+    // a file it can't parse would be overwritten. On success, summary is the full
+    // message to show the user.
     Result installToClient(const String& client, const String& exePath, String& summary);
+
+    // Merges a routemidi server entry into a JSON "mcpServers" configuration file
+    // in place, preserving whatever else is there. Fails without touching the
+    // file when it holds JSON that can't be parsed. Exposed for testing.
+    Result mergeConfigFile(const File& configFile, const String& exePath, String& summary);
 }

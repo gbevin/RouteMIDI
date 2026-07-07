@@ -160,7 +160,7 @@ private:
 
     void printVersion();
     void printSchemaJson();
-    void printMcpConfig();
+    void printMcpConfig(const String& client);
     void installMcpConfig(const String& client);
     void printUsage();
     void initialiseScripting();

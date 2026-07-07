@@ -21,8 +21,57 @@
 namespace mcpconfig
 {
 
-// the { command, args:["--mcp"] } entry every supported client's config uses to
-// launch this binary as an MCP server
+// how a client's server entry is written
+enum class Format { json, toml };
+
+// how --install-mcp reaches a client: a JSON configuration file RouteMIDI can
+// safely parse and rewrite, or a command the client provides to register servers
+// itself (which RouteMIDI reports rather than editing an unfamiliar file)
+enum class Kind { jsonFile, cli };
+
+struct ClientInfo
+{
+    String  name;         // canonical name
+    String  displayName;  // for user-facing messages
+    Format  format;       // the format --print-mcp-config emits for it
+    Kind    kind;         // how --install-mcp handles it
+    String  cliCommand;   // the command to run, for a cli client
+};
+
+// the known clients; the first match on name or alias wins
+static bool lookupClient(const String& client, ClientInfo& out)
+{
+    const String n = client.trim().toLowerCase();
+
+    if (n == "claude-desktop" || n == "claude")
+    {
+        out = { "claude-desktop", "Claude Desktop", Format::json, Kind::jsonFile, {} };
+        return true;
+    }
+    if (n == "cursor")
+    {
+        out = { "cursor", "Cursor", Format::json, Kind::jsonFile, {} };
+        return true;
+    }
+    if (n == "codex")
+    {
+        // Codex's configuration is TOML, a format RouteMIDI can print but not
+        // safely round-trip, and it ships its own command, so --install-mcp
+        // reports that instead of editing ~/.codex/config.toml
+        out = { "codex", "Codex", Format::toml, Kind::cli,
+                "codex mcp add routemidi -- routemidi --mcp" };
+        return true;
+    }
+    if (n == "claude-code")
+    {
+        out = { "claude-code", "Claude Code", Format::json, Kind::cli,
+                "claude mcp add routemidi -- routemidi --mcp" };
+        return true;
+    }
+    return false;
+}
+
+// the { command, args:["--mcp"] } that launches this binary as an MCP server
 static var serverEntry(const String& exePath)
 {
     auto* entry = new DynamicObject();
@@ -35,7 +84,9 @@ static var serverEntry(const String& exePath)
     return var(entry);
 }
 
-String serverBlock(const String& exePath)
+// the JSON "mcpServers" block Claude Desktop, Cursor, Claude Code and most other
+// clients use
+static String jsonServerBlock(const String& exePath)
 {
     auto* servers = new DynamicObject();
     servers->setProperty("routemidi", serverEntry(exePath));
@@ -46,20 +97,56 @@ String serverBlock(const String& exePath)
     return JSON::toString(var(root));
 }
 
+// escapes a value for a TOML basic (double-quoted) string: backslash first so
+// the escapes it introduces aren't escaped again, then the quote
+static String tomlEscape(const String& s)
+{
+    return s.replace("\\", "\\\\").replace("\"", "\\\"");
+}
+
+// the TOML table Codex uses under ~/.codex/config.toml
+static String tomlServerBlock(const String& exePath)
+{
+    return "[mcp_servers.routemidi]" + String(newLine)
+         + "command = \"" + tomlEscape(exePath) + "\"" + newLine
+         + "args = [\"--mcp\"]";
+}
+
+String serverBlock(const String& exePath, const String& client)
+{
+    if (client.isNotEmpty())
+    {
+        ClientInfo info;
+        if (! lookupClient(client, info))
+        {
+            return {};
+        }
+        if (info.format == Format::toml)
+        {
+            return tomlServerBlock(exePath);
+        }
+    }
+    return jsonServerBlock(exePath);
+}
+
 StringArray supportedClients()
 {
-    return { "claude-desktop", "cursor" };
+    return { "claude-desktop", "cursor", "codex", "claude-code" };
 }
 
 File configPathForClient(const String& client)
 {
-    const String name = client.trim().toLowerCase();
+    ClientInfo info;
+    if (! lookupClient(client, info) || info.kind != Kind::jsonFile)
+    {
+        return {};
+    }
 
     // Claude Desktop keeps its MCP servers in claude_desktop_config.json under
     // the per-user application data directory, which JUCE maps to the right
     // place on each platform (~/Library/Application Support, %APPDATA%,
     // ~/.config).
-    if (name == "claude" || name == "claude-desktop")
+    if (info.name == "claude-desktop")
     {
         return File::getSpecialLocation(File::userApplicationDataDirectory)
                    .getChildFile("Claude")
@@ -68,7 +155,7 @@ File configPathForClient(const String& client)
 
     // Cursor reads global MCP servers from ~/.cursor/mcp.json, in the same
     // "mcpServers" shape.
-    if (name == "cursor")
+    if (info.name == "cursor")
     {
         return File::getSpecialLocation(File::userHomeDirectory)
                    .getChildFile(".cursor")
@@ -128,20 +215,29 @@ Result mergeConfigFile(const File& configFile, const String& exePath, String& su
 
     summary = (wasUpdate ? "Updated" : "Added")
               + String(" the routemidi MCP server in ")
-              + configFile.getFullPathName();
+              + configFile.getFullPathName()
+              + newLine + "Restart the client to pick up RouteMIDI.";
     return Result::ok();
 }
 
 Result installToClient(const String& client, const String& exePath, String& summary)
 {
-    const File configFile = configPathForClient(client);
-    if (configFile == File())
+    ClientInfo info;
+    if (! lookupClient(client, info))
     {
         return Result::fail("unknown MCP client \"" + client + "\"; supported: "
                             + supportedClients().joinIntoString(", ")
                             + " (use --print-mcp-config for other clients)");
     }
-    return mergeConfigFile(configFile, exePath, summary);
+
+    if (info.kind == Kind::cli)
+    {
+        summary = info.displayName + " manages its own configuration; run this "
+                  "to add RouteMIDI:" + newLine + "  " + info.cliCommand;
+        return Result::ok();
+    }
+
+    return mergeConfigFile(configPathForClient(info.name), exePath, summary);
 }
 
 } // namespace mcpconfig
