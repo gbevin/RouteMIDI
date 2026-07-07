@@ -5,6 +5,11 @@ name: Release
 # folder with the executable, the readme and the license, plus a SHA-256 checksum
 # -- and, together with the signed macOS package, drafts a GitHub release.
 #
+# Each platform also gets a per-platform MCP Bundle (.mcpb) carrying that
+# platform's binary, so a user can install RouteMIDI into Claude Desktop by
+# double-clicking it (see extension/ and Scripts/build-mcpb.sh). It is packed
+# with the official @anthropic-ai/mcpb tool so the manifest is schema-validated.
+#
 # macOS is built, signed (Developer ID), notarized and stapled by running
 # Scripts/build-macos.sh; that requires the signing and notarization secrets
 # documented on the macos job below.
@@ -39,10 +44,20 @@ jobs:
           Compress-Archive -Path $pkg -DestinationPath "$pkg.zip"
           $hash = (Get-FileHash -Algorithm SHA256 "$pkg.zip").Hash.ToLower()
           Set-Content -Path "$pkg.zip.sha256" -Value "$hash  $pkg.zip" -Encoding ascii
+      - name: Install MCP bundle tool
+        run: npm install -g @anthropic-ai/mcpb
+      - name: Pack MCP bundle
+        shell: bash
+        run: |
+          out="routemidi-windows-${GITHUB_REF_NAME}.mcpb"
+          ./Scripts/build-mcpb.sh "Builds/VisualStudio2017/x64/Release/ConsoleApp/routemidi.exe" "$out"
+          sha256sum "$out" > "$out.sha256"
       - uses: actions/upload-artifact@v7
         with:
           name: windows
-          path: routemidi-windows-*.zip*
+          path: |
+            routemidi-windows-*.zip*
+            routemidi-windows-*.mcpb*
 
   # Requires five repository secrets (Settings -> Secrets and variables -> Actions):
   #   MACOS_CERTIFICATE      base64 of a .p12 holding BOTH the "Developer ID
@@ -95,10 +110,21 @@ jobs:
           zip=$(ls routemidi-macOS-*.zip)
           shasum -a 256 "$zip" > "$zip.sha256"
 
+      - name: Install MCP bundle tool
+        run: npm install -g @anthropic-ai/mcpb
+      - name: Pack MCP bundle
+        run: |
+          ./Scripts/build-mcpb.sh "Builds/MacOSX/build/Release/routemidi" "Installers/routemidi-macOS-${GITHUB_REF_NAME}.mcpb"
+          cd Installers
+          bundle=$(ls routemidi-macOS-*.mcpb)
+          shasum -a 256 "$bundle" > "$bundle.sha256"
+
       - uses: actions/upload-artifact@v7
         with:
           name: macos
-          path: Installers/routemidi-macOS-*.zip*
+          path: |
+            Installers/routemidi-macOS-*.zip*
+            Installers/routemidi-macOS-*.mcpb*
 
   release:
     name: Draft release

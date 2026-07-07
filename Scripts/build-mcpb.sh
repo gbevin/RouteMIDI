@@ -12,9 +12,10 @@
 # is stamped from the binary's own --version, so there is nothing to keep in
 # sync by hand.
 #
-# The resulting bundle should be validated and (re)packed with the official
-# tool before publishing, e.g. `npx @anthropic-ai/mcpb pack <dir>`, which also
-# checks the manifest against the current schema.
+# When the official packer (`@anthropic-ai/mcpb`, install with
+# `npm install -g @anthropic-ai/mcpb`) is on the PATH it is used, so the
+# manifest is validated against the current schema; otherwise the bundle is
+# assembled with `zip`, since a .mcpb is just a zip of the manifest and files.
 
 set -euo pipefail
 
@@ -26,8 +27,8 @@ fi
 BIN="$1"
 OUT="${2:-routemidi.mcpb}"
 
-if [[ ! -x "$BIN" ]]; then
-    echo "error: '$BIN' is not an executable binary" >&2
+if [[ ! -f "$BIN" ]]; then
+    echo "error: '$BIN' is not a file" >&2
     exit 1
 fi
 
@@ -35,8 +36,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MANIFEST="$SCRIPT_DIR/../extension/manifest.json"
 
 # the version is the single source of truth in the binary; strip everything up
-# to and including the " v" of the "routemidi v1.2.3" banner
-VERSION="$("$BIN" --version | head -1 | sed -E 's/.* v//')"
+# to and including the " v" of the "routemidi v1.2.3" banner (and any trailing
+# carriage return from a Windows binary's output)
+VERSION="$("$BIN" --version | head -1 | tr -d '\r' | sed -E 's/.* v//')"
 
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
@@ -58,6 +60,16 @@ sed "s/\"version\": \"0.0.0\"/\"version\": \"$VERSION\"/" "$MANIFEST" > "$STAGE/
 
 OUT_ABS="$(cd "$(dirname "$OUT")" && pwd)/$(basename "$OUT")"
 rm -f "$OUT_ABS"
-( cd "$STAGE" && zip -r -q "$OUT_ABS" manifest.json server )
+
+# prefer the official packer so the manifest is schema-validated; fall back to a
+# plain zip (a .mcpb is a zip) when it isn't installed
+if command -v mcpb >/dev/null 2>&1; then
+    mcpb pack "$STAGE" "$OUT_ABS"
+elif command -v zip >/dev/null 2>&1; then
+    ( cd "$STAGE" && zip -r -q "$OUT_ABS" manifest.json server )
+else
+    echo "error: need either 'mcpb' (npm install -g @anthropic-ai/mcpb) or 'zip'" >&2
+    exit 1
+fi
 
 echo "wrote $OUT_ABS (RouteMIDI $VERSION)"

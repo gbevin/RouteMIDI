@@ -95,9 +95,10 @@ inherit the shell `PATH`, so a bare name wouldn't resolve for them):
   you can review it. Restart the client afterwards.
 - For **Claude Code**, `claude mcp add routemidi -- routemidi --mcp` registers the
   same server in one command.
-- For **Claude Desktop**, the `extension/` folder holds a Desktop Extension
-  manifest; `Scripts/build-mcpb.sh` packs it into a `routemidi.mcpb` bundle the
-  user installs by double-clicking, with no configuration file to edit at all.
+- For **Claude Desktop**, a per-platform MCP Bundle (`.mcpb`) is attached to each
+  GitHub release; the user installs RouteMIDI by double-clicking it, with no
+  configuration file to edit at all. The `extension/` folder holds the manifest
+  and `Scripts/build-mcpb.sh` builds a bundle from a local binary.
 
 The server exposes these tools:
 
