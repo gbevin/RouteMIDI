@@ -25,17 +25,9 @@
 #include "Conversion.h"
 #include "ScriptOscClass.h"
 #include "ScriptUtilClass.h"
+#include "TerminalColor.h"
 
 #include <cstdlib>
-#if JUCE_WINDOWS
- #include <windows.h>
- #include <io.h>
- #ifndef ENABLE_VIRTUAL_TERMINAL_PROCESSING
-  #define ENABLE_VIRTUAL_TERMINAL_PROCESSING 0x0004
- #endif
-#else
- #include <unistd.h>
-#endif
 
 static const int DEFAULT_OCTAVE_MIDDLE_C = 3;
 static const String DEFAULT_VIRTUAL_IN_NAME = "RouteMIDI In";
@@ -61,59 +53,9 @@ namespace ansi
     static const Role command { "38;2;109;188;128", "32" };   // sage green: command and flag names
     static const Role option  { "38;2;126;167;205", "34" };   // steel blue: option placeholders and the URL
 
-    static bool computeEnabled()
-    {
-        if (std::getenv("NO_COLOR") != nullptr)
-        {
-            return false;   // a hard user opt-out; wins over CLICOLOR_FORCE
-        }
-        const char* force = std::getenv("CLICOLOR_FORCE");
-        const bool forced = force != nullptr && String(force) != "0";
-
-       #if JUCE_WINDOWS
-        const bool tty = _isatty(_fileno(stdout)) != 0;
-        if (! forced && ! tty)
-        {
-            return false;   // piped or redirected and not forced: plain text
-        }
-        // writing to a real console, the escapes only render once virtual
-        // terminal processing is on (Windows 10+); if that can't be enabled the
-        // codes would print literally, so fall back to plain. Piped output
-        // (reached only via CLICOLOR_FORCE) needs no console mode - the codes
-        // are just bytes the consumer handles.
-        if (tty)
-        {
-            HANDLE out = GetStdHandle(STD_OUTPUT_HANDLE);
-            DWORD mode = 0;
-            if (out == INVALID_HANDLE_VALUE || out == nullptr
-                || ! GetConsoleMode(out, &mode)
-                || ! SetConsoleMode(out, mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING))
-            {
-                return false;
-            }
-        }
-        return true;
-       #else
-        if (forced)
-        {
-            return true;   // explicitly forced, even when not a terminal
-        }
-        if (isatty(fileno(stdout)) == 0)
-        {
-            return false;   // piped or redirected: emit plain text
-        }
-        const char* term = std::getenv("TERM");
-        if (term != nullptr && String(term) == "dumb")
-        {
-            return false;
-        }
-        return true;
-       #endif
-    }
-
     static bool enabled()
     {
-        static const bool value = computeEnabled();
+        static const bool value = terminalSupportsColor();
         return value;
     }
 

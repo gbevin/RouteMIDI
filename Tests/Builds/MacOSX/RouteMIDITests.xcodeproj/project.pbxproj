@@ -11,6 +11,7 @@
 		1B948E0084B964977F9EAA18 /* PipelineTests.cpp */ = {isa = PBXBuildFile; fileRef = F0FA7932B74CE43C88E98636; };
 		241680E34B28E1EE2885FB28 /* ScriptTests.cpp */ = {isa = PBXBuildFile; fileRef = BA87A2CFFB0E14F32F30FB07; };
 		2D657955D4DAE23E5C6873D0 /* Mpe.cpp */ = {isa = PBXBuildFile; fileRef = 138310665B1A17D8E7369EE5; };
+		43D0E8E2C53AD86720600379 /* TerminalColor.cpp */ = {isa = PBXBuildFile; fileRef = B7F34A322582B1B63FE9BB69; };
 		43D78E379089FCBDB2E9FE0C /* CoreAudio.framework */ = {isa = PBXBuildFile; fileRef = A87DFC8C47F1399670DCD5C9; };
 		4B3803715E058FFCC1B2873D /* include_juce_core.mm */ = {isa = PBXBuildFile; fileRef = 718E470C47423A5734BBE6B4; };
 		5174F64FEA450A915AE6263C /* TransformTests.cpp */ = {isa = PBXBuildFile; fileRef = 14B6680109E5B6BB4914503B; };
@@ -105,8 +106,10 @@
 		A87DFC8C47F1399670DCD5C9 /* CoreAudio.framework */ /* CoreAudio.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreAudio.framework; path = System/Library/Frameworks/CoreAudio.framework; sourceTree = SDKROOT; };
 		B42D5AC1744E0CB58FC6E8FC /* FilterTests.cpp */ /* FilterTests.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = FilterTests.cpp; path = ../../FilterTests.cpp; sourceTree = SOURCE_ROOT; };
 		B5371D4BAE8253A9EEE4FC34 /* Latch.cpp */ /* Latch.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Latch.cpp; path = ../../../Source/Latch.cpp; sourceTree = SOURCE_ROOT; };
+		B6094B210C91EB8307940FE7 /* TerminalColor.h */ /* TerminalColor.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = TerminalColor.h; path = ../../../Source/TerminalColor.h; sourceTree = SOURCE_ROOT; };
 		B670BBCFAA9C202AA89D82D8 /* Schema.h */ /* Schema.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Schema.h; path = ../../../Source/Schema.h; sourceTree = SOURCE_ROOT; };
 		B6D9DA2E3532B698C3BD62E1 /* Conversion.cpp */ /* Conversion.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Conversion.cpp; path = ../../../Source/Conversion.cpp; sourceTree = SOURCE_ROOT; };
+		B7F34A322582B1B63FE9BB69 /* TerminalColor.cpp */ /* TerminalColor.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = TerminalColor.cpp; path = ../../../Source/TerminalColor.cpp; sourceTree = SOURCE_ROOT; };
 		B8A904ADC5D4CD648027A987 /* ScriptOscClass.cpp */ /* ScriptOscClass.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = ScriptOscClass.cpp; path = ../../../Source/ScriptOscClass.cpp; sourceTree = SOURCE_ROOT; };
 		BA87A2CFFB0E14F32F30FB07 /* ScriptTests.cpp */ /* ScriptTests.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = ScriptTests.cpp; path = ../../ScriptTests.cpp; sourceTree = SOURCE_ROOT; };
 		BB8917A3DE81DC89943F4CCA /* Security.framework */ /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
@@ -221,6 +224,8 @@
 				B670BBCFAA9C202AA89D82D8,
 				27A807253AC68FA194146265,
 				9406B1A5F7E99FA639A35066,
+				B7F34A322582B1B63FE9BB69,
+				B6094B210C91EB8307940FE7,
 				BC3AC7AAE26DD24EC82A6052,
 				2601CB19CB8D9C11BCCAF3FB,
 			);
@@ -366,6 +371,7 @@
 				A8826F1F73C1BB1BAEA4660C,
 				C4224F3888C472B0DD596618,
 				A4A71C8142DA11300ADCC4A5,
+				43D0E8E2C53AD86720600379,
 				64CD3BF771D78A5EFEB2D73C,
 				9F1FD4C249FA372C5CC6D19A,
 				A929407C33A369FACE239FC6,

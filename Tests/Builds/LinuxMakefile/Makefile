@@ -88,6 +88,7 @@ OBJECTS_CONSOLEAPP := \
   $(JUCE_OBJDIR)/McpServer_7747aa0d.o \
   $(JUCE_OBJDIR)/Schema_68a49d5b.o \
   $(JUCE_OBJDIR)/Sustain_e484fe73.o \
+  $(JUCE_OBJDIR)/TerminalColor_88d6c457.o \
   $(JUCE_OBJDIR)/TextMidi_ff6fa9e8.o \
   $(JUCE_OBJDIR)/TestRunner_6696edd7.o \
   $(JUCE_OBJDIR)/ScalingTests_c076264f.o \
@@ -198,6 +199,11 @@ $(JUCE_OBJDIR)/Schema_68a49d5b.o: ../../../Source/Schema.cpp
 $(JUCE_OBJDIR)/Sustain_e484fe73.o: ../../../Source/Sustain.cpp
 	-$(V_AT)mkdir -p $(@D)
 	@echo "Compiling Sustain.cpp"
+	$(V_AT)$(CXX) $(JUCE_CXXFLAGS) $(JUCE_CPPFLAGS_CONSOLEAPP) $(JUCE_CFLAGS_CONSOLEAPP) -o "$@" -c "$<"
+
+$(JUCE_OBJDIR)/TerminalColor_88d6c457.o: ../../../Source/TerminalColor.cpp
+	-$(V_AT)mkdir -p $(@D)
+	@echo "Compiling TerminalColor.cpp"
 	$(V_AT)$(CXX) $(JUCE_CXXFLAGS) $(JUCE_CPPFLAGS_CONSOLEAPP) $(JUCE_CFLAGS_CONSOLEAPP) -o "$@" -c "$<"
 
 $(JUCE_OBJDIR)/TextMidi_ff6fa9e8.o: ../../../Source/TextMidi.cpp

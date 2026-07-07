@@ -49,6 +49,8 @@
       <FILE id="src020" name="Schema.h" compile="0" resource="0" file="../Source/Schema.h"/>
       <FILE id="scp021" name="Sustain.cpp" compile="1" resource="0" file="../Source/Sustain.cpp"/>
       <FILE id="src021" name="Sustain.h" compile="0" resource="0" file="../Source/Sustain.h"/>
+      <FILE id="scp023" name="TerminalColor.cpp" compile="1" resource="0" file="../Source/TerminalColor.cpp"/>
+      <FILE id="src023" name="TerminalColor.h" compile="0" resource="0" file="../Source/TerminalColor.h"/>
       <FILE id="scp018" name="TextMidi.cpp" compile="1" resource="0" file="../Source/TextMidi.cpp"/>
       <FILE id="src018" name="TextMidi.h" compile="0" resource="0" file="../Source/TextMidi.h"/>
     </GROUP>

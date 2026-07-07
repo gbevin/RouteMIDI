@@ -41,6 +41,7 @@
 		AADC62C5B9CB859326A74332 /* include_juce_events.mm */ = {isa = PBXBuildFile; fileRef = F0AC19E3023CA8E85D590A1B; };
 		B61C2506A473A9D6519ADFDF /* McpServer.cpp */ = {isa = PBXBuildFile; fileRef = 2BAFC07253691C1A03FC73D9; };
 		DEC01D2856CBEABC6569DE16 /* include_juce_midi_ci.cpp */ = {isa = PBXBuildFile; fileRef = 3B899882E9F48AFC64E535EF; };
+		E8C4E438B2F64618624EAAD8 /* TerminalColor.cpp */ = {isa = PBXBuildFile; fileRef = 52E0070156CA6392E10997DF; };
 		F00D5676A75100DF5C848DF8 /* include_juce_audio_basics.mm */ = {isa = PBXBuildFile; fileRef = BC898F0BA43B56118F3015D2; };
 /* End PBXBuildFile section */
 
@@ -58,6 +59,7 @@
 		28F1F23438CA15D2AF8C89C3 /* ApplicationState.cpp */ /* ApplicationState.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = ApplicationState.cpp; path = ../../Source/ApplicationState.cpp; sourceTree = SOURCE_ROOT; };
 		2BAFC07253691C1A03FC73D9 /* McpServer.cpp */ /* McpServer.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = McpServer.cpp; path = ../../Source/McpServer.cpp; sourceTree = SOURCE_ROOT; };
 		2D67FDB33E161218328F6807 /* ParamSelection.h */ /* ParamSelection.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ParamSelection.h; path = ../../Source/ParamSelection.h; sourceTree = SOURCE_ROOT; };
+		32182945DF1F1B1E5A2F590A /* TerminalColor.h */ /* TerminalColor.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = TerminalColor.h; path = ../../Source/TerminalColor.h; sourceTree = SOURCE_ROOT; };
 		368C712F41AD8C0DC5E4A389 /* juce_osc */ /* juce_osc */ = {isa = PBXFileReference; lastKnownFileType = folder; name = juce_osc; path = ../../JuceLibraryCode/modules/juce_osc; sourceTree = SOURCE_ROOT; };
 		369E04E0314D26B628F08040 /* Mono.cpp */ /* Mono.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Mono.cpp; path = ../../Source/Mono.cpp; sourceTree = SOURCE_ROOT; };
 		38630DFA0030BF212C9E9B60 /* Schema.cpp */ /* Schema.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Schema.cpp; path = ../../Source/Schema.cpp; sourceTree = SOURCE_ROOT; };
@@ -67,6 +69,7 @@
 		3D48DC81B13A450D530A0037 /* Sustain.h */ /* Sustain.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Sustain.h; path = ../../Source/Sustain.h; sourceTree = SOURCE_ROOT; };
 		5133E6DBD03BB2F966578F3E /* Latch.cpp */ /* Latch.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Latch.cpp; path = ../../Source/Latch.cpp; sourceTree = SOURCE_ROOT; };
 		52AE88A364FFF2111D8EF313 /* include_juce_osc.cpp */ /* include_juce_osc.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = include_juce_osc.cpp; path = ../../JuceLibraryCode/include_juce_osc.cpp; sourceTree = SOURCE_ROOT; };
+		52E0070156CA6392E10997DF /* TerminalColor.cpp */ /* TerminalColor.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = TerminalColor.cpp; path = ../../Source/TerminalColor.cpp; sourceTree = SOURCE_ROOT; };
 		55BBBA41C247C883C31B9DA4 /* Schema.h */ /* Schema.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Schema.h; path = ../../Source/Schema.h; sourceTree = SOURCE_ROOT; };
 		5D3F4C219DB9D465708B6231 /* AudioToolbox.framework */ /* AudioToolbox.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AudioToolbox.framework; path = System/Library/Frameworks/AudioToolbox.framework; sourceTree = SDKROOT; };
 		5F6526C961F6F88C95A67C56 /* Route.cpp */ /* Route.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Route.cpp; path = ../../Source/Route.cpp; sourceTree = SOURCE_ROOT; };
@@ -217,6 +220,8 @@
 				9CD2954B59A33B0796DD0778,
 				21797EC5FAA9C2DC6DD2B3EF,
 				CA2DB941303379744442D8FD,
+				52E0070156CA6392E10997DF,
+				32182945DF1F1B1E5A2F590A,
 				FD07E2770A84564DE0AE098B,
 				B5ECD1859A16460098FC52D3,
 			);
@@ -331,6 +336,7 @@
 				733F39336A3BA81575DD317E,
 				39B2279B8530BBC87FA033F9,
 				141F7CB00D1F92A017A030DD,
+				E8C4E438B2F64618624EAAD8,
 				54D8066932636A1D5D89E096,
 				F00D5676A75100DF5C848DF8,
 				9B0F8BACA6BC3E1F951394D8,

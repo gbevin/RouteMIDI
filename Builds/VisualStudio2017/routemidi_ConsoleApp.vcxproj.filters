@@ -256,6 +256,9 @@
     <ClCompile Include="..\..\Source\ScriptUtilClass.cpp">
       <Filter>routemidi\Source</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Source\TerminalColor.cpp">
+      <Filter>routemidi\Source</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Source\TextMidi.cpp">
       <Filter>routemidi\Source</Filter>
     </ClCompile>
@@ -1267,6 +1270,9 @@
       <Filter>routemidi\Source</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Source\ScriptUtilClass.h">
+      <Filter>routemidi\Source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\TerminalColor.h">
       <Filter>routemidi\Source</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Source\TextMidi.h">

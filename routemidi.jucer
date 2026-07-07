@@ -50,6 +50,8 @@
             file="Source/ScriptUtilClass.cpp"/>
       <FILE id="uuu1PF" name="ScriptUtilClass.h" compile="0" resource="0"
             file="Source/ScriptUtilClass.h"/>
+      <FILE id="tcl002" name="TerminalColor.cpp" compile="1" resource="0" file="Source/TerminalColor.cpp"/>
+      <FILE id="tcl001" name="TerminalColor.h" compile="0" resource="0" file="Source/TerminalColor.h"/>
       <FILE id="txm002" name="TextMidi.cpp" compile="1" resource="0" file="Source/TextMidi.cpp"/>
       <FILE id="txm001" name="TextMidi.h" compile="0" resource="0" file="Source/TextMidi.h"/>
     </GROUP>

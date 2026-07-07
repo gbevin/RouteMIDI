@@ -256,6 +256,9 @@
     <ClCompile Include="..\..\..\Source\Sustain.cpp">
       <Filter>RouteMIDITests\Source</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\Source\TerminalColor.cpp">
+      <Filter>RouteMIDITests\Source</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\Source\TextMidi.cpp">
       <Filter>RouteMIDITests\Source</Filter>
     </ClCompile>
@@ -1297,6 +1300,9 @@
       <Filter>RouteMIDITests\Source</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\Source\Sustain.h">
+      <Filter>RouteMIDITests\Source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Source\TerminalColor.h">
       <Filter>RouteMIDITests\Source</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\Source\TextMidi.h">

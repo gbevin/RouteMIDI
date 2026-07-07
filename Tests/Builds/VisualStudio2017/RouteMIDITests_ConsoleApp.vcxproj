@@ -157,6 +157,7 @@
     <ClCompile Include="..\..\..\Source\McpServer.cpp"/>
     <ClCompile Include="..\..\..\Source\Schema.cpp"/>
     <ClCompile Include="..\..\..\Source\Sustain.cpp"/>
+    <ClCompile Include="..\..\..\Source\TerminalColor.cpp"/>
     <ClCompile Include="..\..\..\Source\TextMidi.cpp"/>
     <ClCompile Include="..\..\TestRunner.cpp"/>
     <ClCompile Include="..\..\ScalingTests.cpp"/>
@@ -1089,6 +1090,7 @@
     <ClInclude Include="..\..\..\Source\McpServer.h"/>
     <ClInclude Include="..\..\..\Source\Schema.h"/>
     <ClInclude Include="..\..\..\Source\Sustain.h"/>
+    <ClInclude Include="..\..\..\Source\TerminalColor.h"/>
     <ClInclude Include="..\..\..\Source\TextMidi.h"/>
     <ClInclude Include="..\..\TestHelpers.h"/>
     <ClInclude Include="..\..\..\JuceLibraryCode\modules\juce_audio_basics\audio_play_head\juce_AudioPlayHead.h"/>
