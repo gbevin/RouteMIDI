@@ -29,4 +29,11 @@ namespace ansi
     // is turned on first (Windows 10+); if it can't be enabled, output stays
     // plain.
     bool terminalSupportsColor();
+
+    // whether that terminal accepts 24-bit truecolor codes (vs the nearest
+    // 16-color fallback). On Unix this is advertised through COLORTERM; on
+    // Windows a real console that accepted virtual terminal processing is
+    // truecolor-capable (Windows 10 1703+), even though it sets no COLORTERM.
+    // Only meaningful when terminalSupportsColor() is true.
+    bool terminalSupportsTrueColor();
 }

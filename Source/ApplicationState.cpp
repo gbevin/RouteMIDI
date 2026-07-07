@@ -27,8 +27,6 @@
 #include "ScriptUtilClass.h"
 #include "TerminalColor.h"
 
-#include <cstdlib>
-
 static const int DEFAULT_OCTAVE_MIDDLE_C = 3;
 static const String DEFAULT_VIRTUAL_IN_NAME = "RouteMIDI In";
 static const String DEFAULT_VIRTUAL_OUT_NAME = "RouteMIDI Out";
@@ -62,12 +60,7 @@ namespace ansi
     // truecolor when the terminal advertises it, otherwise the 16-color palette
     static bool trueColor()
     {
-        static const bool value = []
-        {
-            const char* ct = std::getenv("COLORTERM");
-            return ct != nullptr && (String(ct).containsIgnoreCase("truecolor")
-                                     || String(ct).containsIgnoreCase("24bit"));
-        }();
+        static const bool value = terminalSupportsTrueColor();
         return value;
     }
 

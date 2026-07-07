@@ -34,6 +34,14 @@
 namespace ansi
 {
 
+// true when COLORTERM advertises 24-bit color, the portable Unix convention
+static bool colorTermAdvertisesTrueColor()
+{
+    const char* ct = std::getenv("COLORTERM");
+    return ct != nullptr && (String(ct).containsIgnoreCase("truecolor")
+                             || String(ct).containsIgnoreCase("24bit"));
+}
+
 bool terminalSupportsColor()
 {
     if (std::getenv("NO_COLOR") != nullptr)
@@ -81,6 +89,24 @@ bool terminalSupportsColor()
         return false;
     }
     return true;
+   #endif
+}
+
+bool terminalSupportsTrueColor()
+{
+    if (colorTermAdvertisesTrueColor())
+    {
+        return true;
+    }
+   #if JUCE_WINDOWS
+    // Windows consoles don't set COLORTERM, but a real console on which
+    // terminalSupportsColor() enabled virtual terminal processing is truecolor-
+    // capable (that requires Windows 10 1703+, where 24-bit codes render).
+    // Forced-on piped output (no console) has an unknown consumer, so it stays
+    // on the 16-color fallback unless COLORTERM says otherwise.
+    return _isatty(_fileno(stdout)) != 0;
+   #else
+    return false;
    #endif
 }
 
