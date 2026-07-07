@@ -107,7 +107,7 @@ static String tomlEscape(const String& s)
 // the TOML table Codex uses under ~/.codex/config.toml
 static String tomlServerBlock(const String& exePath)
 {
-    return "[mcp_servers.routemidi]" + String(newLine)
+    return String("[mcp_servers.routemidi]") + newLine
          + "command = \"" + tomlEscape(exePath) + "\"" + newLine
          + "args = [\"--mcp\"]";
 }
