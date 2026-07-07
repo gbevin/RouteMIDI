@@ -283,6 +283,9 @@
     <ClCompile Include="..\..\MpeTests.cpp">
       <Filter>RouteMIDITests\Tests</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\PipelineTests.cpp">
+      <Filter>RouteMIDITests\Tests</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\ConnectionTests.cpp">
       <Filter>RouteMIDITests\Tests</Filter>
     </ClCompile>

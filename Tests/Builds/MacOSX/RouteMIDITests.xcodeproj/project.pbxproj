@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		199E5491C5BD928276C7F1F6 /* Cocoa.framework */ = {isa = PBXBuildFile; fileRef = 8C407C921E9D90D075A9F113; };
+		1B948E0084B964977F9EAA18 /* PipelineTests.cpp */ = {isa = PBXBuildFile; fileRef = F0FA7932B74CE43C88E98636; };
 		241680E34B28E1EE2885FB28 /* ScriptTests.cpp */ = {isa = PBXBuildFile; fileRef = BA87A2CFFB0E14F32F30FB07; };
 		2D657955D4DAE23E5C6873D0 /* Mpe.cpp */ = {isa = PBXBuildFile; fileRef = 138310665B1A17D8E7369EE5; };
 		43D78E379089FCBDB2E9FE0C /* CoreAudio.framework */ = {isa = PBXBuildFile; fileRef = A87DFC8C47F1399670DCD5C9; };
@@ -120,6 +121,7 @@
 		E46E2FC6F0FF094218C8CD7D /* ScriptUtilClass.h */ /* ScriptUtilClass.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ScriptUtilClass.h; path = ../../../Source/ScriptUtilClass.h; sourceTree = SOURCE_ROOT; };
 		E5421163D9B8BB6977F383EA /* include_juce_audio_devices.mm */ /* include_juce_audio_devices.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = include_juce_audio_devices.mm; path = ../../JuceLibraryCode/include_juce_audio_devices.mm; sourceTree = SOURCE_ROOT; };
 		E6EB4492482C2A691133DEF4 /* RecentFilesMenuTemplate.nib */ /* RecentFilesMenuTemplate.nib */ = {isa = PBXFileReference; lastKnownFileType = file.nib; name = RecentFilesMenuTemplate.nib; path = RecentFilesMenuTemplate.nib; sourceTree = SOURCE_ROOT; };
+		F0FA7932B74CE43C88E98636 /* PipelineTests.cpp */ /* PipelineTests.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = PipelineTests.cpp; path = ../../PipelineTests.cpp; sourceTree = SOURCE_ROOT; };
 		FDEB72B1D642C1CEA6DFE933 /* include_juce_osc.cpp */ /* include_juce_osc.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = include_juce_osc.cpp; path = ../../JuceLibraryCode/include_juce_osc.cpp; sourceTree = SOURCE_ROOT; };
 		FEF8124308305487E5963E75 /* McpServer.h */ /* McpServer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = McpServer.h; path = ../../../Source/McpServer.h; sourceTree = SOURCE_ROOT; };
 		FF7225493601E83F076CD6D7 /* Mono.cpp */ /* Mono.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Mono.cpp; path = ../../../Source/Mono.cpp; sourceTree = SOURCE_ROOT; };
@@ -237,6 +239,7 @@
 				8D7FE2DBDB22E423320F9B00,
 				BA87A2CFFB0E14F32F30FB07,
 				74E83C7D42C715792B6537C9,
+				F0FA7932B74CE43C88E98636,
 				65924251E6EE3E1631ABD10F,
 			);
 			name = Tests;
@@ -372,6 +375,7 @@
 				D60F3BBB09B99044764343FC,
 				241680E34B28E1EE2885FB28,
 				C471B6BF835DDA3B669FCDE1,
+				1B948E0084B964977F9EAA18,
 				D771D8E54E276B98FD0A33B7,
 				B2CE1D45A02DBB1BCA173C47,
 				880F325DDB948121A5E1D8B0,

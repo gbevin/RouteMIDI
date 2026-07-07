@@ -62,6 +62,7 @@
       <FILE id="tst007" name="ParsingTests.cpp" compile="1" resource="0" file="ParsingTests.cpp"/>
       <FILE id="tst008" name="ScriptTests.cpp" compile="1" resource="0" file="ScriptTests.cpp"/>
       <FILE id="tst009" name="MpeTests.cpp" compile="1" resource="0" file="MpeTests.cpp"/>
+      <FILE id="tst010" name="PipelineTests.cpp" compile="1" resource="0" file="PipelineTests.cpp"/>
       <FILE id="tst010" name="ConnectionTests.cpp" compile="1" resource="0" file="ConnectionTests.cpp"/>
     </GROUP>
   </MAINGROUP>
