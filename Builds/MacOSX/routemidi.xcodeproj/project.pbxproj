@@ -41,6 +41,7 @@
 		AADC62C5B9CB859326A74332 /* include_juce_events.mm */ = {isa = PBXBuildFile; fileRef = F0AC19E3023CA8E85D590A1B; };
 		B61C2506A473A9D6519ADFDF /* McpServer.cpp */ = {isa = PBXBuildFile; fileRef = 2BAFC07253691C1A03FC73D9; };
 		DEC01D2856CBEABC6569DE16 /* include_juce_midi_ci.cpp */ = {isa = PBXBuildFile; fileRef = 3B899882E9F48AFC64E535EF; };
+		E6B336CC5C7113A005FC88EA /* McpConfig.cpp */ = {isa = PBXBuildFile; fileRef = 3E1522BB5773B7382FDA1FE4; };
 		E8C4E438B2F64618624EAAD8 /* TerminalColor.cpp */ = {isa = PBXBuildFile; fileRef = 52E0070156CA6392E10997DF; };
 		F00D5676A75100DF5C848DF8 /* include_juce_audio_basics.mm */ = {isa = PBXBuildFile; fileRef = BC898F0BA43B56118F3015D2; };
 /* End PBXBuildFile section */
@@ -67,6 +68,7 @@
 		39BBB61E6B2796DB8C72B46D /* CoreAudio.framework */ /* CoreAudio.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreAudio.framework; path = System/Library/Frameworks/CoreAudio.framework; sourceTree = SDKROOT; };
 		3B899882E9F48AFC64E535EF /* include_juce_midi_ci.cpp */ /* include_juce_midi_ci.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = include_juce_midi_ci.cpp; path = ../../JuceLibraryCode/include_juce_midi_ci.cpp; sourceTree = SOURCE_ROOT; };
 		3D48DC81B13A450D530A0037 /* Sustain.h */ /* Sustain.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Sustain.h; path = ../../Source/Sustain.h; sourceTree = SOURCE_ROOT; };
+		3E1522BB5773B7382FDA1FE4 /* McpConfig.cpp */ /* McpConfig.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = McpConfig.cpp; path = ../../Source/McpConfig.cpp; sourceTree = SOURCE_ROOT; };
 		5133E6DBD03BB2F966578F3E /* Latch.cpp */ /* Latch.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Latch.cpp; path = ../../Source/Latch.cpp; sourceTree = SOURCE_ROOT; };
 		52AE88A364FFF2111D8EF313 /* include_juce_osc.cpp */ /* include_juce_osc.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = include_juce_osc.cpp; path = ../../JuceLibraryCode/include_juce_osc.cpp; sourceTree = SOURCE_ROOT; };
 		52E0070156CA6392E10997DF /* TerminalColor.cpp */ /* TerminalColor.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = TerminalColor.cpp; path = ../../Source/TerminalColor.cpp; sourceTree = SOURCE_ROOT; };
@@ -83,6 +85,7 @@
 		8FD5AB6A856BACE261AC7521 /* Sustain.cpp */ /* Sustain.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Sustain.cpp; path = ../../Source/Sustain.cpp; sourceTree = SOURCE_ROOT; };
 		8FF3E27E707D2D5F6D83FDEE /* McpServer.h */ /* McpServer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = McpServer.h; path = ../../Source/McpServer.h; sourceTree = SOURCE_ROOT; };
 		92335890AFA077CA46856B96 /* ConsoleApp */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = routemidi; sourceTree = BUILT_PRODUCTS_DIR; };
+		93CBA54A9B2A14485FF6CADF /* McpConfig.h */ /* McpConfig.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = McpConfig.h; path = ../../Source/McpConfig.h; sourceTree = SOURCE_ROOT; };
 		984B89DA298818FDB2DF5FC5 /* Latch.h */ /* Latch.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Latch.h; path = ../../Source/Latch.h; sourceTree = SOURCE_ROOT; };
 		9CD2954B59A33B0796DD0778 /* ScriptOscClass.h */ /* ScriptOscClass.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ScriptOscClass.h; path = ../../Source/ScriptOscClass.h; sourceTree = SOURCE_ROOT; };
 		AE03F584DF5EFEE8BE9C71BE /* RecentFilesMenuTemplate.nib */ /* RecentFilesMenuTemplate.nib */ = {isa = PBXFileReference; lastKnownFileType = file.nib; name = RecentFilesMenuTemplate.nib; path = RecentFilesMenuTemplate.nib; sourceTree = SOURCE_ROOT; };
@@ -202,6 +205,8 @@
 				369E04E0314D26B628F08040,
 				23E31207938832D19BD7AA17,
 				B2451D1DBA700503A8FEDC18,
+				3E1522BB5773B7382FDA1FE4,
+				93CBA54A9B2A14485FF6CADF,
 				2BAFC07253691C1A03FC73D9,
 				8FF3E27E707D2D5F6D83FDEE,
 				38630DFA0030BF212C9E9B60,
@@ -327,6 +332,7 @@
 				8CC96C84E9919543939AB516,
 				1486D3BF838F2ED0BF49213C,
 				2BA07F2CF2B004870E08CD28,
+				E6B336CC5C7113A005FC88EA,
 				B61C2506A473A9D6519ADFDF,
 				775AC60B580F0E0B1F5A59E7,
 				80ED198ED2167D21A964A902,

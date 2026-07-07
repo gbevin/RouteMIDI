@@ -80,6 +80,25 @@ Example MCP server configuration:
 }
 ```
 
+### Connecting a client without editing JSON
+
+RouteMIDI can write this configuration for you, so `command` points at the
+absolute path of the running binary (GUI clients such as Claude Desktop don't
+inherit the shell `PATH`, so a bare name wouldn't resolve for them):
+
+- `routemidi --print-mcp-config` prints the block above with the path filled in,
+  to pipe or paste wherever a client wants it.
+- `routemidi --install-mcp <client>` merges the entry into a known client's
+  configuration file in place, creating it if needed and preserving any servers
+  already there. Supported clients are `claude-desktop` and `cursor`; it refuses
+  to touch a configuration file it can't parse, and reports the path it wrote so
+  you can review it. Restart the client afterwards.
+- For **Claude Code**, `claude mcp add routemidi -- routemidi --mcp` registers the
+  same server in one command.
+- For **Claude Desktop**, the `extension/` folder holds a Desktop Extension
+  manifest; `Scripts/build-mcpb.sh` packs it into a `routemidi.mcpb` bundle the
+  user installs by double-clicking, with no configuration file to edit at all.
+
 The server exposes these tools:
 
 - `get_schema`: returns the same machine-readable command metadata as

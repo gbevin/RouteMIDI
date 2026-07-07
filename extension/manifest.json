@@ -1,0 +1,27 @@
+{
+  "manifest_version": "0.3",
+  "name": "routemidi",
+  "display_name": "RouteMIDI",
+  "version": "0.0.0",
+  "description": "Route, filter, transform and convert MIDI between your devices, driven by an AI assistant over MCP.",
+  "author": {
+    "name": "Uwyn LLC",
+    "url": "https://www.uwyn.com"
+  },
+  "homepage": "https://github.com/gbevin/RouteMIDI",
+  "documentation": "https://github.com/gbevin/RouteMIDI/blob/master/AI.md",
+  "license": "GPL-3.0-or-later",
+  "server": {
+    "type": "binary",
+    "entry_point": "server/routemidi",
+    "mcp_config": {
+      "command": "${__dirname}/server/routemidi",
+      "args": ["--mcp"],
+      "env": {}
+    }
+  },
+  "compatibility": {
+    "claude_desktop": ">=0.10.0",
+    "platforms": ["darwin", "win32", "linux"]
+  }
+}

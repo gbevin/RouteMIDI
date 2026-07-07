@@ -227,10 +227,14 @@ Options:
   --schema json          Print machine-readable command JSON and exit
                          [experimental]
   --mcp                  Run a stdio MCP server [experimental]
+  --print-mcp-config     Print an MCP client configuration block and exit
+  --install-mcp [client] Add RouteMIDI to an MCP client's configuration and exit
   --                     Read commands from standard input until it's closed
 ```
 
 Use `--schema json` for command metadata for scripts, MCP servers and AI agents. Use `--mcp` to let MCP clients control RouteMIDI over stdio. These two features are experimental and fast-moving: their JSON and the MCP tools may change between releases. See **[AI.md](AI.md)** for the generation contract, the schema and the MCP server with its tools and security model.
+
+To connect RouteMIDI to a local AI assistant without hand-editing JSON, run `routemidi --install-mcp claude-desktop` (or `cursor`) to add it to that client's configuration, or `routemidi --print-mcp-config` to print the block to paste elsewhere. For Claude Code, `claude mcp add routemidi -- routemidi --mcp` does the same in one command. See **[AI.md](AI.md)** for the per-client setup, including the double-click Claude Desktop extension.
 
 Each command can also be written with its long name instead of the short one:
 ```

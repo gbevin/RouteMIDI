@@ -26,6 +26,8 @@
       <FILE id="mno002" name="Mono.cpp" compile="1" resource="0" file="Source/Mono.cpp"/>
       <FILE id="mno001" name="Mono.h" compile="0" resource="0" file="Source/Mono.h"/>
       <FILE id="hGRRus" name="Main.cpp" compile="1" resource="0" file="Source/Main.cpp"/>
+      <FILE id="mcc002" name="McpConfig.cpp" compile="1" resource="0" file="Source/McpConfig.cpp"/>
+      <FILE id="mcc001" name="McpConfig.h" compile="0" resource="0" file="Source/McpConfig.h"/>
       <FILE id="mcp002" name="McpServer.cpp" compile="1" resource="0" file="Source/McpServer.cpp"/>
       <FILE id="mcp001" name="McpServer.h" compile="0" resource="0" file="Source/McpServer.h"/>
       <FILE id="sch002" name="Schema.cpp" compile="1" resource="0" file="Source/Schema.cpp"/>

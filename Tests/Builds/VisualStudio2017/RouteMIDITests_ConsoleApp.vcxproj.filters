@@ -247,6 +247,9 @@
     <ClCompile Include="..\..\..\Source\ScriptUtilClass.cpp">
       <Filter>RouteMIDITests\Source</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\Source\McpConfig.cpp">
+      <Filter>RouteMIDITests\Source</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\Source\McpServer.cpp">
       <Filter>RouteMIDITests\Source</Filter>
     </ClCompile>
@@ -290,6 +293,9 @@
       <Filter>RouteMIDITests\Tests</Filter>
     </ClCompile>
     <ClCompile Include="..\..\ConnectionTests.cpp">
+      <Filter>RouteMIDITests\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\McpConfigTests.cpp">
       <Filter>RouteMIDITests\Tests</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\JuceLibraryCode\modules\juce_audio_basics\audio_play_head\juce_AudioPlayHead.cpp">
@@ -1291,6 +1297,9 @@
       <Filter>RouteMIDITests\Source</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\Source\ScriptUtilClass.h">
+      <Filter>RouteMIDITests\Source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Source\McpConfig.h">
       <Filter>RouteMIDITests\Source</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\Source\McpServer.h">

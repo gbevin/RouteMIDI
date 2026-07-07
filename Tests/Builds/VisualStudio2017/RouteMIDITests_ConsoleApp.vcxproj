@@ -154,6 +154,7 @@
     <ClCompile Include="..\..\..\Source\ScriptMidiMessageClass.cpp"/>
     <ClCompile Include="..\..\..\Source\ScriptOscClass.cpp"/>
     <ClCompile Include="..\..\..\Source\ScriptUtilClass.cpp"/>
+    <ClCompile Include="..\..\..\Source\McpConfig.cpp"/>
     <ClCompile Include="..\..\..\Source\McpServer.cpp"/>
     <ClCompile Include="..\..\..\Source\Schema.cpp"/>
     <ClCompile Include="..\..\..\Source\Sustain.cpp"/>
@@ -169,6 +170,7 @@
     <ClCompile Include="..\..\MpeTests.cpp"/>
     <ClCompile Include="..\..\PipelineTests.cpp"/>
     <ClCompile Include="..\..\ConnectionTests.cpp"/>
+    <ClCompile Include="..\..\McpConfigTests.cpp"/>
     <ClCompile Include="..\..\..\JuceLibraryCode\modules\juce_audio_basics\audio_play_head\juce_AudioPlayHead.cpp">
       <ExcludedFromBuild>true</ExcludedFromBuild>
     </ClCompile>
@@ -1087,6 +1089,7 @@
     <ClInclude Include="..\..\..\Source\ScriptMidiMessageClass.h"/>
     <ClInclude Include="..\..\..\Source\ScriptOscClass.h"/>
     <ClInclude Include="..\..\..\Source\ScriptUtilClass.h"/>
+    <ClInclude Include="..\..\..\Source\McpConfig.h"/>
     <ClInclude Include="..\..\..\Source\McpServer.h"/>
     <ClInclude Include="..\..\..\Source\Schema.h"/>
     <ClInclude Include="..\..\..\Source\Sustain.h"/>

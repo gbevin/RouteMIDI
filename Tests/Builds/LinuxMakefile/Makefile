@@ -85,6 +85,7 @@ OBJECTS_CONSOLEAPP := \
   $(JUCE_OBJDIR)/ScriptMidiMessageClass_3119217.o \
   $(JUCE_OBJDIR)/ScriptOscClass_3ed124de.o \
   $(JUCE_OBJDIR)/ScriptUtilClass_da719b5b.o \
+  $(JUCE_OBJDIR)/McpConfig_15ace68c.o \
   $(JUCE_OBJDIR)/McpServer_7747aa0d.o \
   $(JUCE_OBJDIR)/Schema_68a49d5b.o \
   $(JUCE_OBJDIR)/Sustain_e484fe73.o \
@@ -100,6 +101,7 @@ OBJECTS_CONSOLEAPP := \
   $(JUCE_OBJDIR)/MpeTests_c7653914.o \
   $(JUCE_OBJDIR)/PipelineTests_f6600a14.o \
   $(JUCE_OBJDIR)/ConnectionTests_32ca958.o \
+  $(JUCE_OBJDIR)/McpConfigTests_84149bfa.o \
   $(JUCE_OBJDIR)/include_juce_audio_basics_8a4e984a.o \
   $(JUCE_OBJDIR)/include_juce_audio_devices_63111d02.o \
   $(JUCE_OBJDIR)/include_juce_core_f26d17db.o \
@@ -186,6 +188,11 @@ $(JUCE_OBJDIR)/ScriptUtilClass_da719b5b.o: ../../../Source/ScriptUtilClass.cpp
 	@echo "Compiling ScriptUtilClass.cpp"
 	$(V_AT)$(CXX) $(JUCE_CXXFLAGS) $(JUCE_CPPFLAGS_CONSOLEAPP) $(JUCE_CFLAGS_CONSOLEAPP) -o "$@" -c "$<"
 
+$(JUCE_OBJDIR)/McpConfig_15ace68c.o: ../../../Source/McpConfig.cpp
+	-$(V_AT)mkdir -p $(@D)
+	@echo "Compiling McpConfig.cpp"
+	$(V_AT)$(CXX) $(JUCE_CXXFLAGS) $(JUCE_CPPFLAGS_CONSOLEAPP) $(JUCE_CFLAGS_CONSOLEAPP) -o "$@" -c "$<"
+
 $(JUCE_OBJDIR)/McpServer_7747aa0d.o: ../../../Source/McpServer.cpp
 	-$(V_AT)mkdir -p $(@D)
 	@echo "Compiling McpServer.cpp"
@@ -259,6 +266,11 @@ $(JUCE_OBJDIR)/PipelineTests_f6600a14.o: ../../PipelineTests.cpp
 $(JUCE_OBJDIR)/ConnectionTests_32ca958.o: ../../ConnectionTests.cpp
 	-$(V_AT)mkdir -p $(@D)
 	@echo "Compiling ConnectionTests.cpp"
+	$(V_AT)$(CXX) $(JUCE_CXXFLAGS) $(JUCE_CPPFLAGS_CONSOLEAPP) $(JUCE_CFLAGS_CONSOLEAPP) -o "$@" -c "$<"
+
+$(JUCE_OBJDIR)/McpConfigTests_84149bfa.o: ../../McpConfigTests.cpp
+	-$(V_AT)mkdir -p $(@D)
+	@echo "Compiling McpConfigTests.cpp"
 	$(V_AT)$(CXX) $(JUCE_CXXFLAGS) $(JUCE_CPPFLAGS_CONSOLEAPP) $(JUCE_CFLAGS_CONSOLEAPP) -o "$@" -c "$<"
 
 $(JUCE_OBJDIR)/include_juce_audio_basics_8a4e984a.o: ../../JuceLibraryCode/include_juce_audio_basics.cpp

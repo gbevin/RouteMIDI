@@ -80,6 +80,7 @@ OBJECTS_CONSOLEAPP := \
   $(JUCE_OBJDIR)/Latch_2e80cba5.o \
   $(JUCE_OBJDIR)/Mono_7e1955ec.o \
   $(JUCE_OBJDIR)/Main_90ebc5c2.o \
+  $(JUCE_OBJDIR)/McpConfig_dde070dd.o \
   $(JUCE_OBJDIR)/McpServer_3f7b345e.o \
   $(JUCE_OBJDIR)/Schema_ea09caa.o \
   $(JUCE_OBJDIR)/Sustain_fe08e904.o \
@@ -150,6 +151,11 @@ $(JUCE_OBJDIR)/Mono_7e1955ec.o: ../../Source/Mono.cpp
 $(JUCE_OBJDIR)/Main_90ebc5c2.o: ../../Source/Main.cpp
 	-$(V_AT)mkdir -p $(@D)
 	@echo "Compiling Main.cpp"
+	$(V_AT)$(CXX) $(JUCE_CXXFLAGS) $(JUCE_CPPFLAGS_CONSOLEAPP) $(JUCE_CFLAGS_CONSOLEAPP) -o "$@" -c "$<"
+
+$(JUCE_OBJDIR)/McpConfig_dde070dd.o: ../../Source/McpConfig.cpp
+	-$(V_AT)mkdir -p $(@D)
+	@echo "Compiling McpConfig.cpp"
 	$(V_AT)$(CXX) $(JUCE_CXXFLAGS) $(JUCE_CPPFLAGS_CONSOLEAPP) $(JUCE_CFLAGS_CONSOLEAPP) -o "$@" -c "$<"
 
 $(JUCE_OBJDIR)/McpServer_3f7b345e.o: ../../Source/McpServer.cpp
