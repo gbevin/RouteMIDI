@@ -89,11 +89,20 @@ public:
 
         beginTest("Only JSON clients resolve to config paths");
         {
-            expect(mcpconfig::configPathForClient("claude-desktop")
-                       .getFileName() == "claude_desktop_config.json");
-            expect(mcpconfig::configPathForClient("claude")
-                       .getFileName() == "claude_desktop_config.json");
-            expect(mcpconfig::configPathForClient("cursor").getFileName() == "mcp.json");
+            const File claude = mcpconfig::configPathForClient("claude-desktop");
+            expectEquals(claude.getFileName(), String("claude_desktop_config.json"));
+            // the file lives in a "Claude" folder under the app-data directory
+            expectEquals(claude.getParentDirectory().getFileName(), String("Claude"));
+           #if JUCE_MAC
+            // on macOS that is ~/Library/Application Support/Claude, not ~/Library/Claude
+            expect(claude.getFullPathName().contains("/Library/Application Support/Claude/"));
+           #endif
+            expectEquals(mcpconfig::configPathForClient("claude").getFileName(),
+                         String("claude_desktop_config.json"));
+
+            const File cursor = mcpconfig::configPathForClient("cursor");
+            expectEquals(cursor.getFileName(), String("mcp.json"));
+            expectEquals(cursor.getParentDirectory().getFileName(), String(".cursor"));
             // clients managed by their own CLI have no file for us to write
             expect(mcpconfig::configPathForClient("codex") == File());
             expect(mcpconfig::configPathForClient("claude-code") == File());

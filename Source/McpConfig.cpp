@@ -143,13 +143,18 @@ File configPathForClient(const String& client)
     }
 
     // Claude Desktop keeps its MCP servers in claude_desktop_config.json under
-    // the per-user application data directory, which JUCE maps to the right
-    // place on each platform (~/Library/Application Support, %APPDATA%,
-    // ~/.config).
+    // the per-user application data directory: ~/Library/Application Support on
+    // macOS, %APPDATA% on Windows, ~/.config on Linux. JUCE's
+    // userApplicationDataDirectory is %APPDATA% and ~/.config on Windows and
+    // Linux, but only ~/Library on macOS, so the "Application Support" segment
+    // has to be added there.
     if (info.name == "claude-desktop")
     {
-        return File::getSpecialLocation(File::userApplicationDataDirectory)
-                   .getChildFile("Claude")
+        File base = File::getSpecialLocation(File::userApplicationDataDirectory);
+       #if JUCE_MAC
+        base = base.getChildFile("Application Support");
+       #endif
+        return base.getChildFile("Claude")
                    .getChildFile("claude_desktop_config.json");
     }
 
