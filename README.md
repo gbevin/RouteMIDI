@@ -745,6 +745,33 @@ routemidi in "Seaboard" mpemono lower 1 out "Mono Synth"
 routemidi in "Keyboard" mpexp 1 lower:15 out "MPE Synth"
 ```
 
+For quick reference, here are common routing tasks as one-liners:
+
+| Intent | Command line |
+| --- | --- |
+| Forward a controller to a synth | `routemidi in "Keyboard" out "Synth"` |
+| Merge two controllers | `routemidi in "A" in "B" out "Synth"` |
+| Split one controller to two synths | `routemidi in "Keyboard" out "A" out "B"` |
+| Key split at C3 | `routemidi in "K" noterange C-2 B2 out "Bass" in "K" noterange C3 G8 out "Lead"` |
+| Velocity split | `routemidi in "K" velrange 1 63 out "Pad" in "K" velrange 64 127 out "Lead"` |
+| Transpose an octave up | `routemidi in "K" transp 12 out "Synth"` |
+| Keep a performance in C minor | `routemidi in "K" scale C minor out "Synth"` |
+| Diatonic triads in a key | `routemidi in "K" chord 4 7 scale C major out "Synth"` |
+| Drop clock and active sensing | `routemidi in "Seq" not clock not as out "Synth"` |
+| Move channel 10 onto channel 1 | `routemidi in "Multi" chmap 10 1 out "Synth"` |
+| Hold notes after release | `routemidi in "K" latch out "Synth"` |
+| Sustain pedal for a synth that ignores CC 64 | `routemidi in "K" sustain out "Sampler"` |
+| Calibrate an expression pedal's travel | `routemidi in "Pedal" ccrescale 11 20 108 0 127 out "Synth"` |
+| Drive a mono synth (low-note priority) | `routemidi in "K" mono low out "Synth"` |
+| MPE controller to a non-MPE synth | `routemidi in "Seaboard" mpemono lower 1 out "Mono Synth"` |
+| Regular keyboard to an MPE synth | `routemidi in "K" mpexp 1 lower:15 out "MPE Synth"` |
+| MPE zone across several mono synths | `routemidi in "Seaboard" mpesplit lower out "M1" out "M2" out "M3"` |
+| NRPN to 14-bit CC | `routemidi in "Knobs" convert nrpn 245 cc14 1 out "Synth"` |
+| CC 7 to pitch bend | `routemidi in "Fader" convert cc 7 pb out "Synth"` |
+| Poly pressure to channel pressure | `routemidi in "MPE" convert pp cp out "Mono Synth"` |
+| Custom per-message logic | `routemidi in "K" js "if (MIDI.isNoteOn()) MIDI.setVelocity(100);" out "Synth"` |
+| Bridge apps without hardware | `routemidi vin "RouteMIDI In" vout "RouteMIDI Out"` (Linux/macOS) |
+
 ## Text File Format
 
 The text file that can be read through the `file` command can contain a list of commands and options, just like when you would have written them manually on the console (without the `routemidi` executable). You can insert new lines instead of spaces and any line that starts with a hash (#) character is a comment.
