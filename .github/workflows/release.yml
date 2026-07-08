@@ -49,7 +49,7 @@ jobs:
       - name: Pack MCP bundle
         shell: bash
         run: |
-          out="routemidi-windows-${GITHUB_REF_NAME}.mcpb"
+          out="routemidi-claude-desktop-windows-${GITHUB_REF_NAME}.mcpb"
           ./Scripts/build-mcpb.sh "Builds/VisualStudio2017/x64/Release/ConsoleApp/routemidi.exe" "$out"
           sha256sum "$out" > "$out.sha256"
       - uses: actions/upload-artifact@v7
@@ -57,7 +57,7 @@ jobs:
           name: windows
           path: |
             routemidi-windows-*.zip*
-            routemidi-windows-*.mcpb*
+            routemidi-claude-desktop-windows-*.mcpb*
 
   # Requires five repository secrets (Settings -> Secrets and variables -> Actions):
   #   MACOS_CERTIFICATE      base64 of a .p12 holding BOTH the "Developer ID
@@ -114,9 +114,9 @@ jobs:
         run: npm install -g @anthropic-ai/mcpb
       - name: Pack MCP bundle
         run: |
-          ./Scripts/build-mcpb.sh "Builds/MacOSX/build/Release/routemidi" "Installers/routemidi-macOS-${GITHUB_REF_NAME}.mcpb"
+          ./Scripts/build-mcpb.sh "Builds/MacOSX/build/Release/routemidi" "Installers/routemidi-claude-desktop-macOS-${GITHUB_REF_NAME}.mcpb"
           cd Installers
-          bundle=$(ls routemidi-macOS-*.mcpb)
+          bundle=$(ls routemidi-claude-desktop-macOS-*.mcpb)
           shasum -a 256 "$bundle" > "$bundle.sha256"
 
       - uses: actions/upload-artifact@v7
@@ -124,7 +124,7 @@ jobs:
           name: macos
           path: |
             Installers/routemidi-macOS-*.zip*
-            Installers/routemidi-macOS-*.mcpb*
+            Installers/routemidi-claude-desktop-macOS-*.mcpb*
 
   release:
     name: Draft release

@@ -11,8 +11,10 @@ sync by hand.
 
 The release workflow (`.github/workflows/release.yml`) builds a bundle for each
 published platform (macOS and Windows) with the official `@anthropic-ai/mcpb`
-packer and attaches them to the GitHub release, so normally there is nothing to
-do by hand.
+packer and attaches them to the GitHub release as
+`routemidi-claude-desktop-<platform>-<version>.mcpb`, so normally there is
+nothing to do by hand. The `claude-desktop` in the name tells users the file is
+the AI-assistant integration, not another copy of the command-line tool.
 
 To build one locally from a compiled binary:
 
