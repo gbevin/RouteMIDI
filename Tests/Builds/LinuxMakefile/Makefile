@@ -102,6 +102,7 @@ OBJECTS_CONSOLEAPP := \
   $(JUCE_OBJDIR)/PipelineTests_f6600a14.o \
   $(JUCE_OBJDIR)/ConnectionTests_32ca958.o \
   $(JUCE_OBJDIR)/McpConfigTests_84149bfa.o \
+  $(JUCE_OBJDIR)/CaptureTests_6b0c2170.o \
   $(JUCE_OBJDIR)/include_juce_audio_basics_8a4e984a.o \
   $(JUCE_OBJDIR)/include_juce_audio_devices_63111d02.o \
   $(JUCE_OBJDIR)/include_juce_core_f26d17db.o \
@@ -271,6 +272,11 @@ $(JUCE_OBJDIR)/ConnectionTests_32ca958.o: ../../ConnectionTests.cpp
 $(JUCE_OBJDIR)/McpConfigTests_84149bfa.o: ../../McpConfigTests.cpp
 	-$(V_AT)mkdir -p $(@D)
 	@echo "Compiling McpConfigTests.cpp"
+	$(V_AT)$(CXX) $(JUCE_CXXFLAGS) $(JUCE_CPPFLAGS_CONSOLEAPP) $(JUCE_CFLAGS_CONSOLEAPP) -o "$@" -c "$<"
+
+$(JUCE_OBJDIR)/CaptureTests_6b0c2170.o: ../../CaptureTests.cpp
+	-$(V_AT)mkdir -p $(@D)
+	@echo "Compiling CaptureTests.cpp"
 	$(V_AT)$(CXX) $(JUCE_CXXFLAGS) $(JUCE_CPPFLAGS_CONSOLEAPP) $(JUCE_CFLAGS_CONSOLEAPP) -o "$@" -c "$<"
 
 $(JUCE_OBJDIR)/include_juce_audio_basics_8a4e984a.o: ../../JuceLibraryCode/include_juce_audio_basics.cpp

@@ -28,6 +28,18 @@
 #include "ParamSelection.h"
 #include "Sustain.h"
 
+#include <deque>
+
+// One routed message kept in a route's capture buffer, so an MCP client can poll
+// the traffic flowing through the route (the read_route tool). Each carries a
+// per-route monotonic sequence number so a caller can ask for only what's new.
+struct CapturedMidi
+{
+    int64 seq;            // per-route sequence number, assigned in arrival order
+    String input;         // the input port the message came in on
+    MidiMessage message;  // the message as the route emitted it (post-processing)
+};
+
 // A single MIDI input port of a route.
 struct RouteInput
 {
@@ -99,4 +111,19 @@ struct Route
     mpe::Splitter mpeSplit;               // per-route voice-to-output allocation state
 
     bool panic { false };                 // send all-notes-off to outputs on disconnect/shutdown
+
+    // rolling buffer of routed messages for the MCP read_route tool; filled only
+    // in MCP mode, guarded by the same lock as the routing path (midiCallbackLock_)
+    static constexpr int captureCapacity = 1024;
+    std::deque<CapturedMidi> capture;
+    int64 captureSeq { 0 };               // next sequence number to hand out
+
+    void captureMessage(const String& inputName, const MidiMessage& msg)
+    {
+        capture.push_back({ captureSeq++, inputName, msg });
+        while ((int) capture.size() > captureCapacity)
+        {
+            capture.pop_front();
+        }
+    }
 };

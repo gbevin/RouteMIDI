@@ -91,6 +91,10 @@ public:
                              Array<MidiMessage>& outMsgs, Array<int>& outPorts);
     const OwnedArray<Route>& getRoutes() const { return routes_; }
 
+    // when enabled, processRouteMessage records each routed message into its
+    // route's capture buffer for the MCP read_route tool; turned on in MCP mode
+    void enableTrafficCapture(bool enabled) { captureTraffic_ = enabled; }
+
     // text MIDI codec (TextMidi.cpp) with the current settings: renders and
     // parses the SendMIDI/ReceiveMIDI-compatible text format
     String messageToText(const MidiMessage& msg) const
@@ -181,6 +185,7 @@ private:
     bool noteNumbersOutput_;
     bool timestampOutput_;
     bool monitor_;
+    bool captureTraffic_ { false };   // record routed traffic for the MCP read_route tool
     bool monitorShowSource_;
     int octaveMiddleC_;
 

@@ -332,6 +332,7 @@ void ApplicationState::initialise(JUCEApplicationBase& app)
         // running, and each request is handled on the message thread
         startOutputSender();
         startTimer(200);
+        enableTrafficCapture(true);   // so the read_route tool can observe route traffic
         mcpServer_ = std::make_unique<McpServer>(*this);
         mcpServer_->start();
         return;
@@ -1346,6 +1347,18 @@ bool ApplicationState::processRouteMessage(Route& route, RouteInput& input, cons
             // split routing: each message is dispatched to a specific output
             // (a voice's port) or broadcast to all (port -1)
             processSplit(route, outMsg, outMsgs, outPorts);
+        }
+    }
+
+    // capture the routed traffic (what passed the route's filters and processing)
+    // so an MCP client can poll it with read_route. Enabled only in MCP mode
+    // (and in tests); this runs under midiCallbackLock_ on the live and injected
+    // paths, the same lock read_route takes to read the buffer.
+    if (captureTraffic_)
+    {
+        for (auto& outMsg : outMsgs)
+        {
+            route.captureMessage(input.fullInName, outMsg);
         }
     }
 

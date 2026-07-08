@@ -166,6 +166,15 @@ static DynamicObject* newInjectMidiSchema()
     return newObjectSchema(properties, { "route", "messages" });
 }
 
+static DynamicObject* newReadRouteSchema()
+{
+    auto properties = newObject();
+    properties->setProperty("route", var(newIntegerProperty("The route id, as reported by list_routes and start_route")));
+    properties->setProperty("after", var(newIntegerProperty("Return only messages whose seq is greater than this cursor; omit to get everything currently buffered. Pass the cursor from the previous result to poll for only new messages.")));
+    properties->setProperty("max", var(newIntegerProperty("Maximum number of messages to return (default 128, capped at the buffer size of 1024)")));
+    return newObjectSchema(properties, { "route" });
+}
+
 static DynamicObject* newMcpTool(const String& name, const String& title,
                                  const String& description,
                                  DynamicObject* inputSchema,
@@ -223,6 +232,20 @@ static Array<var> mcpTools()
                              "the echo.",
                              newInjectMidiSchema(),
                              false)));
+    tools.add(var(newMcpTool("read_route",
+                             "Read Route Traffic",
+                             "Return the MIDI messages that have recently flowed through a route, "
+                             "so a route can be listened to (what inject_midi is to sending, this "
+                             "is to receiving). Each entry is the shared SendMIDI/ReceiveMIDI text "
+                             "format with the input port it arrived on and a per-route sequence "
+                             "number. To watch a route, poll repeatedly, passing the 'cursor' from "
+                             "the previous result as 'after' to get only new messages; omit "
+                             "'after' to get everything currently buffered. The buffer keeps the "
+                             "most recent 1024 messages, and 'dropped' reports how many were "
+                             "missed when polling too slowly. Only messages that pass the route's "
+                             "filters and processing are captured, exactly what its monitor shows.",
+                             newReadRouteSchema(),
+                             true)));
     tools.add(var(newMcpTool("stop_route",
                              "Stop Route",
                              "Stop and remove a route by id, sending all-notes-off to its "
@@ -841,8 +864,9 @@ var McpServer::handleRequest(const var& message)
                             "discovers ports, start_route starts live MIDI "
                             "routes from explicit command tokens and "
                             "inject_midi sends test messages through a running "
-                            "route, echoing what it emitted. This MCP "
-                            "interface is experimental and may change between "
+                            "route echoing what it emitted, and read_route polls "
+                            "the messages that have flowed through a route. This "
+                            "MCP interface is experimental and may change between "
                             "RouteMIDI releases.");
         return var(newMcpResponse(id, result));
     }
@@ -1192,6 +1216,71 @@ var McpServer::handleRequest(const var& message)
             // to the outputs directly when an injected message reconfigures an
             // MPE zone; those messages are not part of the echo, so flag them
             result->setProperty("zoneReset", zoneReset);
+            return structuredOk(result);
+        }
+        if (name == "read_route")
+        {
+            Route* route = nullptr;
+            int index = -1;
+            const String error = findRouteArg(route, index);
+            if (error.isNotEmpty())
+            {
+                return toolError(error);
+            }
+
+            // -1 (the default) means "everything currently buffered": every seq is
+            // greater than -1. A real cursor returns only strictly newer messages.
+            const int64 after = args->hasProperty("after")
+                                ? (int64) (double) args->getProperty("after") : (int64) -1;
+            constexpr int defaultMax = 128;
+            int maxMessages = args->hasProperty("max") ? (int) args->getProperty("max") : defaultMax;
+            maxMessages = jlimit(1, Route::captureCapacity, maxMessages);
+
+            Array<var> messages;
+            int64 cursor = after;
+            int64 dropped = 0;
+            {
+                const ScopedLock sl(state_.midiCallbackLock_);
+
+                // if the caller's cursor predates the oldest buffered message,
+                // messages aged out of the ring between polls
+                const int64 oldest = route->capture.empty() ? route->captureSeq
+                                                             : route->capture.front().seq;
+                if (after >= 0 && oldest > after + 1)
+                {
+                    dropped = oldest - (after + 1);
+                }
+
+                for (const auto& captured : route->capture)
+                {
+                    if (captured.seq > after)
+                    {
+                        auto item = newObject();
+                        item->setProperty("seq", (double) captured.seq);
+                        item->setProperty("input", captured.input);
+                        item->setProperty("message", state_.messageToText(captured.message));
+                        messages.add(var(item));
+                        cursor = captured.seq;
+                        if (messages.size() >= maxMessages)
+                        {
+                            break;
+                        }
+                    }
+                }
+
+                // with nothing new to return, advance the cursor to the current end
+                // so the next poll continues forward instead of replaying history
+                if (messages.isEmpty())
+                {
+                    cursor = jmax(after, route->captureSeq - 1);
+                }
+            }
+
+            auto result = newObject();
+            result->setProperty("route", route->id);
+            result->setProperty("messages", var(messages));
+            result->setProperty("cursor", (double) cursor);
+            result->setProperty("dropped", (double) dropped);
             return structuredOk(result);
         }
         if (name == "add_commands" || name == "replace_command")

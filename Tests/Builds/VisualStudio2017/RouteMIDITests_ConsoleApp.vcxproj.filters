@@ -298,6 +298,9 @@
     <ClCompile Include="..\..\McpConfigTests.cpp">
       <Filter>RouteMIDITests\Tests</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\CaptureTests.cpp">
+      <Filter>RouteMIDITests\Tests</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\JuceLibraryCode\modules\juce_audio_basics\audio_play_head\juce_AudioPlayHead.cpp">
       <Filter>JUCE Modules\juce_audio_basics\audio_play_head</Filter>
     </ClCompile>

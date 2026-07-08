@@ -134,6 +134,15 @@ The server exposes these tools:
   defaults to 0, so `note-on 60` without a velocity becomes an effective
   note-off. Generate every operand and check the echoed result against the
   intent.
+- `read_route`: returns the MIDI messages that have recently flowed through a
+  route, so a route can be listened to (the receiving counterpart to
+  `inject_midi`). Each entry is a text MIDI message with the input port it
+  arrived on and a per-route `seq`. To watch a route, poll repeatedly, passing
+  the returned `cursor` as `after` to get only new messages; omit `after` to get
+  everything currently buffered. The buffer holds the most recent 1024 messages,
+  and `dropped` reports how many were missed when polling too slowly. Only
+  messages that pass the route's filters and processing are captured (both live
+  traffic and injected messages), exactly what the monitor would show.
 - `add_commands`: appends processing commands (filters, transforms, MPE
   operations, conversions) to a running route; ports cannot be changed.
 - `replace_command`: replaces one command of a running route in place, keeping

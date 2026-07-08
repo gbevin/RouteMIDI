@@ -171,6 +171,7 @@
     <ClCompile Include="..\..\PipelineTests.cpp"/>
     <ClCompile Include="..\..\ConnectionTests.cpp"/>
     <ClCompile Include="..\..\McpConfigTests.cpp"/>
+    <ClCompile Include="..\..\CaptureTests.cpp"/>
     <ClCompile Include="..\..\..\JuceLibraryCode\modules\juce_audio_basics\audio_play_head\juce_AudioPlayHead.cpp">
       <ExcludedFromBuild>true</ExcludedFromBuild>
     </ClCompile>

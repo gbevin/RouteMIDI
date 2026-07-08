@@ -140,23 +140,28 @@ run "mpemono collapse" in - mpemono lower 1 out -
 # a real MCP client sends one compact JSON message per line; the handshake, the
 # tool listing and a route lifecycle (start, inject, edit, stop) must all come
 # back as single-line JSON responses
-MCP_OUT="$(printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n' \
+MCP_OUT="$(printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n' \
     '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"pipe-test","version":"1"}}}' \
     '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' \
     '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"start_route","arguments":{"commands":["in","PipeTestIn","transp","12","out","PipeTestOut"]}}}' \
     '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"inject_midi","arguments":{"route":1,"messages":["channel 1 note-on 60 100"]}}}' \
-    '{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"replace_command","arguments":{"route":1,"stage":"transforms","index":0,"commands":["transp","-12"]}}}' \
-    '{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"stop_route","arguments":{"route":1}}}' \
-    '{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"list_routes","arguments":{}}}' \
+    '{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"read_route","arguments":{"route":1}}}' \
+    '{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"read_route","arguments":{"route":1,"after":0}}}' \
+    '{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"replace_command","arguments":{"route":1,"stage":"transforms","index":0,"commands":["transp","-12"]}}}' \
+    '{"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"stop_route","arguments":{"route":1}}}' \
+    '{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"list_routes","arguments":{}}}' \
     | "$BIN" --mcp 2>/dev/null | tr -d '\r')"
-if [ "$(printf '%s\n' "$MCP_OUT" | wc -l | tr -d ' ')" = "7" ] \
+if [ "$(printf '%s\n' "$MCP_OUT" | wc -l | tr -d ' ')" = "9" ] \
     && printf '%s\n' "$MCP_OUT" | sed -n 1p | grep -q '"serverInfo".*"routemidi"' \
-    && printf '%s\n' "$MCP_OUT" | sed -n 2p | grep -q '"list_routes"' \
+    && printf '%s\n' "$MCP_OUT" | sed -n 2p | grep -q '"read_route"' \
     && printf '%s\n' "$MCP_OUT" | sed -n 3p | grep -q '"id": 1' \
     && printf '%s\n' "$MCP_OUT" | sed -n 4p | grep -q 'note-on.*C4' \
-    && printf '%s\n' "$MCP_OUT" | sed -n 5p | grep -q '\-12' \
-    && printf '%s\n' "$MCP_OUT" | sed -n 6p | grep -q '"stopped": 1' \
-    && printf '%s\n' "$MCP_OUT" | sed -n 7p | grep -q '"routes": \[\]'; then
+    && printf '%s\n' "$MCP_OUT" | sed -n 5p | grep -q 'note-on.*C4' \
+    && printf '%s\n' "$MCP_OUT" | sed -n 5p | grep -q '"dropped": 0' \
+    && printf '%s\n' "$MCP_OUT" | sed -n 6p | grep -q '"messages": \[\]' \
+    && printf '%s\n' "$MCP_OUT" | sed -n 7p | grep -q '\-12' \
+    && printf '%s\n' "$MCP_OUT" | sed -n 8p | grep -q '"stopped": 1' \
+    && printf '%s\n' "$MCP_OUT" | sed -n 9p | grep -q '"routes": \[\]'; then
     echo "ok   mcp handshake and route lifecycle"
 else
     echo "FAIL mcp handshake and route lifecycle"

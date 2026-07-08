@@ -69,6 +69,7 @@
       <FILE id="tst010" name="PipelineTests.cpp" compile="1" resource="0" file="PipelineTests.cpp"/>
       <FILE id="tst010" name="ConnectionTests.cpp" compile="1" resource="0" file="ConnectionTests.cpp"/>
       <FILE id="tst011" name="McpConfigTests.cpp" compile="1" resource="0" file="McpConfigTests.cpp"/>
+      <FILE id="tst012" name="CaptureTests.cpp" compile="1" resource="0" file="CaptureTests.cpp"/>
     </GROUP>
   </MAINGROUP>
   <EXPORTFORMATS>
