@@ -131,7 +131,7 @@ ApplicationState::ApplicationState()
     commands_.add({"ccrange",      "control-change-range",       CONTROL_CHANGE_RANGE,        3, {"number", "low", "high"},  {"Pass a Control Change only when its value is in a range"}});
     commands_.add({"cc14range",    "control-change-14-range",    CONTROL_CHANGE_14BIT_RANGE,  3, {"number", "low", "high"},  {"Pass a 14-bit CC only when its value is in a range (0-16383)"}});
     commands_.add({"inscale",      "in-scale",                   IN_SCALE,                    2, {"root", "scale"},          {"Pass notes that belong to a scale (root and name)"}});
-    commands_.add({"mpemanager",    "mpe-manager",                 MPE_MANAGER,                  1, {"zone[:n]"},               {"Pass the manager channel of an MPE zone (e.g. lower)"}});
+    commands_.add({"mpemanager",   "mpe-manager",                MPE_MANAGER,                 1, {"zone[:n]"},               {"Pass the manager channel of an MPE zone (e.g. lower)"}});
     commands_.add({"mpemember",    "mpe-member",                 MPE_MEMBER,                  1, {"zone[:n]"},               {"Pass the member channels of an MPE zone (e.g. upper:7)"}});
     commands_.add({"mpezone",      "mpe-zone",                   MPE_ZONE,                    1, {"zone[:n]"},               {"Pass a whole MPE zone (its manager and member channels)"}});
     commands_.add({"chmap",        "channel-map",                CHANNEL_MAP,                 2, {"from", "to"},             {"Remap channel-voice messages from one channel to another"}, "Transforms"});

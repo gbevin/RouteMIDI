@@ -329,7 +329,7 @@ public:
             }
             // 8192 + (9387-8192) * 48/12 = 8192 + 1195*4 = 12972
             expectEquals(memberBend, 12972);
-            expectEquals(managerBend, 10000);   // manager bend unchanged
+            expectEquals(managerBend, 10000);  // manager bend unchanged
             expect(cc74Seen);                  // non-bend messages pass through
         }
 
@@ -353,7 +353,7 @@ public:
                 }
             }
             expectEquals(sense, 24);
-            expect(! onManager);              // member channels only, not the manager
+            expect(! onManager);             // member channels only, not the manager
             expect(lastSenseIdx < noteIdx);  // declared before the Note On
         }
 
