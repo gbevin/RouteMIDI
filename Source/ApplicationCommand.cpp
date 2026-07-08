@@ -293,7 +293,7 @@ bool ApplicationCommand::isFilter() const
         case CONTROL_CHANGE_RANGE:
         case CONTROL_CHANGE_14BIT_RANGE:
         case IN_SCALE:
-        case MPE_MASTER:
+        case MPE_MANAGER:
         case MPE_MEMBER:
         case MPE_ZONE:
             return true;
@@ -487,14 +487,14 @@ bool ApplicationCommand::matches(const ApplicationState& state, const MidiMessag
             return (copts_[1].scaleMask >> pc) & 1;
         }
 
-        case MPE_MASTER:
-            // pass messages on the master channel of the given MPE zone
-            return copts_[0].zoneValid && msg.getChannel() == copts_[0].zone.masterChannel();
+        case MPE_MANAGER:
+            // pass messages on the manager channel of the given MPE zone
+            return copts_[0].zoneValid && msg.getChannel() == copts_[0].zone.managerChannel();
         case MPE_MEMBER:
             // pass messages on any member channel of the given MPE zone
             return copts_[0].zoneValid && copts_[0].zone.memberIndexOf(msg.getChannel()) >= 0;
         case MPE_ZONE:
-            // pass a whole zone: its master channel and all its member channels
+            // pass a whole zone: its manager channel and all its member channels
             return copts_[0].zoneValid && copts_[0].zone.contains(msg.getChannel());
 
         default:

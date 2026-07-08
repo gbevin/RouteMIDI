@@ -26,19 +26,19 @@
 
 // Helpers describing a MIDI Polyphonic Expression (MPE) zone and the per-input
 // state needed to expand a regular channel into one. An MPE zone has a single
-// master channel carrying zone-wide messages and a contiguous block of member
+// manager channel carrying zone-wide messages and a contiguous block of member
 // channels carrying one note each (with per-note pitch bend, channel pressure
-// and CC 74). The Lower Zone has master channel 1 and members counting up from
-// channel 2; the Upper Zone has master channel 16 and members counting down
+// and CC 74). The Lower Zone has manager channel 1 and members counting up from
+// channel 2; the Upper Zone has manager channel 16 and members counting down
 // from channel 15.
 namespace mpe
 {
     struct Zone
     {
-        bool lower { true };   // true = Lower Zone (master 1), false = Upper Zone (master 16)
+        bool lower { true };   // true = Lower Zone (manager 1), false = Upper Zone (manager 16)
         int members { 15 };    // number of member channels, 1-15
 
-        int masterChannel() const { return lower ? 1 : 16; }
+        int managerChannel() const { return lower ? 1 : 16; }
 
         // the MIDI channel (1-16) of the index-th member channel (0-based), or
         // 0 when the index is out of range for this zone
@@ -48,8 +48,8 @@ namespace mpe
         // not one of this zone's member channels
         int memberIndexOf(int channel) const;
 
-        bool isMaster(int channel) const { return channel == masterChannel(); }
-        bool contains(int channel) const { return isMaster(channel) || memberIndexOf(channel) >= 0; }
+        bool isManager(int channel) const { return channel == managerChannel(); }
+        bool contains(int channel) const { return isManager(channel) || memberIndexOf(channel) >= 0; }
     };
 
     // Parses a zone token of the form "<side>[:<members>]" where side starts
@@ -58,7 +58,7 @@ namespace mpe
     // an unrecognized side.
     bool parseZone(const String& token, Zone& out);
 
-    // Appends a standard MPE Configuration Message (RPN 6 on the master channel)
+    // Appends a standard MPE Configuration Message (RPN 6 on the manager channel)
     // announcing the zone's member-channel count, followed by the RPN null to
     // deselect the parameter.
     void appendConfigMessage(Array<MidiMessage>& out, const Zone& zone, double timestamp);
@@ -212,8 +212,8 @@ namespace mpe
         int counter { 0 };   // monotonically increasing note-trigger counter
         bool active[17];     // whether a note is held on each source member channel
         int order[17];       // trigger order per source channel (higher = more recent)
-        int masterRpnMsb { -1 };  // RPN selection on the master channel, to spot the MCM (RPN 6)
-        int masterRpnLsb { -1 };
+        int managerRpnMsb { -1 };  // RPN selection on the manager channel, to spot the MCM (RPN 6)
+        int managerRpnLsb { -1 };
         int srcBend[17];         // last pitch bend held on each source member channel, -1 = none
         int srcPressure[17];     // last channel pressure held on each source channel, -1 = none
         int channelCC[17][128];  // last value of each CC held on each source channel, -1 = none
@@ -264,7 +264,7 @@ namespace mpe
     // (none, one or several) to the output.
 
     // "mpe": remap every channel of the source zone onto the destination zone,
-    // master -> master and member index i -> destination member i; when the
+    // manager -> manager and member index i -> destination member i; when the
     // destination has fewer members, colliding notes fold last-note-wins
     void relocate(Relocator& rel, const Zone& src, const Zone& dst,
                   const MidiMessage& msg, Array<MidiMessage>& output);
@@ -276,7 +276,7 @@ namespace mpe
                   const MidiMessage& msg, Array<MidiMessage>& output);
 
     // "mpexp": spread the notes arriving on a single channel across an MPE
-    // zone's member channels, sending zone-wide messages to the master channel
+    // zone's member channels, sending zone-wide messages to the manager channel
     void expand(Allocator& alloc, int srcChannel, const Zone& dst,
                 const MidiMessage& msg, Array<MidiMessage>& output);
 

@@ -75,22 +75,22 @@ public:
         beginTest("Zone channel math for the Lower and Upper zones");
         {
             mpe::Zone lower; lower.lower = true;  lower.members = 15;
-            expectEquals(lower.masterChannel(), 1);
+            expectEquals(lower.managerChannel(), 1);
             expectEquals(lower.memberChannel(0), 2);
             expectEquals(lower.memberChannel(14), 16);
             expectEquals(lower.memberIndexOf(2), 0);
             expectEquals(lower.memberIndexOf(16), 14);
-            expectEquals(lower.memberIndexOf(1), -1);   // master is not a member
+            expectEquals(lower.memberIndexOf(1), -1);   // manager is not a member
             expect(lower.contains(1) && lower.contains(16) && !lower.contains(0));
 
             mpe::Zone upper; upper.lower = false; upper.members = 7;
-            expectEquals(upper.masterChannel(), 16);
+            expectEquals(upper.managerChannel(), 16);
             expectEquals(upper.memberChannel(0), 15);
             expectEquals(upper.memberChannel(6), 9);
             expectEquals(upper.memberIndexOf(15), 0);
             expectEquals(upper.memberIndexOf(9), 6);
             expectEquals(upper.memberIndexOf(8), -1);   // outside the 7 members
-            expectEquals(upper.memberIndexOf(16), -1);  // master is not a member
+            expectEquals(upper.memberIndexOf(16), -1);  // manager is not a member
         }
 
         beginTest("ExpressionState combines Manager and Member bend per the MPE spec");
@@ -205,41 +205,41 @@ public:
 
         ApplicationState state;
 
-        beginTest("mpemaster and mpemember filters select the right channels");
+        beginTest("mpemanager and mpemember filters select the right channels");
         {
-            auto master = makeCommand(MPE_MASTER, {"lower"});
+            auto manager = makeCommand(MPE_MANAGER, {"lower"});
             auto member = makeCommand(MPE_MEMBER, {"lower:7"});
 
-            // lower zone with 7 members: master 1, members 2-8
-            expect(  master.matches(state, MidiMessage::controllerEvent(1, 7, 64), 0));
-            expect(! master.matches(state, MidiMessage::controllerEvent(2, 7, 64), 0));
+            // lower zone with 7 members: manager 1, members 2-8
+            expect(  manager.matches(state, MidiMessage::controllerEvent(1, 7, 64), 0));
+            expect(! manager.matches(state, MidiMessage::controllerEvent(2, 7, 64), 0));
 
             expect(  member.matches(state, MidiMessage::noteOn(2, 60, (uint8)100), 0));
             expect(  member.matches(state, MidiMessage::noteOn(8, 60, (uint8)100), 0));
             expect(! member.matches(state, MidiMessage::noteOn(9, 60, (uint8)100), 0));  // beyond 7 members
-            expect(! member.matches(state, MidiMessage::noteOn(1, 60, (uint8)100), 0));  // master, not member
+            expect(! member.matches(state, MidiMessage::noteOn(1, 60, (uint8)100), 0));  // manager, not member
 
-            // mpezone passes the whole zone (master and members), to isolate one
+            // mpezone passes the whole zone (manager and members), to isolate one
             // zone of a two-zone controller
             auto zone = makeCommand(MPE_ZONE, {"lower:7"});
-            expect(  zone.matches(state, MidiMessage::controllerEvent(1, 7, 64), 0));   // master
+            expect(  zone.matches(state, MidiMessage::controllerEvent(1, 7, 64), 0));   // manager
             expect(  zone.matches(state, MidiMessage::noteOn(2, 60, (uint8)100), 0));   // member
             expect(  zone.matches(state, MidiMessage::noteOn(8, 60, (uint8)100), 0));   // member
             expect(! zone.matches(state, MidiMessage::noteOn(9, 60, (uint8)100), 0));   // upper zone, dropped
-            expect(! zone.matches(state, MidiMessage::controllerEvent(16, 7, 64), 0));  // upper master, dropped
+            expect(! zone.matches(state, MidiMessage::controllerEvent(16, 7, 64), 0));  // upper manager, dropped
         }
 
         beginTest("relocate remaps the Lower zone onto the Upper zone");
         {
             Array<MidiMessage> in;
-            in.add(MidiMessage::controllerEvent(1, 74, 64));            // master message
+            in.add(MidiMessage::controllerEvent(1, 74, 64));            // manager message
             in.add(MidiMessage::noteOn(2, 60, (uint8)100));            // first member
             in.add(MidiMessage::pitchWheel(3, 9000));                  // second member
             in.add(MidiMessage::noteOn(7, 64, (uint8)100));            // unrelated channel? no, ch7 is a member
 
             auto out = runMpe(state, MPE_RELOCATE, {"lower:15", "upper:15"}, in);
             expectEquals(out.size(), 4);
-            // lower master 1 -> upper master 16
+            // lower manager 1 -> upper manager 16
             expectEquals(out[0].getChannel(), 16);
             // lower member index 0 (ch2) -> upper member index 0 (ch15)
             expectEquals(out[1].getChannel(), 15);
@@ -316,20 +316,20 @@ public:
             // semitone bend (value 9387) must become the same +7 at 12 semitones
             Array<MidiMessage> in;
             in.add(MidiMessage::pitchWheel(2, 9387));         // member, +7 st at 48
-            in.add(MidiMessage::pitchWheel(1, 10000));        // master: left alone
+            in.add(MidiMessage::pitchWheel(1, 10000));        // manager: left alone
             in.add(MidiMessage::controllerEvent(2, 74, 50));  // not pitch bend: left alone
             auto out = runMpe(state, MPE_BEND, {"lower:15", "48", "12"}, in);
 
-            int memberBend = -1, masterBend = -1; bool cc74Seen = false;
+            int memberBend = -1, managerBend = -1; bool cc74Seen = false;
             for (const auto& m : out)
             {
                 if (m.isPitchWheel() && m.getChannel() == 2) memberBend = m.getPitchWheelValue();
-                if (m.isPitchWheel() && m.getChannel() == 1) masterBend = m.getPitchWheelValue();
+                if (m.isPitchWheel() && m.getChannel() == 1) managerBend = m.getPitchWheelValue();
                 if (m.isController() && m.getControllerNumber() == 74) cc74Seen = true;
             }
             // 8192 + (9387-8192) * 48/12 = 8192 + 1195*4 = 12972
             expectEquals(memberBend, 12972);
-            expectEquals(masterBend, 10000);   // master bend unchanged
+            expectEquals(managerBend, 10000);   // manager bend unchanged
             expect(cc74Seen);                  // non-bend messages pass through
         }
 
@@ -341,7 +341,7 @@ public:
 
             // RPN 0 = 24 declared on every member channel (2, 3, 4), before the note
             int noteIdx = -1, lastSenseIdx = -1, sense = -1;
-            bool onMaster = false;
+            bool onManager = false;
             for (int i = 0; i < out.size(); ++i)
             {
                 if (out[i].isNoteOn()) noteIdx = i;
@@ -349,11 +349,11 @@ public:
                 {
                     sense = out[i].getControllerValue();
                     lastSenseIdx = i;
-                    if (out[i].getChannel() == 1) onMaster = true;
+                    if (out[i].getChannel() == 1) onManager = true;
                 }
             }
             expectEquals(sense, 24);
-            expect(! onMaster);              // member channels only, not the master
+            expect(! onManager);              // member channels only, not the manager
             expect(lastSenseIdx < noteIdx);  // declared before the Note On
         }
 
@@ -387,7 +387,7 @@ public:
         beginTest("relocate rewrites the MCM member count to the destination zone");
         {
             // an MPE Configuration Message announcing 15 members, relocated to an
-            // 8-member zone, should announce 8 (and move to the destination master)
+            // 8-member zone, should announce 8 (and move to the destination manager)
             Array<MidiMessage> in;
             in.add(MidiMessage::controllerEvent(1, 101, 0));
             in.add(MidiMessage::controllerEvent(1, 100, 6));
@@ -397,7 +397,7 @@ public:
             int memberCount = -1;
             for (const auto& m : out)
             {
-                expectEquals(m.getChannel(), 1);   // lower -> lower master stays channel 1
+                expectEquals(m.getChannel(), 1);   // lower -> lower manager stays channel 1
                 if (m.isController() && m.getControllerNumber() == 6) memberCount = m.getControllerValue();
             }
             expectEquals(memberCount, 8);
@@ -481,7 +481,7 @@ public:
         beginTest("collapse folds every zone channel onto one channel");
         {
             Array<MidiMessage> in;
-            in.add(MidiMessage::noteOn(1, 60, (uint8)100));   // master
+            in.add(MidiMessage::noteOn(1, 60, (uint8)100));   // manager
             in.add(MidiMessage::noteOn(2, 64, (uint8)100));   // member
             in.add(MidiMessage::noteOn(5, 67, (uint8)100));   // member
             in.add(MidiMessage::noteOn(11, 70, (uint8)100));  // outside a 4-member zone (ch 1-5)
@@ -730,12 +730,12 @@ public:
             in.add(MidiMessage::noteOn(1, 60, (uint8)100));
             auto out = runMpe(state, MPE_EXPAND, {"1", "lower:15"}, in);
 
-            // the MPE Configuration Message (RPN 6 on the master) comes first
+            // the MPE Configuration Message (RPN 6 on the manager) comes first
             expect(out.size() >= 6);
             expect(out[0].isController() && out[0].getControllerNumber() == 101 && out[0].getControllerValue() == 0);
             expect(out[1].isController() && out[1].getControllerNumber() == 100 && out[1].getControllerValue() == 6);
             expect(out[2].isController() && out[2].getControllerNumber() == 6   && out[2].getControllerValue() == 15);
-            expect(out[1].getChannel() == 1);  // sent on the master channel
+            expect(out[1].getChannel() == 1);  // sent on the manager channel
             // then the note, on the first member channel
             const auto& note = out[out.size() - 1];
             expect(note.isNoteOn());
@@ -855,14 +855,14 @@ public:
             expect(out[noteOffIdx - 1].isChannelPressure() && out[noteOffIdx - 1].getChannelPressureValue() == 0);
         }
 
-        beginTest("expand sends zone-wide messages to the master channel");
+        beginTest("expand sends zone-wide messages to the manager channel");
         {
             Array<MidiMessage> in;
             in.add(MidiMessage::pitchWheel(1, 10000));
             in.add(MidiMessage::channelPressureChange(1, 50));
             auto out = runMpe(state, MPE_EXPAND, {"1", "lower:15"}, in);
 
-            // no notes, so no config block; both go to master channel 1
+            // no notes, so no config block; both go to manager channel 1
             for (const auto& m : out)
             {
                 expectEquals(m.getChannel(), 1);
@@ -1067,7 +1067,7 @@ public:
 
         beginTest("split suppresses the MPE Configuration Message (RPN 6)");
         {
-            // the MCM as emitted on the master channel: select RPN 6, set it, null
+            // the MCM as emitted on the manager channel: select RPN 6, set it, null
             Array<MidiMessage> in;
             in.add(MidiMessage::controllerEvent(1, 101, 0));
             in.add(MidiMessage::controllerEvent(1, 100, 6));

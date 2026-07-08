@@ -93,7 +93,7 @@ static const char* commandStage(CommandIndex command)
         case CONTROL_CHANGE_RANGE:
         case CONTROL_CHANGE_14BIT_RANGE:
         case IN_SCALE:
-        case MPE_MASTER:
+        case MPE_MANAGER:
         case MPE_MEMBER:
         case MPE_ZONE:
             return "filters";

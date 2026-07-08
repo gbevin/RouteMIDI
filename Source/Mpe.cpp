@@ -74,7 +74,7 @@ bool parseZone(const String& token, Zone& out)
 
 void appendConfigMessage(Array<MidiMessage>& out, const Zone& zone, double timestamp)
 {
-    const int ch = zone.masterChannel();
+    const int ch = zone.managerChannel();
     const MidiMessage msgs[] = {
         MidiMessage::controllerEvent(ch, 101, 0),            // RPN MSB
         MidiMessage::controllerEvent(ch, 100, 6),            // RPN LSB = MPE Configuration
@@ -170,7 +170,7 @@ bool McmTracker::reconfigures(const MidiMessage& msg)
 void ExpressionState::resetSensitivity(const Zone& zone)
 {
     for (int i = 0; i < 17; ++i) bendSense[i] = 48.0;
-    bendSense[zone.masterChannel()] = 2.0;
+    bendSense[zone.managerChannel()] = 2.0;
 }
 
 void ExpressionState::resetForZone(const Zone& zone)
@@ -216,7 +216,7 @@ int ExpressionState::update(const Zone& zone, const MidiMessage& msg)
         {
             // Pitch Bend Sensitivity; on a Member Channel it applies to
             // every Member Channel of the zone (spec section 2.2.5)
-            if (zone.isMaster(ch))
+            if (zone.isManager(ch))
             {
                 bendSense[ch] = (double) v;
             }
@@ -277,8 +277,8 @@ int Collapser::activeChannel() const
 void Relocator::reset()
 {
     counter = 0;
-    masterRpnMsb = -1;
-    masterRpnLsb = -1;
+    managerRpnMsb = -1;
+    managerRpnLsb = -1;
     for (int i = 0; i < 17; ++i)
     {
         active[i] = false;
@@ -346,22 +346,22 @@ void relocate(Relocator& rel, const Zone& src, const Zone& dst,
     const double ts = msg.getTimeStamp();
     const int ch = msg.getChannel();
 
-    // the master channel is zone-wide; just move it across, but keep the
+    // the manager channel is zone-wide; just move it across, but keep the
     // MPE Configuration Message's announced member count accurate for the
     // destination zone (rewrite the RPN 6 data entry)
-    if (ch == src.masterChannel())
+    if (ch == src.managerChannel())
     {
         MidiMessage out = msg;
-        out.setChannel(dst.masterChannel());
+        out.setChannel(dst.managerChannel());
         if (msg.isController())
         {
             const int cc = msg.getControllerNumber();
             const int v = msg.getControllerValue();
-            if (cc == 101) rel.masterRpnMsb = v;
-            else if (cc == 100) rel.masterRpnLsb = v;
-            else if (cc == 6 && rel.masterRpnMsb == 0 && rel.masterRpnLsb == 6)
+            if (cc == 101) rel.managerRpnMsb = v;
+            else if (cc == 100) rel.managerRpnLsb = v;
+            else if (cc == 6 && rel.managerRpnMsb == 0 && rel.managerRpnLsb == 6)
             {
-                out = MidiMessage::controllerEvent(dst.masterChannel(), 6, dst.members);
+                out = MidiMessage::controllerEvent(dst.managerChannel(), 6, dst.members);
             }
         }
         out.setTimeStamp(ts);
@@ -493,7 +493,7 @@ void collapse(Collapser& col, const Zone& src, int target,
 {
     const double ts = msg.getTimeStamp();
     const int ch = msg.getChannel();
-    const int managerCh = src.masterChannel();
+    const int managerCh = src.managerChannel();
 
     // messages outside the zone pass straight through
     if (!src.contains(ch))
@@ -576,7 +576,7 @@ void collapse(Collapser& col, const Zone& src, int target,
     };
 
     // --- Manager (zone-wide) messages affect the note that owns the channel ---
-    if (src.isMaster(ch))
+    if (src.isManager(ch))
     {
         if (change == ExpressionState::Bend)     { emitBend(col.activeChannel()); return; }
         if (change == ExpressionState::CC74)     { emitCC74(col.activeChannel()); return; }
@@ -746,7 +746,7 @@ void expand(Allocator& alloc, int srcChannel, const Zone& dst,
         // pressure (the Z dimension)
         const int note = msg.getNoteNumber();
         const int mch = (note >= 0 && note < 128) ? alloc.noteChannel[note] : -1;
-        MidiMessage out = MidiMessage::channelPressureChange(mch >= 1 ? mch : dst.masterChannel(),
+        MidiMessage out = MidiMessage::channelPressureChange(mch >= 1 ? mch : dst.managerChannel(),
                                                              msg.getAfterTouchValue());
         out.setTimeStamp(ts);
         output.add(out);
@@ -754,9 +754,9 @@ void expand(Allocator& alloc, int srcChannel, const Zone& dst,
     }
 
     // remaining channel-voice messages (CC, pitch bend, channel
-    // pressure, program change) are zone-wide: send them to the master
+    // pressure, program change) are zone-wide: send them to the manager
     MidiMessage out = msg;
-    out.setChannel(dst.masterChannel());
+    out.setChannel(dst.managerChannel());
     output.add(out);
 }
 
@@ -815,7 +815,7 @@ void split(Splitter& sp, const Zone& zone, int targetCh, int ports,
         sp.expr.resetForZone(zone);
     }
 
-    const int managerCh = zone.masterChannel();
+    const int managerCh = zone.managerChannel();
     const int memberIndex = zone.memberIndexOf(ch);
     const bool inZone = (ch >= 1 && zone.contains(ch));
 
@@ -881,7 +881,7 @@ void split(Splitter& sp, const Zone& zone, int targetCh, int ports,
     // --- Manager (zone-wide), non-zone, and channelless messages ---
     if (ch == 0 || memberIndex < 0)
     {
-        if (zone.isMaster(ch))
+        if (zone.isManager(ch))
         {
             // zone-wide expression is folded into every occupied port's combined value
             if (change == ExpressionState::Bend)     { for (int p = 0; p < ports; ++p) emitPortBend(p);     return; }
