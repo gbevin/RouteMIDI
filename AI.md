@@ -228,6 +228,14 @@ channel  1   note-off          C4   0
 
 One message per line: an optional `channel <1-16>` prefix, then one of `note-on <note> <velocity>`, `note-off <note> <velocity>`, `poly-pressure <note> <value>`, `control-change <cc> <value>`, `program-change <n>`, `channel-pressure <n>`, `pitch-bend <0-16383>`, `midi-clock`, `start`, `stop`, `continue`, `active-sensing`, `reset`, `song-position <n>`, `song-select <n>`, `tune-request`, `time-code <t> <v>`, `system-exclusive <bytes>` (with inline `hex`/`dec` toggles). The same format is read by SendMIDI and written by ReceiveMIDI.
 
+Because all three tools speak this format, they chain into live pipelines: ReceiveMIDI captures a port as text, RouteMIDI processes it in the middle, and SendMIDI emits it on another port. This transposes everything a keyboard plays before it reaches the synth, without starting a route on hardware ports:
+
+```
+$ receivemidi dev "Keyboard" | routemidi in - transp 12 out - | sendmidi dev "Synth" --
+```
+
+The same text also records and replays: redirect ReceiveMIDI's output (with `ts` for timestamps) to a file, and SendMIDI's `file` command plays it back with the original timing.
+
 **Working over MCP**
 
 * The tool list, client configuration and troubleshooting live in the [MCP server section](#the-mcp-server). Everything below assumes the server was launched with `--mcp`.
