@@ -193,6 +193,11 @@ Transforms:
   cpset       number     Set a fixed Channel Pressure value (0-127)
   cpcurve     gamma      Apply a gamma curve to Channel Pressure
   cpinvert               Invert Channel Pressure (0-127 mirrored)
+  ppadd       number     Add an offset to Poly Pressure (clamped 0-127)
+  ppscale     factor     Scale Poly Pressure by a factor (clamped 0-127)
+  ppset       number     Set a fixed Poly Pressure value (0-127)
+  ppcurve     gamma      Apply a gamma curve to Poly Pressure
+  ppinvert               Invert Poly Pressure (0-127 mirrored)
   pbadd       number     Add an offset to Pitch Bend (clamped 0-16383)
   pbscale     factor     Scale Pitch Bend around center by a factor (0-16383)
   pbset       number     Set a fixed Pitch Bend value (0-16383)
@@ -257,9 +262,10 @@ Each command can also be written with its long name instead of the short one:
   nrpn-set rpn-add rpn-scale rpn-curve rpn-invert rpn-rescale rpn-set
   program-change-map program-change-add channel-pressure-add
   channel-pressure-scale channel-pressure-set channel-pressure-curve
-  channel-pressure-invert pitch-bend-add pitch-bend-scale pitch-bend-set
-  pitch-bend-invert javascript javascript-file mpe-mono mpe-expand mpe-split
-  mpe-bend mpe-sensitivity
+  channel-pressure-invert poly-pressure-add poly-pressure-scale
+  poly-pressure-set poly-pressure-curve poly-pressure-invert pitch-bend-add
+  pitch-bend-scale pitch-bend-set pitch-bend-invert javascript javascript-file
+  mpe-mono mpe-expand mpe-split mpe-bend mpe-sensitivity
 ```
 
 ## Routes
@@ -369,7 +375,7 @@ routemidi in "Keyboard" velclip 40 100 out "Synth"      # never too soft or too 
 routemidi in "Keyboard" velcomp 0.5 out "Synth"         # tighten the dynamic range
 ```
 
-The invert transforms mirror a value across its range: `velinvert` flips note-on velocity (soft becomes loud), `ccinvert` flips a controller's value (0 becomes 127 and vice versa, for instance to reverse a pedal or fader that works backwards), `cpinvert` flips Channel Pressure, and `pbinvert` mirrors Pitch Bend around its centre so a bend up becomes the same bend down.
+The invert transforms mirror a value across its range: `velinvert` flips note-on velocity (soft becomes loud), `ccinvert` flips a controller's value (0 becomes 127 and vice versa, for instance to reverse a pedal or fader that works backwards), `cpinvert` flips Channel Pressure, `ppinvert` flips Poly Pressure per note, and `pbinvert` mirrors Pitch Bend around its centre so a bend up becomes the same bend down. Poly Pressure has the same add/scale/set/curve family as Channel Pressure (`ppadd`, `ppscale`, `ppset`, `ppcurve`), so per-note pressure from a poly aftertouch keyboard can be reshaped without collapsing it to a channel-wide value.
 
 ```
 routemidi in "Pedal" ccinvert 11 out "Synth"            # reverse an expression pedal
@@ -769,6 +775,7 @@ For quick reference, here are common routing tasks as one-liners:
 | NRPN to 14-bit CC | `routemidi in "Knobs" convert nrpn 245 cc14 1 out "Synth"` |
 | CC 7 to pitch bend | `routemidi in "Fader" convert cc 7 pb out "Synth"` |
 | Poly pressure to channel pressure | `routemidi in "MPE" convert pp cp out "Mono Synth"` |
+| Soften poly aftertouch response | `routemidi in "Keyboard" ppcurve 2.0 out "Synth"` |
 | Custom per-message logic | `routemidi in "K" js "if (MIDI.isNoteOn()) MIDI.setVelocity(100);" out "Synth"` |
 | Bridge apps without hardware | `routemidi vin "RouteMIDI In" vout "RouteMIDI Out"` (Linux/macOS) |
 

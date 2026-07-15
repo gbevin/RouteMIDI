@@ -138,6 +138,11 @@ static const char* commandStage(CommandIndex command)
         case CHANNEL_PRESSURE_SET:
         case CHANNEL_PRESSURE_CURVE:
         case CHANNEL_PRESSURE_INVERT:
+        case POLY_PRESSURE_ADD:
+        case POLY_PRESSURE_SCALE:
+        case POLY_PRESSURE_SET:
+        case POLY_PRESSURE_CURVE:
+        case POLY_PRESSURE_INVERT:
         case JAVASCRIPT:
         case JAVASCRIPT_FILE:
             return "transforms";

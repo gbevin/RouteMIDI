@@ -677,6 +677,40 @@ public:
             expectEquals(m.getChannelPressureValue(), 27);
         }
 
+        beginTest("Poly Pressure transforms");
+        {
+            // the note number rides along unchanged through every value change
+            MidiMessage m = MidiMessage::aftertouchChange(1, 60, 50);
+            expect(makeCommand(POLY_PRESSURE_ADD, {"10"}).transform(state, m));
+            expectEquals(m.getAfterTouchValue(), 60);
+            expectEquals(m.getNoteNumber(), 60);
+
+            m = MidiMessage::aftertouchChange(1, 61, 100);
+            expect(makeCommand(POLY_PRESSURE_SCALE, {"0.5"}).transform(state, m));
+            expectEquals(m.getAfterTouchValue(), 50);
+            expectEquals(m.getNoteNumber(), 61);
+
+            m = MidiMessage::aftertouchChange(1, 62, 10);
+            expect(makeCommand(POLY_PRESSURE_SET, {"64"}).transform(state, m));
+            expectEquals(m.getAfterTouchValue(), 64);
+            expectEquals(m.getNoteNumber(), 62);
+
+            // gamma 2.0 attenuates the same way it does for velocity
+            m = MidiMessage::aftertouchChange(1, 60, 64);
+            expect(makeCommand(POLY_PRESSURE_CURVE, {"2.0"}).transform(state, m));
+            expectEquals(m.getAfterTouchValue(), 32);
+
+            // ppinvert mirrors the 0-127 pressure range
+            m = MidiMessage::aftertouchChange(1, 60, 100);
+            expect(makeCommand(POLY_PRESSURE_INVERT).transform(state, m));
+            expectEquals(m.getAfterTouchValue(), 27);
+
+            // channel pressure is a different message and passes untouched
+            m = MidiMessage::channelPressureChange(1, 100);
+            expect(makeCommand(POLY_PRESSURE_INVERT).transform(state, m));
+            expectEquals(m.getChannelPressureValue(), 100);
+        }
+
         beginTest("Gamma curves");
         {
             // gamma 1.0 is linear (identity)

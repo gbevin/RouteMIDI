@@ -273,6 +273,7 @@ Every recipe below also works as an MCP `start_route` payload: drop the `routemi
 | NRPN to 14-bit CC | `routemidi in "Knobs" convert nrpn 245 cc14 1 out "Synth"` |
 | CC 7 to pitch bend | `routemidi in "Fader" convert cc 7 pb out "Synth"` |
 | Poly pressure to channel pressure | `routemidi in "MPE" convert pp cp out "Mono Synth"` |
+| Soften poly aftertouch response | `routemidi in "Keyboard" ppcurve 2.0 out "Synth"` |
 | Custom per-message logic | `routemidi in "K" js "if (MIDI.isNoteOn()) MIDI.setVelocity(100);" out "Synth"` |
 | Bridge apps without hardware | `routemidi vin "RouteMIDI In" vout "RouteMIDI Out"` (Linux/macOS) |
 

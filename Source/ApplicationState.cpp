@@ -192,6 +192,11 @@ ApplicationState::ApplicationState()
     commands_.add({"cpset",        "channel-pressure-set",       CHANNEL_PRESSURE_SET,        1, {"number"},                 {"Set a fixed Channel Pressure value (0-127)"}});
     commands_.add({"cpcurve",      "channel-pressure-curve",     CHANNEL_PRESSURE_CURVE,      1, {"gamma"},                  {"Apply a gamma curve to Channel Pressure"}});
     commands_.add({"cpinvert",     "channel-pressure-invert",    CHANNEL_PRESSURE_INVERT,     0, {""},                       {"Invert Channel Pressure (0-127 mirrored)"}});
+    commands_.add({"ppadd",        "poly-pressure-add",          POLY_PRESSURE_ADD,           1, {"number"},                 {"Add an offset to Poly Pressure (clamped 0-127)"}});
+    commands_.add({"ppscale",      "poly-pressure-scale",        POLY_PRESSURE_SCALE,         1, {"factor"},                 {"Scale Poly Pressure by a factor (clamped 0-127)"}});
+    commands_.add({"ppset",        "poly-pressure-set",          POLY_PRESSURE_SET,           1, {"number"},                 {"Set a fixed Poly Pressure value (0-127)"}});
+    commands_.add({"ppcurve",      "poly-pressure-curve",        POLY_PRESSURE_CURVE,         1, {"gamma"},                  {"Apply a gamma curve to Poly Pressure"}});
+    commands_.add({"ppinvert",     "poly-pressure-invert",       POLY_PRESSURE_INVERT,        0, {""},                       {"Invert Poly Pressure (0-127 mirrored)"}});
     commands_.add({"pbadd",        "pitch-bend-add",             PITCH_BEND_ADD,              1, {"number"},                 {"Add an offset to Pitch Bend (clamped 0-16383)"}});
     commands_.add({"pbscale",      "pitch-bend-scale",           PITCH_BEND_SCALE,            1, {"factor"},                 {"Scale Pitch Bend around center by a factor (0-16383)"}});
     commands_.add({"pbset",        "pitch-bend-set",             PITCH_BEND_SET,              1, {"number"},                 {"Set a fixed Pitch Bend value (0-16383)"}});

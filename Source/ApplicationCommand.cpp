@@ -346,6 +346,11 @@ bool ApplicationCommand::isTransform() const
         case CHANNEL_PRESSURE_SET:
         case CHANNEL_PRESSURE_CURVE:
         case CHANNEL_PRESSURE_INVERT:
+        case POLY_PRESSURE_ADD:
+        case POLY_PRESSURE_SCALE:
+        case POLY_PRESSURE_SET:
+        case POLY_PRESSURE_CURVE:
+        case POLY_PRESSURE_INVERT:
         case JAVASCRIPT:
         case JAVASCRIPT_FILE:
             return true;
@@ -850,6 +855,47 @@ bool ApplicationCommand::transform(const ApplicationState& state, MidiMessage& m
             {
                 msg = MidiMessage::channelPressureChange(msg.getChannel(),
                                                          127 - msg.getChannelPressureValue());
+                msg.setTimeStamp(timestamp);
+            }
+            break;
+        case POLY_PRESSURE_ADD:
+            if (msg.isAftertouch())
+            {
+                int v = jlimit(0, 127, msg.getAfterTouchValue() + copts_[0].intValue);
+                msg = MidiMessage::aftertouchChange(msg.getChannel(), msg.getNoteNumber(), v);
+                msg.setTimeStamp(timestamp);
+            }
+            break;
+        case POLY_PRESSURE_SCALE:
+            if (msg.isAftertouch())
+            {
+                int v = jlimit(0, 127, roundToInt(msg.getAfterTouchValue() * (float) copts_[0].number));
+                msg = MidiMessage::aftertouchChange(msg.getChannel(), msg.getNoteNumber(), v);
+                msg.setTimeStamp(timestamp);
+            }
+            break;
+        case POLY_PRESSURE_SET:
+            if (msg.isAftertouch())
+            {
+                int v = jlimit(0, 127, copts_[0].intValue);
+                msg = MidiMessage::aftertouchChange(msg.getChannel(), msg.getNoteNumber(), v);
+                msg.setTimeStamp(timestamp);
+            }
+            break;
+        case POLY_PRESSURE_CURVE:
+            if (msg.isAftertouch())
+            {
+                int v = applyGammaCurve(msg.getAfterTouchValue(), 127, copts_[0].number);
+                msg = MidiMessage::aftertouchChange(msg.getChannel(), msg.getNoteNumber(), v);
+                msg.setTimeStamp(timestamp);
+            }
+            break;
+        case POLY_PRESSURE_INVERT:
+            // mirror the 0-127 pressure range, keeping the note
+            if (msg.isAftertouch())
+            {
+                msg = MidiMessage::aftertouchChange(msg.getChannel(), msg.getNoteNumber(),
+                                                    127 - msg.getAfterTouchValue());
                 msg.setTimeStamp(timestamp);
             }
             break;
