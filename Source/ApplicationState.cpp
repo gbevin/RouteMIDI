@@ -505,10 +505,10 @@ void ApplicationState::timerCallback()
     // MIDI input callback (which needs the same lock), risking dropped packets.
     auto availableIns  = MidiInput::getAvailableDevices();
     auto availableOuts = MidiOutput::getAvailableDevices();
-    StringArray inNames;
+    StringArray inIdentifiers;
     for (auto&& d : availableIns)
     {
-        inNames.add(d.name);
+        inIdentifiers.add(d.identifier);
     }
 
     // The route graph is built entirely during startup and never changes once the
@@ -530,10 +530,13 @@ void ApplicationState::timerCallback()
             String toConnect;   // an inName still waiting to be (re)connected
             {
                 const ScopedLock sl(midiCallbackLock_);
-                if (input->fullInName.isNotEmpty() && !inNames.contains(input->fullInName))
+                // the unique identifier is checked rather than the name, so
+                // the twin of a disconnected port can't mask its disappearance
+                if (input->fullInName.isNotEmpty() && !inIdentifiers.contains(input->fullInIdentifier))
                 {
                     lostName = input->fullInName;
                     input->fullInName = String();
+                    input->fullInIdentifier = String();
                     input->midiIn = nullptr;
                 }
                 else if (input->inName.isNotEmpty() && input->midiIn == nullptr)
@@ -553,20 +556,15 @@ void ApplicationState::timerCallback()
             }
             else if (toConnect.isNotEmpty())
             {
-                // resolve a device from the snapshot (exact name first, then a
-                // substring match) and open it WITHOUT the lock; only the swap-in is
-                // done locked, and only if the input still wants it
+                // resolve a device from the snapshot and open it WITHOUT the
+                // lock; only the swap-in is done locked, and only if the input
+                // still wants it
                 String identifier, fullName;
-                for (auto&& d : availableIns)
+                auto index = matchDeviceIndex(availableIns, toConnect);
+                if (index >= 0)
                 {
-                    if (d.name == toConnect) { identifier = d.identifier; fullName = d.name; break; }
-                }
-                if (identifier.isEmpty())
-                {
-                    for (auto&& d : availableIns)
-                    {
-                        if (d.name.containsIgnoreCase(toConnect)) { identifier = d.identifier; fullName = d.name; break; }
-                    }
+                    identifier = availableIns[index].identifier;
+                    fullName = availableIns[index].name;
                 }
 
                 if (identifier.isNotEmpty())
@@ -582,6 +580,7 @@ void ApplicationState::timerCallback()
                             {
                                 input->midiIn.swap(opened);
                                 input->fullInName = fullName;
+                                input->fullInIdentifier = identifier;
                                 connected = true;
                             }
                         }
@@ -612,9 +611,11 @@ void ApplicationState::timerCallback()
             }
 
             String identifier, fullName;
-            for (auto&& device : availableOuts)
+            auto outIndex = matchDeviceIndex(availableOuts, toOpen);
+            if (outIndex >= 0)
             {
-                if (device.name.containsIgnoreCase(toOpen)) { identifier = device.identifier; fullName = device.name; break; }
+                identifier = availableOuts[outIndex].identifier;
+                fullName = availableOuts[outIndex].name;
             }
 
             if (identifier.isNotEmpty())
@@ -781,14 +782,14 @@ void ApplicationState::executeCommand(ApplicationCommand& cmd)
         case LIST:
         {
             std::cout << "MIDI input ports:" << std::endl;
-            for (auto&& device : MidiInput::getAvailableDevices())
+            for (auto&& name : displayNames(MidiInput::getAvailableDevices()))
             {
-                std::cout << "  " << device.name << std::endl;
+                std::cout << "  " << name << std::endl;
             }
             std::cout << std::endl << "MIDI output ports:" << std::endl;
-            for (auto&& device : MidiOutput::getAvailableDevices())
+            for (auto&& name : displayNames(MidiOutput::getAvailableDevices()))
             {
-                std::cout << "  " << device.name << std::endl;
+                std::cout << "  " << name << std::endl;
             }
             break;
         }
@@ -1074,6 +1075,63 @@ String ApplicationState::addProcessingCommand(Route& route, ApplicationCommand c
     }
 }
 
+StringArray ApplicationState::displayNames(const Array<MidiDeviceInfo>& devices)
+{
+    StringArray names;
+    for (int i = 0; i < devices.size(); ++i)
+    {
+        int total = 0;
+        int position = 1;
+        for (int j = 0; j < devices.size(); ++j)
+        {
+            if (devices[j].name == devices[i].name)
+            {
+                total += 1;
+                if (j < i)
+                {
+                    position += 1;
+                }
+            }
+        }
+        if (total > 1)
+        {
+            names.add(devices[i].name + " (" + String(position) + ")");
+        }
+        else
+        {
+            names.add(devices[i].name);
+        }
+    }
+    return names;
+}
+
+int ApplicationState::matchDeviceIndex(const Array<MidiDeviceInfo>& devices, const String& name)
+{
+    StringArray names = displayNames(devices);
+    for (int i = 0; i < devices.size(); ++i)
+    {
+        if (names[i] == name)
+        {
+            return i;
+        }
+    }
+    for (int i = 0; i < devices.size(); ++i)
+    {
+        if (devices[i].name == name)
+        {
+            return i;
+        }
+    }
+    for (int i = 0; i < devices.size(); ++i)
+    {
+        if (devices[i].name.containsIgnoreCase(name))
+        {
+            return i;
+        }
+    }
+    return -1;
+}
+
 void ApplicationState::openInput(RouteInput& input)
 {
     input.midiIn = nullptr;
@@ -1086,37 +1144,20 @@ void ApplicationState::openInput(RouteInput& input)
 bool ApplicationState::tryToConnectInput(RouteInput& input)
 {
     std::unique_ptr<MidiInput> midiInput = nullptr;
-    String midiInputName;
 
     auto devices = MidiInput::getAvailableDevices();
-    for (auto&& device : devices)
+    auto index = matchDeviceIndex(devices, input.inName);
+    if (index >= 0)
     {
-        if (device.name == input.inName)
-        {
-            midiInput = MidiInput::openDevice(device.identifier, this);
-            midiInputName = device.name;
-            break;
-        }
-    }
-
-    if (midiInput == nullptr)
-    {
-        for (auto&& device : devices)
-        {
-            if (device.name.containsIgnoreCase(input.inName))
-            {
-                midiInput = MidiInput::openDevice(device.identifier, this);
-                midiInputName = device.name;
-                break;
-            }
-        }
+        midiInput = MidiInput::openDevice(devices[index].identifier, this);
     }
 
     if (midiInput)
     {
         midiInput->start();
         input.midiIn.swap(midiInput);
-        input.fullInName = midiInputName;
+        input.fullInName = devices[index].name;
+        input.fullInIdentifier = devices[index].identifier;
         return true;
     }
 
@@ -1152,26 +1193,11 @@ OutputDest* ApplicationState::openOutput(const String& name)
     dest->name = name;
 
     auto devices = MidiOutput::getAvailableDevices();
-    for (auto&& device : devices)
+    auto index = matchDeviceIndex(devices, name);
+    if (index >= 0)
     {
-        if (device.name == name)
-        {
-            dest->out = MidiOutput::openDevice(device.identifier);
-            dest->fullName = device.name;
-            break;
-        }
-    }
-    if (dest->out == nullptr)
-    {
-        for (auto&& device : devices)
-        {
-            if (device.name.containsIgnoreCase(name))
-            {
-                dest->out = MidiOutput::openDevice(device.identifier);
-                dest->fullName = device.name;
-                break;
-            }
-        }
+        dest->out = MidiOutput::openDevice(devices[index].identifier);
+        dest->fullName = devices[index].name;
     }
 
     if (dest->out == nullptr)
@@ -2152,7 +2178,9 @@ void ApplicationState::printUsage()
     std::cout << ansi::paint(ansi::label, "Port names:") << std::endl << std::endl;
     std::cout << "The MIDI port names don't have to be an exact match." << std::endl;
     std::cout << "If RouteMIDI can't find the exact name that was specified, it will pick the" << std::endl
-              << "first MIDI port that contains the provided text, irrespective of case." << std::endl;
+              << "first MIDI port that contains the provided text, irrespective of case." << std::endl
+              << "Ports that share the same name are listed with a number, like \"Port (2)\"," << std::endl
+              << "and that numbered name can be used to select that specific port." << std::endl;
     std::cout << std::endl;
     std::cout << ansi::paint(ansi::label, "Note names:") << std::endl << std::endl;
     std::cout << "Where notes can be provided as arguments, they can also be written as note" << std::endl

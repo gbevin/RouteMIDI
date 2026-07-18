@@ -46,9 +46,11 @@ static DynamicObject* newObject()
 static Array<var> midiDeviceNames(const Array<MidiDeviceInfo>& devices)
 {
     Array<var> names;
-    for (auto&& device : devices)
+    // ports that share a name are numbered, so a client can select a
+    // specific one with that numbered name
+    for (auto&& name : ApplicationState::displayNames(devices))
     {
-        names.add(device.name);
+        names.add(name);
     }
     return names;
 }

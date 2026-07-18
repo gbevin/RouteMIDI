@@ -55,6 +55,16 @@ public:
     static uint8 limit7Bit(int value)   { return textmidi::limit7Bit(value); }
     static uint16 limit14Bit(int value) { return textmidi::limit14Bit(value); }
 
+    // the names to show for these MIDI devices: ports that share the same
+    // name get a number appended, like "KeyStep (2)", so each of them can be
+    // told apart and selected
+    static StringArray displayNames(const Array<MidiDeviceInfo>& devices);
+
+    // finds the device a name refers to: first as one of the display names
+    // above, then as an exact port name, then as a piece of a port name,
+    // ignoring case; returns -1 when nothing matches
+    static int matchDeviceIndex(const Array<MidiDeviceInfo>& devices, const String& name);
+
     // the parser and the per-message processing stages, exposed so a route can
     // be built and driven a message at a time without real MIDI hardware
     void parseParameters(StringArray& parameters);

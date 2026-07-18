@@ -45,6 +45,7 @@ struct RouteInput
 {
     String inName;                        // requested name (may be a substring)
     String fullInName;                    // resolved name once connected
+    String fullInIdentifier;              // resolved unique id once connected
     bool isVirtual { false };             // created as a virtual port
     bool isStdin { false };               // reads MIDI as text from standard input
     std::unique_ptr<MidiInput> midiIn;
