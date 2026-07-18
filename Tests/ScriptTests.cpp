@@ -18,8 +18,11 @@
 
 #include "JuceHeader.h"
 
+#include <sstream>
+
 #include "../Source/ApplicationState.h"
 #include "../Source/ScriptMidiMessageClass.h"
+#include "../Source/ScriptUtilClass.h"
 
 // Drives the JavaScript "MIDI" object through a real JUCE Javascript engine, the
 // same way ApplicationState does when running a js/jsf transform.
@@ -134,6 +137,24 @@ public:
             expectEquals(velocities[3], 127);   // the 4th note-on is accented
             expectEquals(velocities[4], 50);    // and the count keeps going
         }
+
+#if ! JUCE_WINDOWS
+        beginTest("Util.command passes quoted arguments without the quotes");
+        {
+            engine.registerNativeObject("Util", new ScriptUtilClass());
+
+            // the child's output goes through std::cout, so capture it there
+            std::ostringstream captured;
+            auto* previous = std::cout.rdbuf(captured.rdbuf());
+            auto r1 = engine.execute("Util.command('/bin/echo one \"two words\"');");
+            auto r2 = engine.execute("Util.command('/bin/echo', 'a b', 'c');");
+            std::cout.rdbuf(previous);
+
+            expect(r1.wasOk(), r1.getErrorMessage());
+            expect(r2.wasOk(), r2.getErrorMessage());
+            expectEquals(String(captured.str()), String("one two words\na b c\n"));
+        }
+#endif
     }
 };
 
