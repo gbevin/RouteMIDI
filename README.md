@@ -814,7 +814,7 @@ and build the binary by typing `make`
 make
 ```
 
-The resulting binary will be in the `Build/LinuxMakefile/build` directory and can be moved anywhere appropriate on your system, for instance into `/usr/local/bin`:
+The resulting binary will be in the `Builds/LinuxMakefile/build` directory and can be moved anywhere appropriate on your system, for instance into `/usr/local/bin`:
 
 ```
 sudo mv build/routemidi /usr/local/bin
