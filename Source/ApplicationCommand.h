@@ -100,6 +100,7 @@ enum CommandIndex
     NOTE_TO_CC,
     CC_TO_NOTE,
     NOTE_TO_PROGRAM,
+    PROGRAM_TO_CC,
     VELOCITY_SCALE,
     VELOCITY_SET,
     VELOCITY_ADD,

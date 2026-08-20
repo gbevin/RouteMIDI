@@ -315,6 +315,7 @@ bool ApplicationCommand::isTransform() const
         case NOTE_TO_CC:
         case CC_TO_NOTE:
         case NOTE_TO_PROGRAM:
+        case PROGRAM_TO_CC:
         case SCALE:
         case CHORD:
         case LATCH:
@@ -603,6 +604,14 @@ bool ApplicationCommand::transform(const ApplicationState& state, MidiMessage& m
                     return false;
                 }
                 msg = MidiMessage::programChange(msg.getChannel(), copts_[1].value7);
+                msg.setTimeStamp(timestamp);
+            }
+            break;
+        case PROGRAM_TO_CC:
+            // a Program Change becomes a Control Change with the given value
+            if (msg.isProgramChange() && msg.getProgramChangeNumber() == copts_[0].value7)
+            {
+                msg = MidiMessage::controllerEvent(msg.getChannel(), copts_[1].value7, copts_[2].value7);
                 msg.setTimeStamp(timestamp);
             }
             break;

@@ -113,6 +113,7 @@ static const char* commandStage(CommandIndex command)
         case NOTE_TO_CC:
         case CC_TO_NOTE:
         case NOTE_TO_PROGRAM:
+        case PROGRAM_TO_CC:
         case VELOCITY_SCALE:
         case VELOCITY_SET:
         case VELOCITY_ADD:

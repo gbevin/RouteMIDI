@@ -122,6 +122,8 @@ Transforms:
   ccnote      cc note    Turn a Control Change into a note (64+ on, else off)
   notepc      note       Turn a note-on into a Program Change (note-off dropped)
               program
+  pccc        program cc Turn a Program Change into a Control Change
+              value
   velscale    factor     Scale note-on velocity by a factor (clamped 1-127)
   velset      number     Set a fixed note-on velocity (1-127)
   veladd      number     Add an offset to note-on velocity (clamped 1-127)
@@ -252,9 +254,9 @@ Each command can also be written with its long name instead of the short one:
   control-change-14-range in-scale mpe-manager mpe-member mpe-zone channel-map
   channel-set channel-add transpose diatonic-transpose note-map sustain-pedal
   sostenuto-pedal note-to-control-change control-change-to-note
-  note-to-program-change velocity-scale velocity-set velocity-add
-  velocity-curve velocity-clip velocity-compress velocity-invert
-  control-change-map control-change-add control-change-scale
+  note-to-program-change program-change-to-control-change velocity-scale
+  velocity-set velocity-add velocity-curve velocity-clip velocity-compress
+  velocity-invert control-change-map control-change-add control-change-scale
   control-change-curve control-change-invert control-change-rescale
   control-change-set control-change-14-add control-change-14-scale
   control-change-14-curve control-change-14-invert control-change-14-rescale
@@ -390,12 +392,13 @@ routemidi in "Fader" ccrescale 7 0 127 40 100 out "Mixer"    # keep the level in
 routemidi in "Pedal" ccrescale 11 0 127 127 0 out "Synth"    # invert while rescaling
 ```
 
-A few transforms change a message from one type to another. `notecc` turns a specific note into a Control Change (the note-on velocity becomes the value, and the note-off sends 0); `ccnote` turns a Control Change into a note (a value of 64 or more triggers a note-on with that value as the velocity, below 64 a note-off); and `notepc` turns a note-on into a Program Change (the note-off is dropped). `ccnote` is aimed at switch- or pedal-style controllers; a continuously changing CC would retrigger the note. Since `notecc` uses the velocity as the value, put a `velset` in front of it for a fixed value.
+A few transforms change a message from one type to another. `notecc` turns a specific note into a Control Change (the note-on velocity becomes the value, and the note-off sends 0); `ccnote` turns a Control Change into a note (a value of 64 or more triggers a note-on with that value as the velocity, below 64 a note-off); `notepc` turns a note-on into a Program Change (the note-off is dropped); and `pccc` turns a specific Program Change into a Control Change with the given value, which lets patch-select buttons on a foot controller drive switches. `ccnote` is aimed at switch- or pedal-style controllers; a continuously changing CC would retrigger the note. Since `notecc` uses the velocity as the value, put a `velset` in front of it for a fixed value.
 
 ```
 routemidi in "Pad" notecc 60 64 out "Synth"             # a pad key holds the sustain CC
 routemidi in "Foot" ccnote 64 C1 out "Drums"            # a sustain pedal plays a kick
 routemidi in "Pads" notepc 36 0 notepc 37 1 out "Synth" # two pads select two patches
+routemidi in "Foot" pccc 0 1 127 pccc 1 2 127 out "FX"  # patch buttons flip switches
 ```
 
 The `scale` transform snaps every note to the nearest note of a musical key, so a performance always stays in tune. It takes a root (a note name such as `C`, `F#` or `Bb`, or a number) and a scale name. Notes that are already in the scale pass through unchanged, and a note exactly between two scale notes snaps to the lower one; note-offs snap the same way as note-ons so held notes are always released. Scale names are case-insensitive and any spaces, dashes and underscores are ignored, so `harmonicminor`, `harmonic-minor` and `Harmonic Minor` are all the same.

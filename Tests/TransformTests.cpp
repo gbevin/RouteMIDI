@@ -155,6 +155,27 @@ public:
 
             m = MidiMessage::noteOff(5, 48, (uint8)0);
             expect(! makeCommand(NOTE_TO_PROGRAM, {"48", "5"}).transform(state, m));  // dropped
+
+            // pccc: a Program Change becomes a Control Change with the given value
+            m = MidiMessage::programChange(4, 0);
+            expect(makeCommand(PROGRAM_TO_CC, {"0", "1", "127"}).transform(state, m));
+            expect(m.isController());
+            expectEquals(m.getChannel(), 4);          // channel preserved
+            expectEquals(m.getControllerNumber(), 1);
+            expectEquals(m.getControllerValue(), 127);
+
+            m = MidiMessage::programChange(4, 0);
+            expect(makeCommand(PROGRAM_TO_CC, {"0", "1", "64"}).transform(state, m));
+            expectEquals(m.getControllerValue(), 64);
+
+            m = MidiMessage::programChange(4, 9);
+            expect(makeCommand(PROGRAM_TO_CC, {"0", "1", "127"}).transform(state, m));
+            expect(m.isProgramChange());              // a different program is untouched
+
+            m = MidiMessage::controllerEvent(4, 0, 64);
+            expect(makeCommand(PROGRAM_TO_CC, {"0", "1", "127"}).transform(state, m));
+            expect(m.isController());                 // other message types pass through
+            expectEquals(m.getControllerNumber(), 0);
         }
 
         beginTest("Scale quantize (snap notes to a key)");
