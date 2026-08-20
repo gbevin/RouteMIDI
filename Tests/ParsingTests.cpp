@@ -206,6 +206,33 @@ public:
             expectEquals(route->filters.size(), 0);
         }
 
+        beginTest("A program file that includes itself is refused instead of recursing");
+        {
+            auto dir = File::getSpecialLocation(File::tempDirectory);
+            auto self = dir.getChildFile("routemidi-self-" + Uuid().toString() + ".txt");
+            self.replaceWithText("file \"" + self.getFullPathName() + "\"\n");
+            auto a = dir.getChildFile("routemidi-a-" + Uuid().toString() + ".txt");
+            auto b = dir.getChildFile("routemidi-b-" + Uuid().toString() + ".txt");
+            a.replaceWithText("file \"" + b.getFullPathName() + "\"\n");
+            b.replaceWithText("file \"" + a.getFullPathName() + "\"\n");
+
+            ApplicationState state;
+            parse(state, "file \"" + self.getFullPathName() + "\"");
+            parse(state, "file \"" + a.getFullPathName() + "\"");
+            expect(state.getRoutes().isEmpty());
+
+            // a legitimate nested include still works after the guard
+            auto inner = dir.getChildFile("routemidi-inner-" + Uuid().toString() + ".txt");
+            auto outer = dir.getChildFile("routemidi-outer-" + Uuid().toString() + ".txt");
+            inner.replaceWithText("in InPort out OutPort\n");
+            outer.replaceWithText("file \"" + inner.getFullPathName() + "\"\n");
+            parse(state, "file \"" + outer.getFullPathName() + "\"");
+            expectEquals(state.getRoutes().size(), 1);
+
+            self.deleteFile(); a.deleteFile(); b.deleteFile();
+            inner.deleteFile(); outer.deleteFile();
+        }
+
         beginTest("Long command names land in the correct route buckets");
         {
             ApplicationState state;

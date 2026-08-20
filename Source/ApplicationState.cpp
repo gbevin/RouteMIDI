@@ -769,6 +769,16 @@ void ApplicationState::parseParameters(StringArray& parameters)
 
 void ApplicationState::parseFile(File file)
 {
+    // a program file can load other program files; refuse one that is already
+    // being parsed further up the chain, since that would recurse forever
+    const String path = file.getFullPathName();
+    if (parsingFiles_.contains(path))
+    {
+        std::cerr << "Program file \"" << path << "\" includes itself, ignoring" << std::endl;
+        return;
+    }
+    parsingFiles_.add(path);
+
     StringArray parameters;
 
     StringArray lines;
@@ -779,6 +789,8 @@ void ApplicationState::parseFile(File file)
     }
 
     parseParameters(parameters);
+
+    parsingFiles_.removeString(path);
 }
 
 void ApplicationState::executeCommand(ApplicationCommand& cmd)
