@@ -516,6 +516,11 @@ void ApplicationState::timerCallback()
     {
         inIdentifiers.add(d.identifier);
     }
+    StringArray outIdentifiers;
+    for (auto&& d : availableOuts)
+    {
+        outIdentifiers.add(d.identifier);
+    }
 
     // The route graph is built entirely during startup and never changes once the
     // timer is running, so it can be walked without the lock. The lock is taken only
@@ -604,16 +609,43 @@ void ApplicationState::timerCallback()
             }
         }
 
-        // retry any output ports that could not be opened yet, opening unlocked
+        // reconcile the output ports the same way: drop the ones that vanished
+        // and retry the ones still waiting, opening unlocked
         for (auto* dest : route->outputs)
         {
+            if (dest->isVirtual || dest->isStdout)
+            {
+                continue;
+            }
+
+            // decide what to do under a brief lock, then act on it unlocked
+            String lostName;
             String toOpen;
+            std::unique_ptr<MidiOutput> lost;
             {
                 const ScopedLock sl(midiCallbackLock_);
-                if (!dest->isVirtual && !dest->isStdout && dest->out == nullptr && dest->name.isNotEmpty())
+                if (dest->fullOutIdentifier.isNotEmpty() && !outIdentifiers.contains(dest->fullOutIdentifier))
+                {
+                    lostName = dest->fullName;
+                    dest->fullName = String();
+                    dest->fullOutIdentifier = String();
+                    lost = std::move(dest->out);
+                }
+                else if (dest->out == nullptr && dest->name.isNotEmpty())
                 {
                     toOpen = dest->name;
                 }
+            }
+
+            if (lostName.isNotEmpty())
+            {
+                // messages already handed to the sender still point at the
+                // lost port, so drain the sender before closing it
+                stopOutputSender();
+                lost = nullptr;
+                startOutputSender();
+                std::cerr << "MIDI output port \"" << lostName << "\" got disconnected, waiting" << std::endl;
+                continue;
             }
             if (toOpen.isEmpty())
             {
@@ -640,6 +672,7 @@ void ApplicationState::timerCallback()
                         {
                             dest->out.swap(opened);
                             dest->fullName = fullName;
+                            dest->fullOutIdentifier = identifier;
                             connected = true;
                         }
                     }
@@ -1220,6 +1253,7 @@ OutputDest* ApplicationState::openOutput(const String& name)
     {
         dest->out = MidiOutput::openDevice(devices[index].identifier);
         dest->fullName = devices[index].name;
+        dest->fullOutIdentifier = devices[index].identifier;
     }
 
     if (dest->out == nullptr)

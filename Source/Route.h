@@ -83,6 +83,7 @@ struct OutputDest
 {
     String name;                          // requested name (may be a substring)
     String fullName;                      // resolved name once connected
+    String fullOutIdentifier;             // unique id of the connected port
     bool isVirtual { false };             // created as a virtual port
     bool isStdout { false };              // writes MIDI as text to standard output
     std::unique_ptr<MidiOutput> out;

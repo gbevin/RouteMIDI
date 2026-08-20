@@ -216,6 +216,87 @@ public:
             expect(dest->fullName.contains(portName));
         }
 
+        beginTest("timer drops a vanished output and reconnects it when its port returns");
+        {
+            const String inName  = "RouteMIDI OutRecIn "  + Uuid().toString();
+            const String outName = "RouteMIDI OutRec "    + Uuid().toString();
+
+            CaptureMidiCallback capture;
+            auto virtualDest   = MidiInput::createNewDevice(outName, &capture);
+            auto virtualSource = MidiOutput::createNewDevice(inName);
+            if (virtualDest == nullptr || virtualSource == nullptr)
+            {
+                logMessage("  skipped: virtual MIDI not available on this system");
+                return;
+            }
+            virtualDest->start();
+            if (! waitForPort([] { return MidiInput::getAvailableDevices();  }, inName,  true, 3000) ||
+                ! waitForPort([] { return MidiOutput::getAvailableDevices(); }, outName, true, 3000))
+            {
+                logMessage("  skipped: virtual ports never appeared in the device lists");
+                return;
+            }
+
+            ApplicationState state;
+            {
+                StringArray params;
+                params.add("in");  params.add(inName);
+                params.add("out"); params.add(outName);
+                state.parseParameters(params);
+            }
+            ApplicationState::Control(state).reconcileConnections();
+            auto& routes = state.getRoutes();
+            if (routes.isEmpty() || routes[0]->outputs.isEmpty() || routes[0]->outputs[0]->out == nullptr
+                || routes[0]->inputs.isEmpty() || routes[0]->inputs[0]->midiIn == nullptr)
+            {
+                logMessage("  skipped: could not open the virtual ports in this process");
+                return;
+            }
+
+            // unplug the destination: the reconcile pass must drop the dead port
+            virtualDest = nullptr;
+            if (! waitForPort([] { return MidiOutput::getAvailableDevices(); }, outName, false, 3000))
+            {
+                logMessage("  skipped: the virtual port never left the device list");
+                return;
+            }
+            {
+                auto* previous = std::cerr.rdbuf(nullptr);
+                ApplicationState::Control(state).reconcileConnections();
+                std::cerr.rdbuf(previous);
+            }
+            expect(routes[0]->outputs[0]->out == nullptr, "a vanished output port was not dropped");
+
+            // replug it: the reconcile pass reopens it and messages flow again
+            virtualDest = MidiInput::createNewDevice(outName, &capture);
+            if (virtualDest == nullptr
+                || ! waitForPort([] { return MidiOutput::getAvailableDevices(); }, outName, true, 3000))
+            {
+                logMessage("  skipped: the virtual port could not be recreated");
+                return;
+            }
+            virtualDest->start();
+            {
+                auto* previous = std::cerr.rdbuf(nullptr);
+                ApplicationState::Control(state).reconcileConnections();
+                std::cerr.rdbuf(previous);
+            }
+            expect(routes[0]->outputs[0]->out != nullptr, "a returned output port was not reconnected");
+
+            ApplicationState::Control(state).startOutputSender();
+            virtualSource->sendMessageNow(MidiMessage::noteOn(1, 60, (uint8) 100));
+            const uint32 start = Time::getMillisecondCounter();
+            for (;;)
+            {
+                { const ScopedLock sl(capture.lock); if (capture.received.size() > 0) break; }
+                if ((int) (Time::getMillisecondCounter() - start) > 2000) break;
+                Thread::sleep(10);
+            }
+            ApplicationState::Control(state).stopOutputSender();
+            const ScopedLock sl(capture.lock);
+            expect(capture.received.size() > 0, "no message arrived at the reconnected output");
+        }
+
         beginTest("a note routed through 'transp' reaches the connected output transposed");
         {
             Array<MidiMessage> received;
