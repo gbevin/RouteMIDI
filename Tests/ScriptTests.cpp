@@ -22,6 +22,7 @@
 
 #include "../Source/ApplicationState.h"
 #include "../Source/ScriptMidiMessageClass.h"
+#include "../Source/ScriptOscClass.h"
 #include "../Source/ScriptUtilClass.h"
 
 // Drives the JavaScript "MIDI" object through a real JUCE Javascript engine, the
@@ -155,6 +156,28 @@ public:
             expectEquals(String(captured.str()), String("one two words\na b c\n"));
         }
 #endif
+
+        beginTest("OSC.send with an invalid address fails instead of throwing");
+        {
+            engine.registerNativeObject("OSC", new ScriptOscClass());
+
+            // a malformed address throws a C++ exception inside JUCE; if it
+            // escaped the script it would terminate the app from the MIDI
+            // thread, so it has to surface as a plain failed send
+            std::ostringstream captured;
+            auto* previous = std::cerr.rdbuf(captured.rdbuf());
+            auto r = engine.execute("var sent = OSC.connect('127.0.0.1', 9999).send('no leading slash', 1);");
+            std::cerr.rdbuf(previous);
+
+            expect(r.wasOk(), r.getErrorMessage());
+            expect(! (bool) engine.evaluate("sent"));
+            expect(String(captured.str()).contains("OSC"));
+
+            // a valid address on the same sender still goes through
+            auto r2 = engine.execute("var ok = OSC.connect('127.0.0.1', 9999).send('/status', 1);");
+            expect(r2.wasOk(), r2.getErrorMessage());
+            expect((bool) engine.evaluate("ok"));
+        }
     }
 };
 

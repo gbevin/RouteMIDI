@@ -18,6 +18,8 @@
 
 #include "ScriptOscClass.h"
 
+#include <iostream>
+
 ScriptOscSenderClass::ScriptOscSenderClass(const String& host, int port)
 {
     setMethod("send", send);
@@ -28,27 +30,35 @@ var ScriptOscSenderClass::send(const var::NativeFunctionArgs& a)
 {
     if (a.numArguments < 1) return false;
     
-    OSCMessage msg(a.arguments[0].toString());
-    for (int i = 1; i < a.numArguments; ++i)
+    // an invalid address or argument throws; that must not escape the script
+    // into the MIDI thread, so it becomes a false return like other failures
+    try
     {
-        var arg = a.arguments[i];
-        if (arg.isInt() || arg.isInt64() || arg.isBool())
+        OSCMessage msg(a.arguments[0].toString());
+        for (int i = 1; i < a.numArguments; ++i)
         {
-            msg.addInt32(arg);
+            var arg = a.arguments[i];
+            if (arg.isInt() || arg.isInt64() || arg.isBool())
+            {
+                msg.addInt32(arg);
+            }
+            else if (arg.isDouble())
+            {
+                msg.addFloat32(arg);
+            }
+            else
+            {
+                msg.addString(arg.toString());
+            }
         }
-        else if (arg.isDouble())
-        {
-            msg.addFloat32(arg);
-        }
-        else
-        {
-            msg.addString(arg.toString());
-        }
+        
+        return ((ScriptOscSenderClass*)a.thisObject.getDynamicObject())->sender_.send(msg);
     }
-    
-    ((ScriptOscSenderClass*)a.thisObject.getDynamicObject())->sender_.send(msg);
-    
-    return true;
+    catch (const OSCException& e)
+    {
+        std::cerr << "Script function send() couldn't send an OSC message: " << e.description << std::endl;
+        return false;
+    }
 }
 
 ScriptOscClass::ScriptOscClass()
