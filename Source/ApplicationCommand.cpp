@@ -412,15 +412,19 @@ bool ApplicationCommand::matches(const ApplicationState& state, const MidiMessag
                 return msbIndex >= 0 && sel7(0, msbIndex);
             }
         case NRPN:
-            // the NRPN parameter-select (98/99) and data-entry (6/38) controllers
+            // the NRPN parameter-select (98/99), data-entry (6/38) and data
+            // increment/decrement (96/97) controllers
             return checkChannel(msg, channelLow, channelHigh) && msg.isController() &&
                 (msg.getControllerNumber() == 98 || msg.getControllerNumber() == 99 ||
-                 msg.getControllerNumber() == 6  || msg.getControllerNumber() == 38);
+                 msg.getControllerNumber() == 6  || msg.getControllerNumber() == 38 ||
+                 msg.getControllerNumber() == 96 || msg.getControllerNumber() == 97);
         case RPN:
-            // the RPN parameter-select (100/101) and data-entry (6/38) controllers
+            // the RPN parameter-select (100/101), data-entry (6/38) and data
+            // increment/decrement (96/97) controllers
             return checkChannel(msg, channelLow, channelHigh) && msg.isController() &&
                 (msg.getControllerNumber() == 100 || msg.getControllerNumber() == 101 ||
-                 msg.getControllerNumber() == 6   || msg.getControllerNumber() == 38);
+                 msg.getControllerNumber() == 6   || msg.getControllerNumber() == 38  ||
+                 msg.getControllerNumber() == 96  || msg.getControllerNumber() == 97);
         case PROGRAM_CHANGE:
             return checkChannel(msg, channelLow, channelHigh) && msg.isProgramChange() &&
                 (opts_.isEmpty() || sel7(0, msg.getProgramChangeNumber()));

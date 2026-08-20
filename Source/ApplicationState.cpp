@@ -1527,10 +1527,10 @@ static bool matchesRpnParam(const ApplicationCommand& cmd, RouteInput& input,
         return input.rpnFilter.isNrpn(ch) == nrpn
                && input.rpnFilter.param(ch) == param;
     }
-    if (cc == 6 || cc == 38)
+    if (cc == 6 || cc == 38 || cc == 96 || cc == 97)
     {
-        // CC 6/38 are the selected parameter's data; after a completed null the
-        // selection is ended and no parameter's data can match
+        // CC 6/38 carry the selected parameter's data and CC 96/97 nudge it;
+        // after a completed null the selection is ended and none can match
         return input.rpnFilter.isNrpn(ch) == nrpn
                && input.rpnFilter.param(ch) == param;
     }

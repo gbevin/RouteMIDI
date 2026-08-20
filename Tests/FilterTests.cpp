@@ -312,6 +312,11 @@ public:
             // both pick up the shared data-entry controllers
             expect(  nrpn.matches(state, MidiMessage::controllerEvent(1, 38, 0), 0));
             expect(  rpn.matches(state, MidiMessage::controllerEvent(1, 38, 0), 0));
+            // and the shared data increment/decrement controllers
+            expect(  nrpn.matches(state, MidiMessage::controllerEvent(1, 96, 1), 0));
+            expect(  nrpn.matches(state, MidiMessage::controllerEvent(1, 97, 1), 0));
+            expect(  rpn.matches(state, MidiMessage::controllerEvent(1, 96, 1), 0));
+            expect(  rpn.matches(state, MidiMessage::controllerEvent(1, 97, 1), 0));
         }
 
         beginTest("nrpn/rpn filter by a specific parameter number");
@@ -326,6 +331,8 @@ public:
             expect(  state.passesFilters(route, sel, MidiMessage::controllerEvent(1, 98, 104)));  // select LSB
             expect(  state.passesFilters(route, sel, MidiMessage::controllerEvent(1, 6, 50)));    // data MSB
             expect(  state.passesFilters(route, sel, MidiMessage::controllerEvent(1, 38, 20)));   // data LSB
+            expect(  state.passesFilters(route, sel, MidiMessage::controllerEvent(1, 96, 1)));    // data increment
+            expect(  state.passesFilters(route, sel, MidiMessage::controllerEvent(1, 97, 1)));    // data decrement
 
             // selecting a neighbouring parameter blocks its select and data
             expect(! state.passesFilters(route, sel, MidiMessage::controllerEvent(1, 99, 5)));    // other MSB
