@@ -16,6 +16,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <atomic>
+#include <thread>
+
 #include "JuceHeader.h"
 
 #include "../Source/ApplicationState.h"
@@ -440,6 +443,137 @@ public:
             flood.join();
             ApplicationState::Control(state).stopOutputSender();
         }
+
+        beginTest("a lost input is closed without deadlocking against a live stream");
+        {
+            // closing a MIDI input waits on the device-callback lock, which a
+            // concurrent callback holds while it waits for the midi callback
+            // lock; if the reconcile pass closed the lost port while holding
+            // that lock, an unplug during a stream would hang both threads. A
+            // second port floods continuously to keep the device-callback lock
+            // busy while the first port is repeatedly unplugged; the reconcile
+            // runs on a worker so a deadlock shows as a failure, not a hang
+            const String goneName  = "RouteMIDI GoneIn "  + Uuid().toString();
+            const String floodName = "RouteMIDI KeepIn "  + Uuid().toString();
+            const String outName   = "RouteMIDI GoneOut " + Uuid().toString();
+
+            CaptureMidiCallback capture;
+            auto virtualDest  = MidiInput::createNewDevice(outName, &capture);
+            auto floodSource  = MidiOutput::createNewDevice(floodName);
+            auto goneSource   = MidiOutput::createNewDevice(goneName);
+            if (virtualDest == nullptr || floodSource == nullptr || goneSource == nullptr)
+            {
+                logMessage("  skipped: virtual MIDI not available on this system");
+                return;
+            }
+            virtualDest->start();
+            if (! waitForPort([] { return MidiInput::getAvailableDevices();  }, goneName,  true, 3000) ||
+                ! waitForPort([] { return MidiInput::getAvailableDevices();  }, floodName, true, 3000) ||
+                ! waitForPort([] { return MidiOutput::getAvailableDevices(); }, outName,   true, 3000))
+            {
+                logMessage("  skipped: virtual ports never appeared in the device lists");
+                return;
+            }
+
+            // heap-allocated so a detected deadlock can leak it instead of
+            // hanging the suite in its destructor
+            auto* state = new ApplicationState();
+            {
+                StringArray params;
+                params.add("in");  params.add(goneName);
+                params.add("in");  params.add(floodName);
+                params.add("out"); params.add(outName);
+                state->parseParameters(params);
+            }
+            ApplicationState::Control(*state).reconcileConnections();
+            auto& routes = state->getRoutes();
+            if (routes.isEmpty() || routes[0]->inputs.size() < 2
+                || routes[0]->inputs[0]->midiIn == nullptr || routes[0]->inputs[1]->midiIn == nullptr)
+            {
+                logMessage("  skipped: could not open the virtual ports in this process");
+                delete state;
+                return;
+            }
+            ApplicationState::Control(*state).startOutputSender();
+
+            std::atomic<bool> stopFlood { false };
+            std::thread flood([&stopFlood, &floodSource]
+            {
+                int note = 0;
+                while (!stopFlood.load())
+                {
+                    floodSource->sendMessageNow(MidiMessage::noteOn(1, 1 + (note % 100), (uint8) 100));
+                    floodSource->sendMessageNow(MidiMessage::noteOff(1, 1 + (note % 100), (uint8) 0));
+                    ++note;
+                    if ((note & 63) == 0)
+                    {
+                        Thread::sleep(1);
+                    }
+                }
+            });
+
+            bool deadlocked = false;
+            for (int cycle = 0; cycle < 5 && !deadlocked; ++cycle)
+            {
+                // unplug the port, then reconcile the loss under the flood
+                goneSource = nullptr;
+                if (! waitForPort([] { return MidiInput::getAvailableDevices(); }, goneName, false, 3000))
+                {
+                    break;
+                }
+
+                std::atomic<bool> done { false };
+                std::thread reconcile([state, &done]
+                {
+                    auto* previous = std::cerr.rdbuf(nullptr);
+                    ApplicationState::Control(*state).reconcileConnections();
+                    std::cerr.rdbuf(previous);
+                    done = true;
+                });
+                const uint32 start = Time::getMillisecondCounter();
+                while (!done.load() && (int) (Time::getMillisecondCounter() - start) < 10000)
+                {
+                    Thread::sleep(5);
+                }
+                if (!done.load())
+                {
+                    deadlocked = true;
+                    reconcile.detach();
+                    break;
+                }
+                reconcile.join();
+
+                // replug and reconnect for the next round
+                goneSource = MidiOutput::createNewDevice(goneName);
+                if (goneSource == nullptr
+                    || ! waitForPort([] { return MidiInput::getAvailableDevices(); }, goneName, true, 3000))
+                {
+                    break;
+                }
+                auto* previous = std::cerr.rdbuf(nullptr);
+                ApplicationState::Control(*state).reconcileConnections();
+                std::cerr.rdbuf(previous);
+            }
+
+            expect(! deadlocked, "closing a lost input deadlocked against a live MIDI stream");
+
+            stopFlood = true;
+            flood.join();
+            if (deadlocked)
+            {
+                // the wedged threads hold the device-callback lock; tearing
+                // anything MIDI down would hang, so leak deliberately
+                virtualDest.release();
+                floodSource.release();
+                goneSource.release();
+            }
+            else
+            {
+                ApplicationState::Control(*state).stopOutputSender();
+                delete state;
+            }
+        }
+
     }
 };
 

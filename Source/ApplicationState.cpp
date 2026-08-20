@@ -529,6 +529,9 @@ void ApplicationState::timerCallback()
             // decide what to do under a brief lock, then act on it unlocked
             String lostName;    // a previously connected port that just vanished
             String toConnect;   // an inName still waiting to be (re)connected
+            std::unique_ptr<MidiInput> lost;   // closed after the lock: closing
+                                               // waits on the device callback,
+                                               // which itself waits on this lock
             {
                 const ScopedLock sl(midiCallbackLock_);
                 // the unique identifier is checked rather than the name, so
@@ -538,7 +541,7 @@ void ApplicationState::timerCallback()
                     lostName = input->fullInName;
                     input->fullInName = String();
                     input->fullInIdentifier = String();
-                    input->midiIn = nullptr;
+                    lost = std::move(input->midiIn);
                 }
                 else if (input->inName.isNotEmpty() && input->midiIn == nullptr)
                 {
@@ -548,6 +551,7 @@ void ApplicationState::timerCallback()
 
             if (lostName.isNotEmpty())
             {
+                lost = nullptr;
                 std::cerr << "MIDI input port \"" << lostName << "\" got disconnected, waiting" << std::endl;
                 if (route->panic)
                 {
