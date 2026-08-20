@@ -574,6 +574,99 @@ public:
             }
         }
 
+        beginTest("shutdown stays safe while a stream is still arriving");
+        {
+            // shutdown flushes panic state that the callbacks also touch, so it
+            // has to keep them out with the callback lock while it runs; run
+            // under a sanitizer for the strongest signal. The panic must still
+            // reach the output before the sender is torn down
+            const String inName  = "RouteMIDI DownIn "  + Uuid().toString();
+            const String outName = "RouteMIDI DownOut " + Uuid().toString();
+
+            CaptureMidiCallback capture;
+            auto virtualDest   = MidiInput::createNewDevice(outName, &capture);
+            auto virtualSource = MidiOutput::createNewDevice(inName);
+            if (virtualDest == nullptr || virtualSource == nullptr)
+            {
+                logMessage("  skipped: virtual MIDI not available on this system");
+                return;
+            }
+            virtualDest->start();
+            if (! waitForPort([] { return MidiInput::getAvailableDevices();  }, inName,  true, 3000) ||
+                ! waitForPort([] { return MidiOutput::getAvailableDevices(); }, outName, true, 3000))
+            {
+                logMessage("  skipped: virtual ports never appeared in the device lists");
+                return;
+            }
+
+            ApplicationState state;
+            {
+                StringArray params;
+                params.add("in");  params.add(inName);
+                params.add("panic");
+                params.add("out"); params.add(outName);
+                state.parseParameters(params);
+            }
+            ApplicationState::Control(state).reconcileConnections();
+            auto& routes = state.getRoutes();
+            if (routes.isEmpty() || routes[0]->inputs.isEmpty() || routes[0]->outputs.isEmpty()
+                || routes[0]->inputs[0]->midiIn == nullptr || routes[0]->outputs[0]->out == nullptr)
+            {
+                logMessage("  skipped: could not open the virtual ports in this process");
+                return;
+            }
+            ApplicationState::Control(state).startOutputSender();
+
+            std::atomic<bool> stopFlood { false };
+            std::thread flood([&stopFlood, &virtualSource]
+            {
+                int note = 0;
+                while (!stopFlood.load())
+                {
+                    virtualSource->sendMessageNow(MidiMessage::noteOn(1, 1 + (note % 100), (uint8) 100));
+                    virtualSource->sendMessageNow(MidiMessage::noteOff(1, 1 + (note % 100), (uint8) 0));
+                    ++note;
+                    if ((note & 63) == 0)
+                    {
+                        Thread::sleep(1);
+                    }
+                }
+            });
+
+            // wait until the stream demonstrably flows, then shut down under it
+            {
+                const uint32 start = Time::getMillisecondCounter();
+                for (;;)
+                {
+                    { const ScopedLock sl(capture.lock); if (capture.received.size() > 20) break; }
+                    if ((int) (Time::getMillisecondCounter() - start) > 3000) break;
+                    Thread::sleep(10);
+                }
+            }
+            state.shutdown();
+            stopFlood = true;
+            flood.join();
+
+            // the panic's all-notes-off went through the sender before it stopped
+            bool sawAllNotesOff = false;
+            const uint32 start = Time::getMillisecondCounter();
+            while (!sawAllNotesOff && (int) (Time::getMillisecondCounter() - start) < 3000)
+            {
+                {
+                    const ScopedLock sl(capture.lock);
+                    for (auto& m : capture.received)
+                    {
+                        if (m.isController() && m.getControllerNumber() == 123)
+                        {
+                            sawAllNotesOff = true;
+                            break;
+                        }
+                    }
+                }
+                Thread::sleep(10);
+            }
+            expect(sawAllNotesOff, "shutdown's panic never reached the output");
+        }
     }
 };
 

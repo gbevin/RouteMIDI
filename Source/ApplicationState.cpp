@@ -391,17 +391,22 @@ void ApplicationState::shutdown()
     // any panic/notes-off through the sender before it is torn down
     stopTimer();
 
-    for (auto* route : routes_)
     {
-        if (route->panic)
+        // the inputs stay open until destruction, so their callbacks can still
+        // fire; the lock keeps them out of the state and files touched here
+        const ScopedLock sl(midiCallbackLock_);
+        for (auto* route : routes_)
         {
-            sendPanic(*route);
-        }
-        for (auto* dest : route->outputs)
-        {
-            if (dest->syxFile)
+            if (route->panic)
             {
-                dest->syxFile->flush();
+                sendPanic(*route);
+            }
+            for (auto* dest : route->outputs)
+            {
+                if (dest->syxFile)
+                {
+                    dest->syxFile->flush();
+                }
             }
         }
     }
