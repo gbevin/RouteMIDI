@@ -216,6 +216,44 @@ public:
             expect(dest->fullName.contains(portName));
         }
 
+        beginTest("shutdown closes open inputs so no callback outlives the state");
+        {
+            const String inName = "RouteMIDI ShutIn " + Uuid().toString();
+            auto virtualSource = MidiOutput::createNewDevice(inName);
+            if (virtualSource == nullptr)
+            {
+                logMessage("  skipped: virtual MIDI not available on this system");
+                return;
+            }
+            if (! waitForPort([] { return MidiInput::getAvailableDevices(); }, inName, true, 3000))
+            {
+                logMessage("  skipped: the virtual input never appeared");
+                return;
+            }
+
+            ApplicationState state;
+            {
+                StringArray params;
+                params.add("in");  params.add(inName);
+                params.add("out"); params.add("RouteMIDI ShutOut Unconnected");
+                auto* previous = std::cerr.rdbuf(nullptr);
+                state.parseParameters(params);
+                ApplicationState::Control(state).reconcileConnections();
+                std::cerr.rdbuf(previous);
+            }
+            auto& routes = state.getRoutes();
+            if (routes.isEmpty() || routes[0]->inputs.isEmpty() || routes[0]->inputs[0]->midiIn == nullptr)
+            {
+                logMessage("  skipped: could not open the virtual input in this process");
+                return;
+            }
+
+            state.shutdown();
+            // the input is closed before shutdown returns, so nothing can fire
+            // a callback into the state as it destructs
+            expect(routes[0]->inputs[0]->midiIn == nullptr, "shutdown left an input open");
+        }
+
         beginTest("shutdown's panic sends the full safety net to a connected output");
         {
             const String outName = "RouteMIDI Panic " + Uuid().toString();

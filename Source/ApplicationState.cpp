@@ -391,6 +391,30 @@ void ApplicationState::shutdown()
     // any panic/notes-off through the sender before it is torn down
     stopTimer();
 
+    // close every input before returning: once this method returns the lock and
+    // the routes destruct, and a still-open input's callback would fire into a
+    // destroyed CriticalSection and deleted routes. Move the inputs out under
+    // the lock, then destroy them unlocked, the ABBA-safe pattern the reconnect
+    // timer uses (~MidiInput blocks on JUCE's callback lock while a callback may
+    // be waiting on ours)
+    {
+        std::vector<std::unique_ptr<MidiInput>> closing;
+        {
+            const ScopedLock sl(midiCallbackLock_);
+            for (auto* route : routes_)
+            {
+                for (auto* input : route->inputs)
+                {
+                    if (input->midiIn != nullptr)
+                    {
+                        closing.push_back(std::move(input->midiIn));
+                    }
+                }
+            }
+        }
+        closing.clear();   // ~MidiInput stops and closes each port, unlocked
+    }
+
     {
         // the inputs stay open until destruction, so their callbacks can still
         // fire; the lock keeps them out of the state and files touched here
