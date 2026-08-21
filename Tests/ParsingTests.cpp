@@ -499,7 +499,9 @@ public:
                 if (convert != nullptr)
                 {
                     expect(convert->getProperty("stage").toString() == "conversions");
-                    expectEquals((int)convert->getProperty("minArgs"), 4);
+                    // convert's real shape is 2-4 tokens, not a fixed 4
+                    expect(convert->getProperty("arity").toString() == "variable");
+                    expectEquals((int)convert->getProperty("minArgs"), 2);
                     expectEquals((int)convert->getProperty("maxArgs"), 4);
                 }
 
@@ -524,8 +526,32 @@ public:
                 if (chord != nullptr)
                 {
                     expect(chord->getProperty("arity").toString() == "variable");
-                    expect(chord->getProperty("maxArgs").isVoid());
                 }
+
+                // the contract carries a version to gate on, and no volatile index
+                expectEquals((int)root->getProperty("contractVersion"), 1);
+                expect(findCommand("in")->hasProperty("index") == false);
+
+                // a variable command with a required leading arg reports it
+                auto* mpesplitArity = findCommand("mpesplit");
+                if (mpesplitArity != nullptr)
+                {
+                    expect(mpesplitArity->getProperty("arity").toString() == "variable");
+                    expectEquals((int)mpesplitArity->getProperty("minArgs"), 1);
+                    expectEquals((int)mpesplitArity->getProperty("maxArgs"), 2);
+                }
+                // a fully optional variable command reports zero required
+                auto* latchArity = findCommand("latch");
+                if (latchArity != nullptr)
+                {
+                    expectEquals((int)latchArity->getProperty("minArgs"), 0);
+                    expectEquals((int)latchArity->getProperty("maxArgs"), 1);
+                }
+
+                // the processing order uses the real stage vocabulary
+                const auto& order = *root->getProperty("processingOrder").getArray();
+                expect(order.contains(var("split")));
+                expect(! order.contains(var("outputs")));
             }
         }
 

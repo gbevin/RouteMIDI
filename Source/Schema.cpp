@@ -187,14 +187,10 @@ static const char* commandStage(CommandIndex command)
     return "unknown";
 }
 
-static const char* commandArityKind(int expectedOptions)
+// an option description in parentheses is optional; every other one is required
+static bool isOptionalArg(const String& desc)
 {
-    return expectedOptions < 0 ? "variable" : "fixed";
-}
-
-static int commandMinArgs(int expectedOptions)
-{
-    return expectedOptions < 0 ? 0 : expectedOptions;
+    return desc.startsWithChar('(');
 }
 
 String commandsJson(const Array<ApplicationCommand>& commands, int defaultOctaveMiddleC)
@@ -202,9 +198,10 @@ String commandsJson(const Array<ApplicationCommand>& commands, int defaultOctave
     auto root = new DynamicObject();
     root->setProperty("schema", "https://github.com/gbevin/RouteMIDI/schema/commands-v1");
     root->setProperty("tool", ProjectInfo::projectName);
-    // this metadata and the MCP tools are experimental: their shapes and names
-    // may change between releases, unlike the command-line interface
-    root->setProperty("experimental", true);
+    // the contract version is bumped only on a breaking change to this document's
+    // shape, independently of the release version, so a client can gate on it;
+    // the release version is reported separately
+    root->setProperty("contractVersion", 1);
     root->setProperty("version", ProjectInfo::versionString);
     root->setProperty("defaultOctaveMiddleC", defaultOctaveMiddleC);
     root->setProperty("defaultNumberBase", "decimal");
@@ -218,12 +215,39 @@ String commandsJson(const Array<ApplicationCommand>& commands, int defaultOctave
         {
             command->setProperty("alias", cmd.altParam_);
         }
-        command->setProperty("index", static_cast<int>(cmd.command_));
         command->setProperty("section", cmd.section_.isNotEmpty() ? cmd.section_ : String());
         command->setProperty("stage", commandStage(cmd.command_));
-        command->setProperty("arity", commandArityKind(cmd.expectedOptions_));
-        command->setProperty("minArgs", commandMinArgs(cmd.expectedOptions_));
-        command->setProperty("maxArgs", cmd.expectedOptions_ < 0 ? var() : var(cmd.expectedOptions_));
+
+        // arity: convert has a genuinely dynamic 2-4 token shape; every other
+        // command is fixed (all args required) or variable (trailing optional
+        // args marked with parentheses in its descriptions)
+        int required = 0, total = 0;
+        for (const auto& d : cmd.optionsDescriptions_)
+        {
+            if (d.isNotEmpty())
+            {
+                ++total;
+                if (!isOptionalArg(d)) ++required;
+            }
+        }
+        if (cmd.command_ == CONVERT)
+        {
+            command->setProperty("arity", "variable");
+            command->setProperty("minArgs", 2);
+            command->setProperty("maxArgs", 4);
+        }
+        else if (cmd.expectedOptions_ < 0)
+        {
+            command->setProperty("arity", "variable");
+            command->setProperty("minArgs", required);
+            command->setProperty("maxArgs", total);
+        }
+        else
+        {
+            command->setProperty("arity", "fixed");
+            command->setProperty("minArgs", cmd.expectedOptions_);
+            command->setProperty("maxArgs", cmd.expectedOptions_);
+        }
         command->setProperty("args", var(stringArrayToVarArray(cmd.optionsDescriptions_, true)));
         command->setProperty("description", cmd.commandDescriptions_.isEmpty() ? String() : cmd.commandDescriptions_[0]);
         commandArray.add(var(command));
@@ -256,7 +280,7 @@ String commandsJson(const Array<ApplicationCommand>& commands, int defaultOctave
     stageOrder.add("transforms");
     stageOrder.add("mpe");
     stageOrder.add("conversions");
-    stageOrder.add("outputs");
+    stageOrder.add("split");
     root->setProperty("processingOrder", var(stageOrder));
 
     Array<var> notes;
