@@ -550,7 +550,8 @@ public:
 
                 // the contract carries a version to gate on, and no volatile index
                 expectEquals((int)root->getProperty("contractVersion"), 1);
-                expect(findCommand("in")->hasProperty("index") == false);
+                auto* inCommand = findCommand("in");
+                expect(inCommand != nullptr && ! inCommand->hasProperty("index"));
 
                 // a variable command with a required leading arg reports it
                 auto* mpesplitArity = findCommand("mpesplit");
@@ -569,20 +570,29 @@ public:
                 }
 
                 // the processing order uses the real stage vocabulary
-                const auto& order = *root->getProperty("processingOrder").getArray();
-                expect(order.contains(var("split")));
-                expect(! order.contains(var("outputs")));
+                const auto* order = root->getProperty("processingOrder").getArray();
+                expect(order != nullptr);
+                expect(order != nullptr && order->contains(var("split")));
+                expect(order != nullptr && ! order->contains(var("outputs")));
 
                 // the contract is marked stable and each command declares MCP
                 // availability truthfully (js/jsf and stdout commands are denied)
                 expect((bool) root->getProperty("stable"));
-                expect(! findCommand("js")->getProperty("mcpAvailable"));
-                expect(! findCommand("jsf")->getProperty("mcpAvailable"));
-                expect(! findCommand("mon")->getProperty("mcpAvailable"));
-                expect(! findCommand("syf")->getProperty("mcpAvailable"));
-                expect((bool) findCommand("transp")->getProperty("mcpAvailable"));
-                expect((bool) findCommand("cc")->getProperty("mcpAvailable"));
-                expect((bool) findCommand("convert")->getProperty("mcpAvailable"));
+                auto mcpAvailable = [&](const String& name, bool expected)
+                {
+                    auto* found = findCommand(name);
+                    expect(found != nullptr, name + " is missing from the schema");
+                    expect(found != nullptr
+                           && (bool) found->getProperty("mcpAvailable") == expected,
+                           name + " has the wrong mcpAvailable");
+                };
+                mcpAvailable("js", false);
+                mcpAvailable("jsf", false);
+                mcpAvailable("mon", false);
+                mcpAvailable("syf", false);
+                mcpAvailable("transp", true);
+                mcpAvailable("cc", true);
+                mcpAvailable("convert", true);
 
                 // the MCP allow-list is default-closed: a command the predicate
                 // has never heard of must be denied, not silently allowed
@@ -828,10 +838,12 @@ public:
             const var injected = checked("inject_midi", R"json({"jsonrpc":"2.0","id":9,"method":"tools/call",
                 "params":{"name":"inject_midi","arguments":{"route":1,
                     "messages":["channel 1 note-on 60 100"]}}})json");
-            expect(injected.getProperty("emitted", var()).getArray()->size() > 0);
+            const auto* emittedArray = injected.getProperty("emitted", var()).getArray();
+            expect(emittedArray != nullptr && emittedArray->size() > 0);
             const var readBack = checked("read_route", R"json({"jsonrpc":"2.0","id":10,"method":"tools/call",
                 "params":{"name":"read_route","arguments":{"route":1}}})json");
-            expect(readBack.getProperty("messages", var()).getArray()->size() > 0);
+            const auto* messagesArray = readBack.getProperty("messages", var()).getArray();
+            expect(messagesArray != nullptr && messagesArray->size() > 0);
 
             checked("panic_route", R"json({"jsonrpc":"2.0","id":11,"method":"tools/call",
                 "params":{"name":"panic_route","arguments":{"route":1}}})json");

@@ -139,6 +139,7 @@ public:
     void runTest() override
     {
         beginTest("timer connects a waiting input once its port appears, and drops it when it vanishes");
+        [&]
         {
             const String portName = "RouteMIDI TestIn " + Uuid().toString();
 
@@ -181,9 +182,10 @@ public:
             ApplicationState::Control(state).reconcileConnections();
             expect(input->midiIn == nullptr);
             expect(input->fullInName.isEmpty());
-        }
+        } ();
 
         beginTest("timer opens a waiting output once its port appears");
+        [&]
         {
             const String portName = "RouteMIDI TestOut " + Uuid().toString();
 
@@ -214,9 +216,10 @@ public:
             ApplicationState::Control(state).reconcileConnections();
             expect(dest->out != nullptr);
             expect(dest->fullName.contains(portName));
-        }
+        } ();
 
         beginTest("shutdown closes open inputs so no callback outlives the state");
+        [&]
         {
             const String inName = "RouteMIDI ShutIn " + Uuid().toString();
             auto virtualSource = MidiOutput::createNewDevice(inName);
@@ -252,9 +255,10 @@ public:
             // the input is closed before shutdown returns, so nothing can fire
             // a callback into the state as it destructs
             expect(routes[0]->inputs[0]->midiIn == nullptr, "shutdown left an input open");
-        }
+        } ();
 
         beginTest("shutdown's panic sends the full safety net to a connected output");
+        [&]
         {
             const String outName = "RouteMIDI Panic " + Uuid().toString();
             CaptureMidiCallback capture;
@@ -315,9 +319,10 @@ public:
                 expectEquals(perChannel[channel][66], 1);
                 expectEquals(perChannel[channel][123], 1);
             }
-        }
+        } ();
 
         beginTest("timer drops a vanished output and reconnects it when its port returns");
+        [&]
         {
             const String inName  = "RouteMIDI OutRecIn "  + Uuid().toString();
             const String outName = "RouteMIDI OutRec "    + Uuid().toString();
@@ -396,9 +401,10 @@ public:
             ApplicationState::Control(state).stopOutputSender();
             const ScopedLock sl(capture.lock);
             expect(capture.received.size() > 0, "no message arrived at the reconnected output");
-        }
+        } ();
 
         beginTest("a note routed through 'transp' reaches the connected output transposed");
+        [&]
         {
             Array<MidiMessage> received;
             if (routeThrough({ "transp", "12" }, MidiMessage::noteOn(1, 60, (uint8) 100), received))
@@ -413,9 +419,10 @@ public:
                     expectEquals((int) m.getVelocity(), 100);
                 }
             }
-        }
+        } ();
 
         beginTest("a note routed through 'chmap' reaches the connected output on the mapped channel");
+        [&]
         {
             Array<MidiMessage> received;
             if (routeThrough({ "chmap", "1", "5" }, MidiMessage::noteOn(1, 64, (uint8) 90), received))
@@ -429,9 +436,10 @@ public:
                     expectEquals(m.getNoteNumber(), 64);
                 }
             }
-        }
+        } ();
 
         beginTest("MCP inject_midi reaches a connected output through the route's pipeline");
+        [&]
         {
             // injection needs no connected input: the route's input port never
             // exists, only the output is live, and the injected message must
@@ -502,9 +510,55 @@ public:
                 expect(m.isNoteOn());
                 expectEquals(m.getNoteNumber(), 72);   // 60 + 12
             }
-        }
+        } ();
+
+        beginTest("MCP start_route reports connected=true when both ports exist");
+        [&]
+        {
+            const String inName  = "RouteMIDI ConnIn "  + Uuid().toString();
+            const String outName = "RouteMIDI ConnOut " + Uuid().toString();
+
+            CaptureMidiCallback capture;
+            auto virtualDest   = MidiInput::createNewDevice(outName, &capture);
+            auto virtualSource = MidiOutput::createNewDevice(inName);
+            if (virtualDest == nullptr || virtualSource == nullptr)
+            {
+                logMessage("  skipped: virtual MIDI not available on this system");
+                return;
+            }
+            virtualDest->start();
+            if (! waitForPort([] { return MidiInput::getAvailableDevices();  }, inName,  true, 3000) ||
+                ! waitForPort([] { return MidiOutput::getAvailableDevices(); }, outName, true, 3000))
+            {
+                logMessage("  skipped: virtual ports never appeared in the device lists");
+                return;
+            }
+
+            ApplicationState state;
+            McpServer mcpServer(state);
+            auto* previous = std::cerr.rdbuf(nullptr);
+            const var response = mcpServer.handleRequest(JSON::parse(
+                String(R"({"jsonrpc":"2.0","id":1,"method":"tools/call","params":)")
+                + R"({"name":"start_route","arguments":{"commands":["in",")" + inName
+                + R"(","out",")" + outName + R"("]}}})"));
+            std::cerr.rdbuf(previous);
+
+            const var structured = response.getProperty("result", var()).getProperty("structuredContent", var());
+            if (state.getRoutes().isEmpty() || state.getRoutes()[0]->inputs.isEmpty()
+                || state.getRoutes()[0]->inputs[0]->midiIn == nullptr
+                || state.getRoutes()[0]->outputs.isEmpty()
+                || state.getRoutes()[0]->outputs[0]->out == nullptr)
+            {
+                logMessage("  skipped: could not open the virtual ports in this process");
+                return;
+            }
+            // both ports resolved at start time, so the informative flag is true
+            expect((bool) structured.getProperty("connected", var()),
+                   "start_route reported connected=false with both ports live");
+        } ();
 
         beginTest("MCP start_route and stop_route stay safe under a live MIDI stream");
+        [&]
         {
             // a background thread floods a connected route through the real MIDI
             // callback path while routes are started and stopped over MCP, so the
@@ -624,9 +678,10 @@ public:
             stopFlood = true;
             flood.join();
             ApplicationState::Control(state).stopOutputSender();
-        }
+        } ();
 
         beginTest("a lost input is closed without deadlocking against a live stream");
+        [&]
         {
             // closing a MIDI input waits on the device-callback lock, which a
             // concurrent callback holds while it waits for the midi callback
@@ -695,12 +750,15 @@ public:
             });
 
             bool deadlocked = false;
+            int completedCycles = 0;
             for (int cycle = 0; cycle < 5 && !deadlocked; ++cycle)
             {
                 // unplug the port, then reconcile the loss under the flood
                 goneSource = nullptr;
                 if (! waitForPort([] { return MidiInput::getAvailableDevices(); }, goneName, false, 3000))
                 {
+                    logMessage("  port removal not observed, ending after "
+                               + String(completedCycles) + " cycles");
                     break;
                 }
 
@@ -724,12 +782,15 @@ public:
                     break;
                 }
                 reconcile.join();
+                ++completedCycles;
 
                 // replug and reconnect for the next round
                 goneSource = MidiOutput::createNewDevice(goneName);
                 if (goneSource == nullptr
                     || ! waitForPort([] { return MidiInput::getAvailableDevices(); }, goneName, true, 3000))
                 {
+                    logMessage("  replug not observed, ending after "
+                               + String(completedCycles) + " cycles");
                     break;
                 }
                 auto* previous = std::cerr.rdbuf(nullptr);
@@ -738,6 +799,8 @@ public:
             }
 
             expect(! deadlocked, "closing a lost input deadlocked against a live MIDI stream");
+            // a pass means nothing unless the scenario actually ran
+            expect(completedCycles > 0, "no unplug cycle completed; the deadlock scenario was never exercised");
 
             stopFlood = true;
             flood.join();
@@ -754,9 +817,10 @@ public:
                 ApplicationState::Control(*state).stopOutputSender();
                 delete state;
             }
-        }
+        } ();
 
         beginTest("shutdown stays safe while a stream is still arriving");
+        [&]
         {
             // shutdown flushes panic state that the callbacks also touch, so it
             // has to keep them out with the callback lock while it runs; run
@@ -815,16 +879,20 @@ public:
                 }
             });
 
-            // wait until the stream demonstrably flows, then shut down under it
+            // wait until the stream demonstrably flows, then shut down under it;
+            // without flowing traffic the test's premise doesn't hold, so that
+            // must fail rather than silently degrade to a no-stream shutdown
+            bool streaming = false;
             {
                 const uint32 start = Time::getMillisecondCounter();
                 for (;;)
                 {
-                    { const ScopedLock sl(capture.lock); if (capture.received.size() > 20) break; }
+                    { const ScopedLock sl(capture.lock); if (capture.received.size() > 20) { streaming = true; break; } }
                     if ((int) (Time::getMillisecondCounter() - start) > 3000) break;
                     Thread::sleep(10);
                 }
             }
+            expect(streaming, "no MIDI flowed before shutdown; the under-stream premise never held");
             state.shutdown();
             stopFlood = true;
             flood.join();
@@ -848,7 +916,7 @@ public:
                 Thread::sleep(10);
             }
             expect(sawAllNotesOff, "shutdown's panic never reached the output");
-        }
+        } ();
     }
 };
 
