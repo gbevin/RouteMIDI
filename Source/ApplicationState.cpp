@@ -1161,6 +1161,9 @@ String ApplicationState::addProcessingCommand(Route& route, ApplicationCommand c
             }
             route.outputSplit.clearQuick();
             route.outputSplit.add(cmd);
+            // adding replaces the split configuration, so the voice allocation
+            // state of the previous one must not survive into the new zone
+            route.mpeSplit = mpe::Splitter();
             return {};
         }
         default:

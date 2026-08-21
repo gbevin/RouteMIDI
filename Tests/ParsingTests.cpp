@@ -583,6 +583,43 @@ public:
             }
         }
 
+        beginTest("Re-adding mpesplit resets the splitter's voice allocations");
+        {
+            ApplicationState state;
+            mcp(state, R"json({"jsonrpc":"2.0","id":1,"method":"tools/call",
+                "params":{"name":"start_route","arguments":{"commands":
+                    ["in","SplitIn","mpesplit","lower","out","SplitA","out","SplitB"]}}})json", true);
+            auto* route = state.getRoutes()[0];
+            auto& input = *route->inputs.getFirst();
+
+            auto noteOnPort = [&](int channel, int note) -> int
+            {
+                Array<MidiMessage> outMsgs;
+                Array<int> outPorts;
+                state.processRouteMessage(*route, input,
+                                          MidiMessage::noteOn(channel, note, (uint8) 100),
+                                          outMsgs, outPorts);
+                for (int i = 0; i < outMsgs.size(); ++i)
+                {
+                    if (outMsgs[i].isNoteOn())
+                    {
+                        return outPorts[i];
+                    }
+                }
+                return -1;
+            };
+
+            expectEquals(noteOnPort(2, 60), 0);   // first voice takes port 0 and holds it
+
+            // replacing the split configuration starts the allocation over, so
+            // the next voice must land on port 0 again instead of continuing
+            // around a stale rotation
+            mcp(state, R"json({"jsonrpc":"2.0","id":2,"method":"tools/call",
+                "params":{"name":"add_commands","arguments":{"route":1,
+                    "commands":["mpesplit","lower"]}}})json", true);
+            expectEquals(noteOnPort(3, 64), 0);
+        }
+
         beginTest("start_route reports connected=false while ports are still waiting");
         {
             ApplicationState state;
