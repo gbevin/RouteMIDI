@@ -529,6 +529,39 @@ public:
             }
         }
 
+        beginTest("MCP protocol conformance: ping, unknown tool, invalid request, notifications");
+        {
+            ApplicationState state;
+
+            // ping MUST get a prompt empty result
+            const var pong = mcp(state, R"json({"jsonrpc":"2.0","id":1,"method":"ping"})json");
+            expect(pong.getDynamicObject() != nullptr);
+            expect(pong.getProperty("result", var()).isObject());
+            expect(! pong.getProperty("result", var()).hasProperty("isError"));
+
+            // an unknown tool is a protocol error, not a successful isError result
+            const var unknown = mcp(state, R"json({"jsonrpc":"2.0","id":2,"method":"tools/call",
+                "params":{"name":"no_such_tool","arguments":{}}})json");
+            expectEquals((int) unknown.getProperty("error", var()).getProperty("code", var()), -32602);
+            expect(! unknown.hasProperty("result"));
+
+            // a well-formed message with an id but no method is Invalid Request
+            const var noMethod = mcp(state, R"json({"jsonrpc":"2.0","id":3,"foo":"bar"})json");
+            expectEquals((int) noMethod.getProperty("error", var()).getProperty("code", var()), -32600);
+
+            // an unknown method is Method not found
+            const var badMethod = mcp(state, R"json({"jsonrpc":"2.0","id":4,"method":"nope"})json");
+            expectEquals((int) badMethod.getProperty("error", var()).getProperty("code", var()), -32601);
+
+            // a true notification (no id) is answered with nothing
+            const var note = mcp(state, R"json({"jsonrpc":"2.0","method":"notifications/initialized"})json");
+            expect(note.isVoid());
+
+            // an id-bearing initialized is a request and still gets a response
+            const var idNote = mcp(state, R"json({"jsonrpc":"2.0","id":5,"method":"tools/list"})json");
+            expect(idNote.getProperty("result", var()).hasProperty("tools"));
+        }
+
         beginTest("MCP initialize advertises RouteMIDI tools");
         {
             ApplicationState state;

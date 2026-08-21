@@ -662,11 +662,6 @@ static DynamicObject* newMcpErrorResponse(const var& id, int code, const String&
     return response;
 }
 
-static bool isMcpNotification(const var& id)
-{
-    return id.isVoid();
-}
-
 // The MCP stdio transport is newline-delimited JSON-RPC: one message per line,
 // written as compact JSON so no newlines are embedded in a message.
 static void writeMcpMessage(const var& message)
@@ -887,12 +882,36 @@ var McpServer::handleRequest(const var& message)
         return var(newMcpErrorResponse(var(), -32700, "Parse error"));
     }
 
+    const bool hasId = request->hasProperty("id");
     const var id = request->getProperty("id");
+    const bool hasMethod = request->hasProperty("method") &&
+                           request->getProperty("method").isString();
+
+    // a well-formed JSON value that isn't a valid Request object (no method, or a
+    // response-shaped message the client must not receive a reply to)
+    if (!hasMethod)
+    {
+        if (!hasId)
+        {
+            return var();   // looks like a notification or a stray response: stay silent
+        }
+        return var(newMcpErrorResponse(id, -32600, "Invalid Request"));
+    }
+
     const String method = request->getProperty("method").toString();
 
-    if (method == "notifications/initialized" || isMcpNotification(id))
+    // a notification carries no id; a message with an id is a request and must be
+    // answered even when its method is notifications/initialized
+    if (!hasId)
     {
         return var();
+    }
+
+    // the utility ping must get a prompt empty result (spec MUST), or a host's
+    // liveness check tears the connection down and kills every live route
+    if (method == "ping")
+    {
+        return var(newMcpResponse(id, newObject()));
     }
 
     if (method == "initialize")
@@ -1484,9 +1503,7 @@ var McpServer::handleRequest(const var& message)
             return structuredOk(routeToVar(*route));
         }
 
-        return var(newMcpResponse(id, newMcpToolResult("Unknown tool: " + name,
-                                                      var(),
-                                                      true)));
+        return var(newMcpErrorResponse(id, -32602, "Unknown tool: " + name));
     }
 
     return var(newMcpErrorResponse(id, -32601, "Method not found"));
