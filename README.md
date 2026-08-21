@@ -313,7 +313,11 @@ Filters select which messages are allowed to pass through a route. As soon as on
 
 Prefix any filter with `not` to make it block instead: matching messages are dropped and everything else passes. Positive and negative filters can be combined: a message must then match at least one positive filter and none of the negative ones.
 
-The `ch` command narrows a route to a single MIDI channel; combined with type filters it restricts them to that channel.
+The `ch` command narrows a route to a single MIDI channel; combined with type filters it restricts them to that channel. It applies to the type filters that follow it, so several `ch` commands can scope different filters to different channels:
+
+```
+routemidi in "Keys" ch 2 cc 11 ch 3 cc 12 out "Synth"    # CC 11 on channel 2, CC 12 on channel 3
+```
 
 The number that selects which message a filter matches (for `ch`, `on`, `off`, `pp`, `cc`, `cc14` and `pc`) may be a single value or an inclusive range written as `lo..hi`. The range form also accepts note names. The `..` separator is used (rather than `-`) so it doesn't clash with note names like `C-2`.
 
