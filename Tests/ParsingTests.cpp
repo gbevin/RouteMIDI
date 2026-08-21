@@ -206,6 +206,30 @@ public:
             expectEquals(route->filters.size(), 0);
         }
 
+        beginTest("syf captures routed SysEx frames verbatim and nothing else");
+        {
+            auto file = File::getSpecialLocation(File::tempDirectory)
+                            .getChildFile("routemidi-syx-" + Uuid().toString() + ".syx");
+            ApplicationState state;
+            parse(state, "in A syf \"" + file.getFullPathName() + "\"");
+            auto* route = state.getRoutes()[0];
+            auto& input = *route->inputs.getFirst();
+
+            const uint8 d1[] = { 0x7d, 0x11, 0x22 };
+            const uint8 d2[] = { 0x7d, 0x33 };
+            ApplicationState::Control(state).routeMessage(*route, input, MidiMessage::createSysExMessage(d1, 3));
+            ApplicationState::Control(state).routeMessage(*route, input, MidiMessage::noteOn(1, 60, (uint8)100));
+            ApplicationState::Control(state).routeMessage(*route, input, MidiMessage::createSysExMessage(d2, 2));
+
+            // two F0/F7-framed dumps back to back; the note stays out
+            MemoryBlock content;
+            expect(file.loadFileAsData(content));
+            const uint8 expected[] = { 0xf0, 0x7d, 0x11, 0x22, 0xf7, 0xf0, 0x7d, 0x33, 0xf7 };
+            expectEquals((int) content.getSize(), 9);
+            expect(content.getSize() == 9 && memcmp(content.getData(), expected, 9) == 0);
+            file.deleteFile();
+        }
+
         beginTest("A misspelled scale name is rejected when the command is added");
         {
             ApplicationState state;
