@@ -206,6 +206,22 @@ public:
             expectEquals(route->filters.size(), 0);
         }
 
+        beginTest("A misspelled scale name is rejected when the command is added");
+        {
+            ApplicationState state;
+            parse(state, "in A inscale C majro out B");
+            expect(state.getRoutes()[0]->filters.isEmpty());
+
+            parse(state, "in A scale C majro dtransp C majro 2 out B");
+            expect(state.getRoutes()[1]->transforms.isEmpty());
+
+            // valid names, including an alias with separators, still register
+            ApplicationState valid;
+            parse(valid, "in A inscale C major scale C Harmonic-Minor dtransp C blues 2 out B");
+            expectEquals(valid.getRoutes()[0]->filters.size(), 1);
+            expectEquals(valid.getRoutes()[0]->transforms.size(), 2);
+        }
+
         beginTest("Monitoring is suppressed while a route writes MIDI text to stdout");
         {
             // with an "out -" route, each message appears on stdout exactly once

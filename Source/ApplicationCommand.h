@@ -218,6 +218,11 @@ struct ApplicationCommand
     // message should be dropped (for instance a transpose out of the 0-127 range)
     bool transform(const ApplicationState& state, MidiMessage& msg) const;
 
+    // a recognized scale name for the scale/inscale/dtransp commands, and the
+    // canonical names for their error message
+    static bool isValidScaleName(const String& name);
+    static String scaleNames();
+
     static bool checkChannel(const MidiMessage& msg, int channelLow, int channelHigh);
 
     String param_;

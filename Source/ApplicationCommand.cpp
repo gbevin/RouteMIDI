@@ -128,6 +128,20 @@ static uint16 scaleMask(const String& name)
     return 0;
 }
 
+bool ApplicationCommand::isValidScaleName(const String& name)
+{
+    return scaleMask(name) != 0;
+}
+
+String ApplicationCommand::scaleNames()
+{
+    return "chromatic, major, minor, dorian, phrygian, lydian, mixolydian, locrian, "
+           "harmonicminor, melodicminor, majorpentatonic, minorpentatonic, majorblues, "
+           "minorblues, diminished, wholetone, spanish, romani, arabian, egyptian, "
+           "ryukyu, augmented, diminished7 or fifth";
+}
+
+
 // snaps a note to the nearest note belonging to the scale, preferring the lower
 // note on a tie and staying within 0-127; returns -1 when no scale note fits in
 // range (which never happens for a non-empty scale)

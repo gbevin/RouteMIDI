@@ -1107,6 +1107,26 @@ String ApplicationState::addProcessingCommand(Route& route, ApplicationCommand c
             route.converters.add(cmd);
             route.convertRules.clearQuick();   // recompiled on the next message
             return {};
+        case IN_SCALE:
+        case SCALE:
+        case DIATONIC_TRANSPOSE:
+            // validate the scale name up front: at routing time a typo would
+            // silently block every note (inscale) or pass everything (scale)
+            if (!ApplicationCommand::isValidScaleName(cmd.opts_[1]))
+            {
+                return "Unknown scale \"" + cmd.opts_[1] + "\", expected one of "
+                       + ApplicationCommand::scaleNames();
+            }
+            if (cmd.command_ == IN_SCALE)
+            {
+                cmd.negate_ = negate;
+                route.filters.add(cmd);
+            }
+            else
+            {
+                route.transforms.add(cmd);
+            }
+            return {};
         case MPE_SPLIT:
         {
             mpe::Zone zone;
