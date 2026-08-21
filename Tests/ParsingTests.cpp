@@ -254,6 +254,13 @@ public:
             parse(custom, "in A scale C 0,3,7 inscale C 0,2,4,7,9 out B");
             expectEquals(custom.getRoutes()[1]->transforms.size(), 1);
             expectEquals(custom.getRoutes()[1]->filters.size(), 1);
+
+            // a bare chord is a silent no-op, so it is refused as the schema's
+            // minArgs promises; with an interval it still registers
+            ApplicationState chords;
+            parse(chords, "in A chord out B in A chord 7 out B");
+            expect(chords.getRoutes()[0]->transforms.isEmpty());
+            expectEquals(chords.getRoutes()[1]->transforms.size(), 1);
         }
 
         beginTest("Monitoring is suppressed while a route writes MIDI text to stdout");
@@ -296,6 +303,18 @@ public:
             parse(state, "file \"" + self.getFullPathName() + "\"");
             parse(state, "file \"" + a.getFullPathName() + "\"");
             expect(state.getRoutes().isEmpty());
+
+            // a symlink alias of a file already being parsed is refused too,
+            // instead of being parsed a second time under its alias path
+            auto alias = dir.getChildFile("routemidi-alias-" + Uuid().toString() + ".txt");
+            if (self.createSymbolicLink(alias, true))
+            {
+                self.replaceWithText("in AliasIn out AliasOut\nfile \"" + alias.getFullPathName() + "\"\n");
+                ApplicationState aliased;
+                parse(aliased, "file \"" + self.getFullPathName() + "\"");
+                expectEquals(aliased.getRoutes().size(), 1);
+                alias.deleteFile();
+            }
 
             // a legitimate nested include still works after the guard
             auto inner = dir.getChildFile("routemidi-inner-" + Uuid().toString() + ".txt");

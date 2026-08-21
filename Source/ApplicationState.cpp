@@ -546,11 +546,14 @@ void ApplicationState::timerCallback()
         outIdentifiers.add(d.identifier);
     }
 
-    // The route graph is built entirely during startup and never changes once the
-    // timer is running, so it can be walked without the lock. The lock is taken only
-    // in short bursts around the connection fields the MIDI callback also reads, and
-    // never across a blocking CoreMIDI open below, so the callback waits as little as
-    // possible (holding it across an openDevice was enough to drop incoming packets).
+    // The route list can be walked without the lock only because everything that
+    // mutates it runs on this same message thread: the CLI builds it during
+    // startup, and the MCP handlers (start_route/stop_route) are marshalled here
+    // via callAsync. Dispatching MCP requests on another thread would break this
+    // walk. The lock is taken only in short bursts around the connection fields
+    // the MIDI callback also reads, and never across a blocking CoreMIDI open
+    // below, so the callback waits as little as possible (holding it across an
+    // openDevice was enough to drop incoming packets).
     for (auto* route : routes_)
     {
         for (auto* input : route->inputs)
@@ -828,7 +831,7 @@ void ApplicationState::parseFile(File file)
 {
     // a program file can load other program files; refuse one that is already
     // being parsed further up the chain, since that would recurse forever
-    const String path = file.getFullPathName();
+    const String path = file.getLinkedTarget().getFullPathName();
     if (parsingFiles_.contains(path))
     {
         std::cerr << "Program file \"" << path << "\" includes itself, ignoring" << std::endl;
@@ -1130,6 +1133,15 @@ String ApplicationState::addProcessingCommand(Route& route, ApplicationCommand c
             // convert rules
             route.converters.add(cmd);
             route.convertRules.clearQuick();   // recompiled on the next message
+            return {};
+        case CHORD:
+            // the schema promises at least one interval; a bare chord would be
+            // a silent no-op
+            if (cmd.opts_.isEmpty())
+            {
+                return "chord needs at least one semitone interval";
+            }
+            route.transforms.add(cmd);
             return {};
         case IN_SCALE:
         case SCALE:
@@ -1591,10 +1603,10 @@ void ApplicationState::processSplit(Route& route, const MidiMessage& msg, Array<
 }
 
 // the cc14range filter: passes the MSB (controller 0-31) and LSB (32-63) halves
-// of a 14-bit CC whose assembled value is in range. It needs the input's MSB
-// memory, so it is matched here instead of in ApplicationCommand::matches. An
-// MSB half is judged with LSB 0 (the MIDI convention after an MSB change); an
-// LSB half is judged with the exact assembled value.
+// of a 14-bit CC by its value window. It needs the input's MSB memory, so it
+// is matched here instead of in ApplicationCommand::matches. Both halves get
+// the verdict of the MSB's 128-value block, so a pair always travels (or
+// stops) together and the window edges act at MSB resolution.
 static bool matchesCc14Range(const ApplicationCommand& cmd, RouteInput& input,
                              const MidiMessage& msg, int channelLow, int channelHigh)
 {
