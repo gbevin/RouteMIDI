@@ -1358,6 +1358,16 @@ void ApplicationState::sendPanic(Route& route)
         input->sustain.clear();
         input->sostenuto.clear();
         input->conv.pressure.reset();
+
+        // the MPE operations' note tracking describes notes that were just
+        // silenced, so it starts over as well; the sensitivity declarations
+        // stay, since the outputs still remember them
+        for (int zone = 0; zone < 2; ++zone)
+        {
+            input->mpeAlloc[zone].reset();
+            input->mpeCollapse[zone].reset();
+            input->mpeRelocate[zone].reset();
+        }
     }
 }
 
@@ -1387,6 +1397,16 @@ void ApplicationState::sendZoneReset(Route& route)
         input->sustain.clear();
         input->sostenuto.clear();
         input->conv.pressure.reset();
+
+        // the MPE operations' note tracking describes notes that were just
+        // silenced, so it starts over as well; the sensitivity declarations
+        // stay, since the outputs still remember them
+        for (int zone = 0; zone < 2; ++zone)
+        {
+            input->mpeAlloc[zone].reset();
+            input->mpeCollapse[zone].reset();
+            input->mpeRelocate[zone].reset();
+        }
     }
 }
 

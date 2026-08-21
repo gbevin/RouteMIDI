@@ -398,6 +398,29 @@ static void cleanupAfterCommandChange(Route& route, const ApplicationCommand& cm
             }
         }
     }
+    if (cmd.command_ == MPE_RELOCATE || cmd.command_ == MPE_COLLAPSE ||
+        cmd.command_ == MPE_EXPAND || cmd.command_ == MPE_SENS)
+    {
+        // each MPE operation accumulates per-input state in the slot of the
+        // zone it was configured for (mpebend is stateless)
+        const int zoneOpt = (cmd.command_ == MPE_EXPAND) ? 1 : 0;
+        mpe::Zone zone;
+        if (zoneOpt < cmd.opts_.size() && mpe::parseZone(cmd.opts_[zoneOpt], zone))
+        {
+            const int z = zone.lower ? 0 : 1;
+            for (auto* input : route.inputs)
+            {
+                switch (cmd.command_)
+                {
+                    case MPE_RELOCATE: input->mpeRelocate[z].reset(); break;
+                    case MPE_COLLAPSE: input->mpeCollapse[z].reset(); break;
+                    case MPE_EXPAND:   input->mpeAlloc[z].reset();    break;
+                    case MPE_SENS:     input->mpeSens[z].reset();     break;
+                    default: break;
+                }
+            }
+        }
+    }
     if (cmd.command_ == MPE_SPLIT)
     {
         route.mpeSplit = mpe::Splitter();

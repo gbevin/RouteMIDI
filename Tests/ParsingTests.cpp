@@ -993,6 +993,57 @@ public:
             expectEquals(state.getRoutes().size(), 0);
         }
 
+        beginTest("MCP edits and panic reset the state of MPE operations");
+        {
+            // a fresh expander announces the zone configuration (the RPN MCM)
+            // before its first note; stale state would skip that announcement
+            auto announces = [](ApplicationState& st, int note)
+            {
+                Array<MidiMessage> outMsgs;
+                Array<int> outPorts;
+                auto* route = st.getRoutes()[0];
+                st.processRouteMessage(*route, *route->inputs[0],
+                                       MidiMessage::noteOn(1, note, (uint8) 100), outMsgs, outPorts);
+                for (auto& m : outMsgs)
+                {
+                    if (m.isController() && m.getControllerNumber() == 6)
+                    {
+                        return true;
+                    }
+                }
+                return false;
+            };
+
+            ApplicationState state;
+            mcp(state, R"json({
+                "jsonrpc": "2.0", "id": 30, "method": "tools/call",
+                "params": { "name": "start_route", "arguments": {
+                    "commands": ["in", "MpeStateIn", "mpexp", "1", "lower", "out", "MpeStateOut"] } }
+            })json", true);
+            expect(announces(state, 60));
+            expect(! announces(state, 61));   // announced once, then quiet
+
+            // removing and re-adding the operation starts it over
+            mcp(state, R"json({
+                "jsonrpc": "2.0", "id": 31, "method": "tools/call",
+                "params": { "name": "remove_command", "arguments": {
+                    "route": 1, "stage": "mpe", "index": 0 } }
+            })json", true);
+            mcp(state, R"json({
+                "jsonrpc": "2.0", "id": 32, "method": "tools/call",
+                "params": { "name": "add_commands", "arguments": {
+                    "route": 1, "commands": ["mpexp", "1", "lower"] } }
+            })json", true);
+            expect(announces(state, 62));
+
+            // panic clears the note tracking, so the zone is announced again
+            mcp(state, R"json({
+                "jsonrpc": "2.0", "id": 33, "method": "tools/call",
+                "params": { "name": "panic_route", "arguments": { "route": 1 } }
+            })json", true);
+            expect(announces(state, 63));
+        }
+
         beginTest("MCP route lifecycle: list, edit and stop a running route");
         {
             ApplicationState state;
