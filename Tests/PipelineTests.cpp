@@ -1,6 +1,6 @@
 /*
  * This file is part of RouteMIDI.
- * Copyright (command) 2017-2026 Uwyn LLC.  https://www.uwyn.com
+ * Copyright (c) 2017-2026 Uwyn LLC.  https://www.uwyn.com
  *
  * RouteMIDI is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -102,14 +102,20 @@ public:
             parse(state, "in X nrpn 1000 clock convert nrpn 1000 cc 7 out Y");
 
             Array<MidiMessage> in;
-            in.add(MidiMessage::controllerEvent(1, 99, 7));      // select MSB (buffered)
+            // select MSB (buffered)
+            in.add(MidiMessage::controllerEvent(1, 99, 7));
             in.add(MidiMessage::midiClock());
-            in.add(MidiMessage::controllerEvent(1, 98, 104));    // select LSB -> intercepted
-            in.add(MidiMessage::noteOn(1, 60, (uint8)100));      // not whitelisted: blocked
-            in.add(MidiMessage::controllerEvent(1, 6, 62));      // data MSB (warm-up emit)
+            // select LSB -> intercepted
+            in.add(MidiMessage::controllerEvent(1, 98, 104));
+            // not whitelisted: blocked
+            in.add(MidiMessage::noteOn(1, 60, (uint8)100));
+            // data MSB (warm-up emit)
+            in.add(MidiMessage::controllerEvent(1, 6, 62));
             in.add(MidiMessage::midiClock());
-            in.add(MidiMessage::controllerEvent(1, 38, 64));     // data LSB -> exact pair
-            in.add(MidiMessage::controllerEvent(1, 99, 127));    // closing null
+            // data LSB -> exact pair
+            in.add(MidiMessage::controllerEvent(1, 38, 64));
+            // closing null
+            in.add(MidiMessage::controllerEvent(1, 99, 127));
             in.add(MidiMessage::controllerEvent(1, 98, 127));
 
             expectEquals(describe(runAll(state, in)),
@@ -144,8 +150,10 @@ public:
             Array<MidiMessage> in;
             in.add(MidiMessage::controllerEvent(1, 99, 7));
             in.add(MidiMessage::controllerEvent(1, 98, 104));
-            in.add(MidiMessage::noteOn(1, 60, (uint8)90));       // becomes CC 6 = 90
-            in.add(MidiMessage::controllerEvent(1, 38, 64));     // pairs with it
+            // becomes CC 6 = 90
+            in.add(MidiMessage::noteOn(1, 60, (uint8)90));
+            // pairs with it
+            in.add(MidiMessage::controllerEvent(1, 38, 64));
 
             expectEquals(describe(runAll(state, in)),
                          String("cc:1:7:90 cc:1:7:90"));
@@ -161,12 +169,17 @@ public:
             parse(state, "in X scale C major convert pp cp out Y");
 
             Array<MidiMessage> in;
-            in.add(MidiMessage::noteOn(1, 60, (uint8)100));       // C3
-            in.add(MidiMessage::noteOn(1, 61, (uint8)100));       // C#3 -> folds to C3
+            // C3
+            in.add(MidiMessage::noteOn(1, 60, (uint8)100));
+            // C#3 -> folds to C3
+            in.add(MidiMessage::noteOn(1, 61, (uint8)100));
             in.add(MidiMessage::aftertouchChange(1, 60, 40));
-            in.add(MidiMessage::aftertouchChange(1, 61, 70));     // folds to C3: max wins
-            in.add(MidiMessage::noteOff(1, 61, (uint8)0));        // folded off releases C3
-            in.add(MidiMessage::aftertouchChange(1, 60, 50));     // restores the pressure
+            // folds to C3: max wins
+            in.add(MidiMessage::aftertouchChange(1, 61, 70));
+            // folded off releases C3
+            in.add(MidiMessage::noteOff(1, 61, (uint8)0));
+            // restores the pressure
+            in.add(MidiMessage::aftertouchChange(1, 60, 50));
             in.add(MidiMessage::noteOff(1, 60, (uint8)0));
 
             expectEquals(describe(runAll(state, in)),
@@ -181,10 +194,13 @@ public:
             parse(state, "in X chord 4 7 sustain out Y");
 
             Array<MidiMessage> in;
-            in.add(MidiMessage::controllerEvent(1, 64, 127));     // pedal down (consumed)
+            // pedal down (consumed)
+            in.add(MidiMessage::controllerEvent(1, 64, 127));
             in.add(MidiMessage::noteOn(1, 60, (uint8)100));
-            in.add(MidiMessage::noteOff(1, 60, (uint8)0));        // whole triad held
-            in.add(MidiMessage::controllerEvent(1, 64, 0));       // pedal up releases it
+            // whole triad held
+            in.add(MidiMessage::noteOff(1, 60, (uint8)0));
+            // pedal up releases it
+            in.add(MidiMessage::controllerEvent(1, 64, 0));
 
             expectEquals(describe(runAll(state, in)),
                          String("on:1:60:100 on:1:64:100 on:1:67:100 off:1:60 off:1:64 off:1:67"));
@@ -200,13 +216,15 @@ public:
             Array<MidiMessage> in;
             in.add(MidiMessage::controllerEvent(1, 64, 127));
             in.add(MidiMessage::noteOn(1, 60, (uint8)100));
-            in.add(MidiMessage(0x90, 60, 0));                     // raw velocity-0 note-on
+            // raw velocity-0 note-on
+            in.add(MidiMessage(0x90, 60, 0));
             in.add(MidiMessage::controllerEvent(1, 64, 0));
 
             const auto out = runAll(state, in);
             expectEquals(out.size(), 2);
             expect(out[0].isNoteOn());
-            expect(out[1].isNoteOff());                           // released at pedal-up
+            // released at pedal-up
+            expect(out[1].isNoteOff());
             expectEquals(out[1].getNoteNumber(), 60);
         }
 
@@ -220,9 +238,12 @@ public:
             parse(state, "in X mpemono lower 1 convert cc 74 cc 1 out Y");
 
             Array<MidiMessage> in;
-            in.add(MidiMessage::noteOn(2, 60, (uint8)100));       // member channel voice
-            in.add(MidiMessage::controllerEvent(2, 74, 90));      // combined, then converted
-            in.add(MidiMessage::pitchWheel(2, 9000));             // triggers the declaration
+            // member channel voice
+            in.add(MidiMessage::noteOn(2, 60, (uint8)100));
+            // combined, then converted
+            in.add(MidiMessage::controllerEvent(2, 74, 90));
+            // triggers the declaration
+            in.add(MidiMessage::pitchWheel(2, 9000));
             in.add(MidiMessage::noteOff(2, 60, (uint8)0));
 
             expectEquals(describe(runAll(state, in)),

@@ -1,6 +1,6 @@
 /*
  * This file is part of RouteMIDI.
- * Copyright (command) 2017-2026 Uwyn LLC.  https://www.uwyn.com
+ * Copyright (c) 2017-2026 Uwyn LLC.  https://www.uwyn.com
  *
  * RouteMIDI is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -169,7 +169,8 @@ static int snapToScale(int note, int root, uint16 mask)
     for (int d = 1; d <= 12; ++d)
     {
         const int down = note - d;
-        if (down >= 0 && inScale(down)) return down;   // ties resolve downward
+        // ties resolve downward
+        if (down >= 0 && inScale(down)) return down;
         const int up = note + d;
         if (up <= 127 && inScale(up)) return up;
     }
@@ -194,7 +195,8 @@ static int diatonicShift(int note, int root, uint16 mask, int steps)
 
     const int base = snapped - root;
     const int octave = (int) std::floor(base / 12.0);
-    const int pitchClass = base - 12 * octave;   // 0-11, guaranteed a scale degree
+    // 0-11, guaranteed a scale degree
+    const int pitchClass = base - 12 * octave;
 
     int index = 0;
     while (index < count && degrees[index] != pitchClass) ++index;
@@ -585,7 +587,8 @@ bool ApplicationCommand::transform(const ApplicationState& state, MidiMessage& m
                 const uint16 mask = copts_[1].scaleMask;
                 if (mask == 0)
                 {
-                    break;   // unrecognised scale, leave the note untouched
+                    // unrecognised scale, leave the note untouched
+                    break;
                 }
                 const int shifted = diatonicShift(msg.getNoteNumber(), copts_[0].pitchClass,
                                                   mask, copts_[2].intValue);
@@ -652,7 +655,8 @@ bool ApplicationCommand::transform(const ApplicationState& state, MidiMessage& m
                 const uint16 mask = copts_[1].scaleMask;
                 if (mask == 0)
                 {
-                    break;   // unrecognised scale, leave the note untouched
+                    // unrecognised scale, leave the note untouched
+                    break;
                 }
                 const int snapped = snapToScale(msg.getNoteNumber(), copts_[0].pitchClass, mask);
                 if (snapped < 0)

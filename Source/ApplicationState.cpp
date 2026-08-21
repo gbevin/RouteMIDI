@@ -1,6 +1,6 @@
 /*
  * This file is part of RouteMIDI.
- * Copyright (command) 2017-2026 Uwyn LLC.  https://www.uwyn.com
+ * Copyright (c) 2017-2026 Uwyn LLC.  https://www.uwyn.com
  *
  * RouteMIDI is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -48,9 +48,12 @@ namespace ansi
     // the terminal's default foreground on purpose, so they stay legible on both
     // dark and light backgrounds without needing to know which one it is.
     struct Role { const char* truecolor; const char* basic; };
-    static const Role label   { "38;2;232;121;76",  "33" };   // terracotta: Usage/Commands/section headers
-    static const Role command { "38;2;109;188;128", "32" };   // sage green: command and flag names
-    static const Role option  { "38;2;126;167;205", "34" };   // steel blue: option placeholders and the URL
+    // terracotta: Usage/Commands/section headers
+    static const Role label   { "38;2;232;121;76",  "33" };
+    // sage green: command and flag names
+    static const Role command { "38;2;109;188;128", "32" };
+    // steel blue: option placeholders and the URL
+    static const Role option  { "38;2;126;167;205", "34" };
 
     static bool enabled()
     {
@@ -69,7 +72,7 @@ namespace ansi
     // off (or the role has no 16-color equivalent on a non-truecolor terminal)
     static String paint(const Role& role, const String& text)
     {
-        if (! enabled() || text.isEmpty())
+        if (!enabled() || text.isEmpty())
         {
             return text;
         }
@@ -249,7 +252,8 @@ void ApplicationState::startOutputSender()
                 {
                     return;
                 }
-                batch.swap(sendQueue_);   // drain everything pending in one go, in order
+                // drain everything pending in one go, in order
+                batch.swap(sendQueue_);
             }
             for (auto& item : batch)
             {
@@ -273,7 +277,8 @@ void ApplicationState::stopOutputSender()
         senderShouldExit_ = true;
     }
     sendQueueCv_.notify_one();
-    senderThread_.join();   // drains any messages still queued before returning
+    // drains any messages still queued before returning
+    senderThread_.join();
 }
 
 void ApplicationState::enqueueSend(MidiOutput* out, const MidiMessage& msg)
@@ -338,7 +343,8 @@ void ApplicationState::initialise(JUCEApplicationBase& app)
         // running, and each request is handled on the message thread
         startOutputSender();
         startTimer(200);
-        enableTrafficCapture(true);   // so the read_route tool can observe route traffic
+        // so the read_route tool can observe route traffic
+        enableTrafficCapture(true);
         mcpServer_ = std::make_unique<McpServer>(*this);
         mcpServer_->start();
         return;
@@ -412,7 +418,8 @@ void ApplicationState::shutdown()
                 }
             }
         }
-        closing.clear();   // ~MidiInput stops and closes each port, unlocked
+        // ~MidiInput stops and closes each port, unlocked
+        closing.clear();
     }
 
     {
@@ -435,10 +442,12 @@ void ApplicationState::shutdown()
         }
     }
 
-    stopOutputSender();   // drains the queue (including any panic) before returning
+    // drains the queue (including any panic) before returning
+    stopOutputSender();
 
-    mcpServer_.reset();   // joins the reader thread, which has already finished:
-                          // quitting happens when the MCP client closes stdin
+    // joins the reader thread, which has already finished:
+    // quitting happens when the MCP client closes stdin
+    mcpServer_.reset();
 }
 
 bool ApplicationState::hasStdinInput() const
@@ -519,7 +528,8 @@ void ApplicationState::parseParametersInto(OwnedArray<Route>& target, StringArra
     parseTarget_ = &target;
     parseParameters(parameters);
     parseTarget_ = nullptr;
-    pendingNegate_ = false;   // a trailing "not" must not negate the next call's first filter
+    // a trailing "not" must not negate the next call's first filter
+    pendingNegate_ = false;
 }
 
 void ApplicationState::reportParseError(const String& message)
@@ -564,11 +574,14 @@ void ApplicationState::timerCallback()
             }
 
             // decide what to do under a brief lock, then act on it unlocked
-            String lostName;    // a previously connected port that just vanished
-            String toConnect;   // an inName still waiting to be (re)connected
-            std::unique_ptr<MidiInput> lost;   // closed after the lock: closing
-                                               // waits on the device callback,
-                                               // which itself waits on this lock
+            // a previously connected port that just vanished
+            String lostName;
+            // an inName still waiting to be (re)connected
+            String toConnect;
+            // closed after the lock: closing
+            // waits on the device callback,
+            // which itself waits on this lock
+            std::unique_ptr<MidiInput> lost;
             {
                 const ScopedLock sl(midiCallbackLock_);
                 // the unique identifier is checked rather than the name, so
@@ -1087,7 +1100,8 @@ String ApplicationState::addProcessingCommand(Route& route, ApplicationCommand c
             cmd.opts_.add(dstType);
             cmd.opts_.add(dstNum);
             route.converters.add(cmd);
-            route.convertRules.clearQuick();   // recompiled on the next message
+            // recompiled on the next message
+            route.convertRules.clearQuick();
             return {};
         }
         case MPE_RELOCATE:
@@ -1136,7 +1150,8 @@ String ApplicationState::addProcessingCommand(Route& route, ApplicationCommand c
             // regenerated in the converter stage, so they live alongside the
             // convert rules
             route.converters.add(cmd);
-            route.convertRules.clearQuick();   // recompiled on the next message
+            // recompiled on the next message
+            route.convertRules.clearQuick();
             return {};
         case CHORD:
             // the schema promises at least one interval; a bare chord would be
@@ -1386,9 +1401,12 @@ void ApplicationState::sendPanic(Route& route)
         }
         for (int channel = 1; channel <= 16; ++channel)
         {
-            enqueueSend(dest->out.get(), MidiMessage::controllerEvent(channel, 64, 0));   // sustain off
-            enqueueSend(dest->out.get(), MidiMessage::controllerEvent(channel, 66, 0));   // sostenuto off
-            enqueueSend(dest->out.get(), MidiMessage::controllerEvent(channel, 123, 0));  // all notes off
+            // sustain off
+            enqueueSend(dest->out.get(), MidiMessage::controllerEvent(channel, 64, 0));
+            // sostenuto off
+            enqueueSend(dest->out.get(), MidiMessage::controllerEvent(channel, 66, 0));
+            // all notes off
+            enqueueSend(dest->out.get(), MidiMessage::controllerEvent(channel, 123, 0));
         }
     }
 
@@ -1426,8 +1444,10 @@ void ApplicationState::sendZoneReset(Route& route)
         }
         for (int channel = 1; channel <= 16; ++channel)
         {
-            enqueueSend(dest->out.get(), MidiMessage::controllerEvent(channel, 123, 0));  // all notes off
-            enqueueSend(dest->out.get(), MidiMessage::controllerEvent(channel, 121, 0));  // reset all controllers
+            // all notes off
+            enqueueSend(dest->out.get(), MidiMessage::controllerEvent(channel, 123, 0));
+            // reset all controllers
+            enqueueSend(dest->out.get(), MidiMessage::controllerEvent(channel, 121, 0));
         }
     }
 
@@ -1672,7 +1692,8 @@ static bool matchesRpnParam(const ApplicationCommand& cmd, RouteInput& input,
     {
         if (msg.getControllerValue() == 127)
         {
-            return true;   // the deselecting null passes as framing
+            // the deselecting null passes as framing
+            return true;
         }
         if (cc == selectMsbCc)
         {
@@ -1709,7 +1730,8 @@ bool ApplicationState::passesFilters(Route& route, RouteInput& input, const Midi
         return true;
     }
 
-    int channelLow = 0, channelHigh = 0;   // context for type filters, 0 = any
+    // context for type filters, 0 = any
+    int channelLow = 0, channelHigh = 0;
     bool hasPositiveType = false;
     bool positiveMatched = false;
     bool negativeMatched = false;
@@ -1825,7 +1847,8 @@ Array<MidiMessage> ApplicationState::applyTransforms(Route& route, RouteInput& i
                     for (const auto& interval : cmd.copts_)
                     {
                         const int n = base + interval.intValue;
-                        if (n < 0 || n > 127) continue;   // out-of-range notes are dropped
+                        // out-of-range notes are dropped
+                        if (n < 0 || n > 127) continue;
                         MidiMessage chordNote = on ? MidiMessage::noteOn(channel, n, (uint8)velocity)
                                                    : MidiMessage::noteOff(channel, n, (uint8)velocity);
                         chordNote.setTimeStamp(ts);
@@ -1972,7 +1995,8 @@ void ApplicationState::rebuildConvertRules(Route& route)
                 r.outLo = jlimit(0, 16383, asDecOrHexIntValue(cmd.opts_[3]));
                 r.outHi = jlimit(0, 16383, asDecOrHexIntValue(cmd.opts_[4]));
             }
-            else if (cmd.opts_.size() > 1)   // invert takes only the controller
+            // invert takes only the controller
+            else if (cmd.opts_.size() > 1)
             {
                 r.addAmount = asDecOrHexIntValue(cmd.opts_[1]);
                 r.factor    = cmd.opts_[1].getFloatValue();
@@ -2143,8 +2167,10 @@ void ApplicationState::printUsage()
     {
         longestCommand = jmax(longestCommand, cmd.param_.length());
     }
-    const int optionColumn = longestCommand + 3;      // where the option names start
-    const int descriptionColumn = optionColumn + 11;  // where the description starts
+    // where the option names start
+    const int optionColumn = longestCommand + 3;
+    // where the description starts
+    const int descriptionColumn = optionColumn + 11;
     bool firstSection = true;
     for (auto&& cmd : commands_)
     {
@@ -2213,7 +2239,8 @@ void ApplicationState::printUsage()
             if (i < descriptionLines.size())
             {
                 padTo(descriptionColumn);
-                out << descriptionLines.getReference(i);   // description in the default color
+                // description in the default color
+                out << descriptionLines.getReference(i);
             }
 
             std::cout << out << std::endl;
@@ -2268,7 +2295,7 @@ void ApplicationState::printUsage()
     };
     auto note = [&isCommandName](const String& text)
     {
-        if (! ansi::enabled())
+        if (!ansi::enabled())
         {
             return text;
         }
@@ -2290,7 +2317,7 @@ void ApplicationState::printUsage()
             }
             const String inner = text.substring(open + 1, close);
             const bool tint = inner.startsWith("--")
-                              || (! inner.containsChar(' ') && isCommandName(inner));
+                              || (!inner.containsChar(' ') && isCommandName(inner));
             out << text.substring(i, open + 1)
                 << (tint ? ansi::paint(ansi::command, inner) : inner) << "\"";
             i = close + 1;

@@ -1,6 +1,6 @@
 /*
  * This file is part of RouteMIDI.
- * Copyright (command) 2017-2026 Uwyn LLC.  https://www.uwyn.com
+ * Copyright (c) 2017-2026 Uwyn LLC.  https://www.uwyn.com
  *
  * RouteMIDI is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -42,7 +42,10 @@ public:
 private:
     void releaseLatched(Array<MidiMessage>& output, double timestamp);
 
-    bool latched_[16][128] {};  // notes currently sounding, per channel and note
-    bool held_[16][128] {};     // keys currently physically down, for hold mode
-    int heldCount_ { 0 };       // number of keys currently down, for hold mode
+    // notes currently sounding, per channel and note
+    bool latched_[16][128] {};
+    // keys currently physically down, for hold mode
+    bool held_[16][128] {};
+    // number of keys currently down, for hold mode
+    int heldCount_ { 0 };
 };

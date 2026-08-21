@@ -1,6 +1,6 @@
 /*
  * This file is part of RouteMIDI.
- * Copyright (command) 2017-2026 Uwyn LLC.  https://www.uwyn.com
+ * Copyright (c) 2017-2026 Uwyn LLC.  https://www.uwyn.com
  *
  * RouteMIDI is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -78,7 +78,7 @@ public:
             expect(midi->isBlocked());
 
             midi->setMidiMessage(MidiMessage::noteOn(1, 60, (uint8)100));
-            expect(! midi->isBlocked());
+            expect(!midi->isBlocked());
         }
 
         beginTest("send* factory emits extra messages");
@@ -135,8 +135,10 @@ public:
             expectEquals(velocities[0], 50);
             expectEquals(velocities[1], 50);
             expectEquals(velocities[2], 50);
-            expectEquals(velocities[3], 127);   // the 4th note-on is accented
-            expectEquals(velocities[4], 50);    // and the count keeps going
+            // the 4th note-on is accented
+            expectEquals(velocities[3], 127);
+            // and the count keeps going
+            expectEquals(velocities[4], 50);
         }
 
 #if ! JUCE_WINDOWS
@@ -170,7 +172,7 @@ public:
             std::cerr.rdbuf(previous);
 
             expect(r.wasOk(), r.getErrorMessage());
-            expect(! (bool) engine.evaluate("sent"));
+            expect(!(bool) engine.evaluate("sent"));
             expect(String(captured.str()).contains("OSC"));
 
             // a valid address on the same sender still goes through

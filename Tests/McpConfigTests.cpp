@@ -1,6 +1,6 @@
 /*
  * This file is part of RouteMIDI.
- * Copyright (command) 2017-2026 Uwyn LLC.  https://www.uwyn.com
+ * Copyright (c) 2017-2026 Uwyn LLC.  https://www.uwyn.com
  *
  * RouteMIDI is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -73,7 +73,7 @@ public:
             expect(block.contains("command = \"" + exe + "\""));
             expect(block.contains("args = [\"--mcp\"]"));
             // and it is TOML, not the JSON shape
-            expect(! block.contains("mcpServers"));
+            expect(!block.contains("mcpServers"));
         }
 
         beginTest("A Windows path is escaped for the TOML basic string");

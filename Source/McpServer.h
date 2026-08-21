@@ -1,6 +1,6 @@
 /*
  * This file is part of RouteMIDI.
- * Copyright (command) 2017-2026 Uwyn LLC.  https://www.uwyn.com
+ * Copyright (c) 2017-2026 Uwyn LLC.  https://www.uwyn.com
  *
  * RouteMIDI is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -33,7 +33,8 @@ class McpServer
 {
 public:
     explicit McpServer(ApplicationState& state);
-    ~McpServer();   // joins the reader thread, which exits when stdin closes
+    // joins the reader thread, which exits when stdin closes
+    ~McpServer();
 
     // spawns the stdin reader thread: the message loop stays free to run the
     // reconnect timer, each request is handled on the message thread (which

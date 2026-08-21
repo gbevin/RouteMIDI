@@ -1,6 +1,6 @@
 /*
  * This file is part of RouteMIDI.
- * Copyright (command) 2017-2026 Uwyn LLC.  https://www.uwyn.com
+ * Copyright (c) 2017-2026 Uwyn LLC.  https://www.uwyn.com
  *
  * RouteMIDI is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -50,9 +50,11 @@ void MonoState::process(Priority priority, const MidiMessage& msg, Array<MidiMes
         {
             if (sounding[c] >= 0)
             {
-                emit(output, false, channel, sounding[c], 0, ts);   // stop the current note
+                // stop the current note
+                emit(output, false, channel, sounding[c], 0, ts);
             }
-            emit(output, true, channel, n, velocity[c][n], ts);     // (re)start this one
+            // (re)start this one
+            emit(output, true, channel, n, velocity[c][n], ts);
             sounding[c] = n;
         }
         // otherwise this note waits in the held set without sounding
@@ -60,15 +62,17 @@ void MonoState::process(Priority priority, const MidiMessage& msg, Array<MidiMes
     else if (msg.isNoteOff())
     {
         const int n = msg.getNoteNumber();
-        if (! held[c][n])
+        if (!held[c][n])
         {
-            return;                          // never tracked; nothing to release
+            // never tracked; nothing to release
+            return;
         }
         held[c][n] = false;
 
         if (sounding[c] != n)
         {
-            return;                          // a waiting note left; the sound is unchanged
+            // a waiting note left; the sound is unchanged
+            return;
         }
 
         emit(output, false, channel, n, msg.getVelocity(), ts);
@@ -80,7 +84,8 @@ void MonoState::process(Priority priority, const MidiMessage& msg, Array<MidiMes
     }
     else
     {
-        output.add(msg);                     // everything else passes through
+        // everything else passes through
+        output.add(msg);
     }
 }
 
@@ -89,7 +94,7 @@ int MonoState::priorityNote(Priority priority, int c) const
     int best = -1;
     for (int n = 0; n < 128; ++n)
     {
-        if (! held[c][n]) continue;
+        if (!held[c][n]) continue;
         if (best < 0
             || (priority == Low  && n < best)
             || (priority == High && n > best)

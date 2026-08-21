@@ -22,9 +22,11 @@
 void ChannelBucket::add(int channel)
 {
     if (channel < 1 || channel > 16) return;
-    channel -= 1;                       // 0-based index
+    // 0-based index
+    channel -= 1;
 
-    if (next_[channel] != -1) return;   // already in the bucket
+    // already in the bucket
+    if (next_[channel] != -1) return;
 
     if (top_ == -1)
     {

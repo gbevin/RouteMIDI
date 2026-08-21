@@ -55,9 +55,14 @@ private:
     void extract(int channel);
     void extremize(int channel);
 
-    int top_;            // channel index of the top of the bucket, -1 when empty
-    int previous_[16];   // previous channel index in the ring for each channel
-    int next_[16];       // next channel index in the ring for each channel
-    int taken_[16];      // how many times each channel is currently taken
-    int bottomReleased_; // channel index of the bottom of the released section
+    // channel index of the top of the bucket, -1 when empty
+    int top_;
+    // previous channel index in the ring for each channel
+    int previous_[16];
+    // next channel index in the ring for each channel
+    int next_[16];
+    // how many times each channel is currently taken
+    int taken_[16];
+    // channel index of the bottom of the released section
+    int bottomReleased_;
 };

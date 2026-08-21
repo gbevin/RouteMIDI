@@ -1,6 +1,6 @@
 /*
  * This file is part of RouteMIDI.
- * Copyright (command) 2017-2026 Uwyn LLC.  https://www.uwyn.com
+ * Copyright (c) 2017-2026 Uwyn LLC.  https://www.uwyn.com
  *
  * RouteMIDI is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -48,11 +48,13 @@ public:
 
             m = MidiMessage::noteOn(16, 60, (uint8)100);
             expect(makeCommand(CHANNEL_ADD, {"2"}).transform(state, m));
-            expectEquals(m.getChannel(), 2);   // 16 + 2 wraps to 2
+            // 16 + 2 wraps to 2
+            expectEquals(m.getChannel(), 2);
 
             m = MidiMessage::noteOn(1, 60, (uint8)100);
             expect(makeCommand(CHANNEL_ADD, {"-1"}).transform(state, m));
-            expectEquals(m.getChannel(), 16);  // 1 - 1 wraps to 16
+            // 1 - 1 wraps to 16
+            expectEquals(m.getChannel(), 16);
         }
 
         beginTest("Note transforms");
@@ -63,10 +65,10 @@ public:
 
             // out of range is dropped
             m = MidiMessage::noteOn(1, 120, (uint8)100);
-            expect(! makeCommand(TRANSPOSE, {"12"}).transform(state, m));
+            expect(!makeCommand(TRANSPOSE, {"12"}).transform(state, m));
 
             m = MidiMessage::noteOn(1, 5, (uint8)100);
-            expect(! makeCommand(TRANSPOSE, {"-10"}).transform(state, m));
+            expect(!makeCommand(TRANSPOSE, {"-10"}).transform(state, m));
 
             m = MidiMessage::noteOn(1, 36, (uint8)100);
             expect(makeCommand(NOTE_MAP, {"36", "60"}).transform(state, m));
@@ -74,7 +76,8 @@ public:
 
             m = MidiMessage::noteOn(1, 37, (uint8)100);
             expect(makeCommand(NOTE_MAP, {"36", "60"}).transform(state, m));
-            expectEquals(m.getNoteNumber(), 37);   // unchanged
+            // unchanged
+            expectEquals(m.getNoteNumber(), 37);
         }
 
         beginTest("Diatonic transpose (shift by scale steps)");
@@ -116,25 +119,29 @@ public:
             MidiMessage m = MidiMessage::noteOn(3, 60, (uint8)100);
             expect(makeCommand(NOTE_TO_CC, {"60", "64"}).transform(state, m));
             expect(m.isController());
-            expectEquals(m.getChannel(), 3);          // channel preserved
+            // channel preserved
+            expectEquals(m.getChannel(), 3);
             expectEquals(m.getControllerNumber(), 64);
             expectEquals(m.getControllerValue(), 100);
 
             m = MidiMessage::noteOff(3, 60, (uint8)0);
             expect(makeCommand(NOTE_TO_CC, {"60", "64"}).transform(state, m));
             expect(m.isController());
-            expectEquals(m.getControllerValue(), 0);  // note-off sends 0
+            // note-off sends 0
+            expectEquals(m.getControllerValue(), 0);
 
             m = MidiMessage::noteOn(1, 61, (uint8)100);
             expect(makeCommand(NOTE_TO_CC, {"60", "64"}).transform(state, m));
-            expect(m.isNoteOn());                     // a different note is untouched
+            // a different note is untouched
+            expect(m.isNoteOn());
 
             // ccnote: a Control Change becomes a note, threshold at 64
             m = MidiMessage::controllerEvent(2, 64, 127);
             expect(makeCommand(CC_TO_NOTE, {"64", "C3"}).transform(state, m));
             expect(m.isNoteOn());
             expectEquals(m.getChannel(), 2);
-            expectEquals(m.getNoteNumber(), 60);      // C3
+            // C3
+            expectEquals(m.getNoteNumber(), 60);
             expectEquals((int)m.getVelocity(), 127);
 
             m = MidiMessage::controllerEvent(2, 64, 0);
@@ -144,7 +151,8 @@ public:
 
             m = MidiMessage::controllerEvent(2, 7, 100);
             expect(makeCommand(CC_TO_NOTE, {"64", "C3"}).transform(state, m));
-            expect(m.isController());                 // a different CC is untouched
+            // a different CC is untouched
+            expect(m.isController());
 
             // notepc: a note-on becomes a Program Change, note-off dropped
             m = MidiMessage::noteOn(5, 48, (uint8)100);
@@ -154,13 +162,15 @@ public:
             expectEquals(m.getProgramChangeNumber(), 5);
 
             m = MidiMessage::noteOff(5, 48, (uint8)0);
-            expect(! makeCommand(NOTE_TO_PROGRAM, {"48", "5"}).transform(state, m));  // dropped
+            // dropped
+            expect(!makeCommand(NOTE_TO_PROGRAM, {"48", "5"}).transform(state, m));
 
             // pccc: a Program Change becomes a Control Change with the given value
             m = MidiMessage::programChange(4, 0);
             expect(makeCommand(PROGRAM_TO_CC, {"0", "1", "127"}).transform(state, m));
             expect(m.isController());
-            expectEquals(m.getChannel(), 4);          // channel preserved
+            // channel preserved
+            expectEquals(m.getChannel(), 4);
             expectEquals(m.getControllerNumber(), 1);
             expectEquals(m.getControllerValue(), 127);
 
@@ -170,24 +180,30 @@ public:
 
             m = MidiMessage::programChange(4, 9);
             expect(makeCommand(PROGRAM_TO_CC, {"0", "1", "127"}).transform(state, m));
-            expect(m.isProgramChange());              // a different program is untouched
+            // a different program is untouched
+            expect(m.isProgramChange());
 
             m = MidiMessage::controllerEvent(4, 0, 64);
             expect(makeCommand(PROGRAM_TO_CC, {"0", "1", "127"}).transform(state, m));
-            expect(m.isController());                 // other message types pass through
+            // other message types pass through
+            expect(m.isController());
             expectEquals(m.getControllerNumber(), 0);
         }
 
         beginTest("Scale quantize (snap notes to a key)");
         {
             // C major: chromatic notes fall to the nearest scale note, ties down
-            MidiMessage m = MidiMessage::noteOn(1, 61, (uint8)100);   // C#4
+            // C#4
+            MidiMessage m = MidiMessage::noteOn(1, 61, (uint8)100);
             expect(makeCommand(SCALE, {"C", "major"}).transform(state, m));
-            expectEquals(m.getNoteNumber(), 60);                      // -> C4
+            // -> C4
+            expectEquals(m.getNoteNumber(), 60);
 
-            m = MidiMessage::noteOn(1, 66, (uint8)100);               // F#4
+            // F#4
+            m = MidiMessage::noteOn(1, 66, (uint8)100);
             expect(makeCommand(SCALE, {"C", "major"}).transform(state, m));
-            expectEquals(m.getNoteNumber(), 65);                      // -> F4
+            // -> F4
+            expectEquals(m.getNoteNumber(), 65);
 
             // a note already in the scale is left alone
             m = MidiMessage::noteOn(1, 60, (uint8)100);
@@ -205,23 +221,31 @@ public:
             expectEquals(m.getNoteNumber(), 66);
 
             // pentatonic scales skip more notes
-            m = MidiMessage::noteOn(1, 65, (uint8)100);               // F4
+            // F4
+            m = MidiMessage::noteOn(1, 65, (uint8)100);
             expect(makeCommand(SCALE, {"C", "majpent"}).transform(state, m));
-            expectEquals(m.getNoteNumber(), 64);                      // -> E4
+            // -> E4
+            expectEquals(m.getNoteNumber(), 64);
 
             // a custom comma-separated scale (semitone degrees from the root)
-            m = MidiMessage::noteOn(1, 64, (uint8)100);               // E4
+            // E4
+            m = MidiMessage::noteOn(1, 64, (uint8)100);
             expect(makeCommand(SCALE, {"C", "0,3,7"}).transform(state, m));
-            expectEquals(m.getNoteNumber(), 63);                      // -> Eb4
+            // -> Eb4
+            expectEquals(m.getNoteNumber(), 63);
 
             // additional scales snap as expected
-            m = MidiMessage::noteOn(1, 64, (uint8)100);               // E4
+            // E4
+            m = MidiMessage::noteOn(1, 64, (uint8)100);
             expect(makeCommand(SCALE, {"C", "diminished"}).transform(state, m));
-            expectEquals(m.getNoteNumber(), 63);                      // -> Eb4
+            // -> Eb4
+            expectEquals(m.getNoteNumber(), 63);
 
-            m = MidiMessage::noteOn(1, 64, (uint8)100);               // E4
+            // E4
+            m = MidiMessage::noteOn(1, 64, (uint8)100);
             expect(makeCommand(SCALE, {"C", "fifth"}).transform(state, m));
-            expectEquals(m.getNoteNumber(), 67);                      // -> G4 (root/fifth)
+            // -> G4 (root/fifth)
+            expectEquals(m.getNoteNumber(), 67);
 
             // major blues keeps the natural third, minor blues snaps it away
             m = MidiMessage::noteOn(1, 64, (uint8)100);
@@ -234,7 +258,8 @@ public:
             // names are case-insensitive and ignore spaces, dashes and underscores
             m = MidiMessage::noteOn(1, 64, (uint8)100);
             expect(makeCommand(SCALE, {"C", "Harmonic-Minor"}).transform(state, m));
-            expectEquals(m.getNoteNumber(), 63);                      // harmonic minor has Eb
+            // harmonic minor has Eb
+            expectEquals(m.getNoteNumber(), 63);
 
             // an unknown scale name leaves the note untouched
             m = MidiMessage::noteOn(1, 61, (uint8)100);
@@ -248,7 +273,8 @@ public:
             Route route;
             route.inputs.add(new RouteInput());
             auto& input = *route.inputs[0];
-            route.transforms.add(makeCommand(CHORD, {"4", "7"}));     // major triad
+            // major triad
+            route.transforms.add(makeCommand(CHORD, {"4", "7"}));
             auto out = state.applyTransforms(route, input, MidiMessage::noteOn(1, 60, (uint8)100));
             expectEquals(out.size(), 3);
             expectEquals(out[0].getNoteNumber(), 60);
@@ -287,9 +313,12 @@ public:
             diatonic.transforms.add(makeCommand(SCALE, {"C", "major"}));
             out = state.applyTransforms(diatonic, *diatonic.inputs[0], MidiMessage::noteOn(1, 64, (uint8)100));
             expectEquals(out.size(), 3);
-            expectEquals(out[0].getNoteNumber(), 64);   // E
-            expectEquals(out[1].getNoteNumber(), 67);   // G# -> G
-            expectEquals(out[2].getNoteNumber(), 71);   // B
+            // E
+            expectEquals(out[0].getNoteNumber(), 64);
+            // G# -> G
+            expectEquals(out[1].getNoteNumber(), 67);
+            // B
+            expectEquals(out[2].getNoteNumber(), 71);
         }
 
         beginTest("Note latch (toggle and hold modes)");
@@ -302,14 +331,17 @@ public:
 
             auto out = state.applyTransforms(route, input, MidiMessage::noteOn(1, 60, (uint8)100));
             expectEquals(out.size(), 1);
-            expect(out[0].isNoteOn());                   // latched on
+            // latched on
+            expect(out[0].isNoteOn());
 
             out = state.applyTransforms(route, input, MidiMessage::noteOff(1, 60, (uint8)0));
-            expectEquals(out.size(), 0);                 // note-off is swallowed
+            // note-off is swallowed
+            expectEquals(out.size(), 0);
 
             out = state.applyTransforms(route, input, MidiMessage::noteOn(1, 60, (uint8)100));
             expectEquals(out.size(), 1);
-            expect(out[0].isNoteOff());                  // second press toggles it off
+            // second press toggles it off
+            expect(out[0].isNoteOff());
             expectEquals(out[0].getNoteNumber(), 60);
 
             // a second note-off after toggling off is swallowed too
@@ -335,7 +367,8 @@ public:
 
             // pressing a new note releases the held chord, then sounds the new note
             out = state.applyTransforms(hold, hin, MidiMessage::noteOn(1, 67, (uint8)100));
-            expectEquals(out.size(), 3);                 // off C, off E, on G (order may vary)
+            // off C, off E, on G (order may vary)
+            expectEquals(out.size(), 3);
             int noteOns = 0, noteOffs = 0;
             for (auto& n : out)
             {
@@ -371,10 +404,14 @@ public:
             // last-note priority: a new note steals, releasing it falls back to
             // the previously held note (retriggered at its own velocity)
             auto out = runMono({}, {
-                MidiMessage::noteOn(1, 60, (uint8)100),   // C sounds
-                MidiMessage::noteOn(1, 64, (uint8)90),    // E steals: off C, on E
-                MidiMessage::noteOff(1, 64, (uint8)0),    // E off, fall back: on C
-                MidiMessage::noteOff(1, 60, (uint8)0) });  // C off
+                // C sounds
+                MidiMessage::noteOn(1, 60, (uint8)100),
+                // E steals: off C, on E
+                MidiMessage::noteOn(1, 64, (uint8)90),
+                // E off, fall back: on C
+                MidiMessage::noteOff(1, 64, (uint8)0),
+                // C off
+                MidiMessage::noteOff(1, 60, (uint8)0) });
             StringArray got;
             for (const auto& m : out) got.add(describe(m));
             expect(got == StringArray({ "on 60", "off 60", "on 64", "off 64", "on 60", "off 60" }));
@@ -389,9 +426,12 @@ public:
 
             // low-note priority: a higher note waits under a held lower one
             out = runMono({"low"}, {
-                MidiMessage::noteOn(1, 60, (uint8)100),   // C sounds
-                MidiMessage::noteOn(1, 67, (uint8)90),    // G higher: waits, no output
-                MidiMessage::noteOff(1, 60, (uint8)0),    // C off, fall back to G
+                // C sounds
+                MidiMessage::noteOn(1, 60, (uint8)100),
+                // G higher: waits, no output
+                MidiMessage::noteOn(1, 67, (uint8)90),
+                // C off, fall back to G
+                MidiMessage::noteOff(1, 60, (uint8)0),
                 MidiMessage::noteOff(1, 67, (uint8)0) });
             got.clear();
             for (const auto& m : out) got.add(describe(m));
@@ -399,9 +439,12 @@ public:
 
             // high-note priority: a lower note waits under a held higher one
             out = runMono({"high"}, {
-                MidiMessage::noteOn(1, 67, (uint8)100),   // G sounds
-                MidiMessage::noteOn(1, 60, (uint8)90),    // C lower: waits
-                MidiMessage::noteOff(1, 67, (uint8)0),    // G off, fall back to C
+                // G sounds
+                MidiMessage::noteOn(1, 67, (uint8)100),
+                // C lower: waits
+                MidiMessage::noteOn(1, 60, (uint8)90),
+                // G off, fall back to C
+                MidiMessage::noteOff(1, 67, (uint8)0),
                 MidiMessage::noteOff(1, 60, (uint8)0) });
             got.clear();
             for (const auto& m : out) got.add(describe(m));
@@ -507,7 +550,8 @@ public:
 
             m = MidiMessage::noteOn(1, 60, (uint8)10);
             expect(makeCommand(VELOCITY_SCALE, {"0.01"}).transform(state, m));
-            expectEquals((int)m.getVelocity(), 1);   // clamped to minimum 1
+            // clamped to minimum 1
+            expectEquals((int)m.getVelocity(), 1);
 
             m = MidiMessage::noteOn(1, 60, (uint8)10);
             expect(makeCommand(VELOCITY_SET, {"64"}).transform(state, m));
@@ -515,7 +559,8 @@ public:
 
             m = MidiMessage::noteOn(1, 60, (uint8)100);
             expect(makeCommand(VELOCITY_ADD, {"50"}).transform(state, m));
-            expectEquals((int)m.getVelocity(), 127);  // clamped to maximum
+            // clamped to maximum
+            expectEquals((int)m.getVelocity(), 127);
 
             // velclip clamps into a window (order of bounds does not matter)
             m = MidiMessage::noteOn(1, 60, (uint8)10);
@@ -525,22 +570,26 @@ public:
             expect(makeCommand(VELOCITY_CLIP, {"40", "100"}).transform(state, m));
             expectEquals((int)m.getVelocity(), 100);
             m = MidiMessage::noteOn(1, 60, (uint8)64);
-            expect(makeCommand(VELOCITY_CLIP, {"100", "40"}).transform(state, m));  // reversed bounds
+            // reversed bounds
+            expect(makeCommand(VELOCITY_CLIP, {"100", "40"}).transform(state, m));
             expectEquals((int)m.getVelocity(), 64);
 
             // velcomp squeezes toward the mid-range (64): amount 0.5 halves the
             // distance, amount 1 leaves it unchanged
             m = MidiMessage::noteOn(1, 60, (uint8)100);
             expect(makeCommand(VELOCITY_COMPRESS, {"0.5"}).transform(state, m));
-            expectEquals((int)m.getVelocity(), 82);   // 64 + (100-64)*0.5
+            // 64 + (100-64)*0.5
+            expectEquals((int)m.getVelocity(), 82);
             m = MidiMessage::noteOn(1, 60, (uint8)20);
             expect(makeCommand(VELOCITY_COMPRESS, {"0.5"}).transform(state, m));
-            expectEquals((int)m.getVelocity(), 42);   // 64 + (20-64)*0.5
+            // 64 + (20-64)*0.5
+            expectEquals((int)m.getVelocity(), 42);
 
             // velinvert mirrors the 1-127 range: soft becomes loud, 64 stays
             m = MidiMessage::noteOn(1, 60, (uint8)100);
             expect(makeCommand(VELOCITY_INVERT).transform(state, m));
-            expectEquals((int)m.getVelocity(), 28);   // 128 - 100
+            // 128 - 100
+            expectEquals((int)m.getVelocity(), 28);
             m = MidiMessage::noteOn(1, 60, (uint8)1);
             expect(makeCommand(VELOCITY_INVERT).transform(state, m));
             expectEquals((int)m.getVelocity(), 127);
@@ -576,7 +625,8 @@ public:
             expectEquals(m.getControllerValue(), 64);
             m = MidiMessage::controllerEvent(1, 8, 100);
             expect(makeCommand(CONTROL_CHANGE_SET, {"7", "64"}).transform(state, m));
-            expectEquals(m.getControllerValue(), 100);   // a different CC is untouched
+            // a different CC is untouched
+            expectEquals(m.getControllerValue(), 100);
 
             // ccinvert mirrors the 0-127 value range
             m = MidiMessage::controllerEvent(1, 7, 100);
@@ -660,7 +710,8 @@ public:
 
             m = MidiMessage::pitchWheel(1, 12288);
             expect(makeCommand(PITCH_BEND_SCALE, {"0.5"}).transform(state, m));
-            expectEquals(m.getPitchWheelValue(), 10240);   // scaled around centre 8192
+            // scaled around centre 8192
+            expectEquals(m.getPitchWheelValue(), 10240);
 
             m = MidiMessage::pitchWheel(1, 12288);
             expect(makeCommand(PITCH_BEND_SET, {"0"}).transform(state, m));
@@ -675,7 +726,8 @@ public:
             expectEquals(m.getPitchWheelValue(), 8192);
             m = MidiMessage::pitchWheel(1, 0);
             expect(makeCommand(PITCH_BEND_INVERT).transform(state, m));
-            expectEquals(m.getPitchWheelValue(), 16383);   // clamped mirror
+            // clamped mirror
+            expectEquals(m.getPitchWheelValue(), 16383);
         }
 
         beginTest("Channel Pressure transforms");

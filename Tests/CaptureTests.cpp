@@ -1,6 +1,6 @@
 /*
  * This file is part of RouteMIDI.
- * Copyright (command) 2017-2026 Uwyn LLC.  https://www.uwyn.com
+ * Copyright (c) 2017-2026 Uwyn LLC.  https://www.uwyn.com
  *
  * RouteMIDI is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -78,7 +78,8 @@ public:
         {
             ApplicationState state;
             state.enableTrafficCapture(true);
-            parse(state, "in X cc out Y");   // only Control Change passes
+            // only Control Change passes
+            parse(state, "in X cc out Y");
             Route& route = *state.getRoutes().getFirst();
             RouteInput& input = *route.inputs.getFirst();
             input.fullInName = "Keyboard";
@@ -89,9 +90,12 @@ public:
                 Array<int> p;
                 state.processRouteMessage(route, input, m, o, p);
             };
-            run(MidiMessage::noteOn(1, 60, (uint8)100));    // blocked by the cc filter
-            run(MidiMessage::controllerEvent(1, 74, 55));   // passes
-            run(MidiMessage::noteOff(1, 60, (uint8)0));      // blocked
+            // blocked by the cc filter
+            run(MidiMessage::noteOn(1, 60, (uint8)100));
+            // passes
+            run(MidiMessage::controllerEvent(1, 74, 55));
+            // blocked
+            run(MidiMessage::noteOff(1, 60, (uint8)0));
 
             expectEquals((int) route.capture.size(), 1);
             expect(route.capture.front().seq == (int64) 0);
@@ -105,7 +109,8 @@ public:
         {
             ApplicationState state;
             state.enableTrafficCapture(true);
-            parse(state, "in X transp 12 out Y");   // transpose up an octave
+            // transpose up an octave
+            parse(state, "in X transp 12 out Y");
             Route& route = *state.getRoutes().getFirst();
             RouteInput& input = *route.inputs.getFirst();
 
@@ -115,14 +120,16 @@ public:
 
             expectEquals((int) route.capture.size(), 1);
             expect(route.capture.front().message.isNoteOn());
-            expectEquals(route.capture.front().message.getNoteNumber(), 72);   // 60 + 12
+            // 60 + 12
+            expectEquals(route.capture.front().message.getNoteNumber(), 72);
         }
 
         beginTest("One input message that fans out to several is captured per emitted message");
         {
             ApplicationState state;
             state.enableTrafficCapture(true);
-            parse(state, "in X chord 4 7 out Y");   // a note becomes a triad
+            // a note becomes a triad
+            parse(state, "in X chord 4 7 out Y");
             Route& route = *state.getRoutes().getFirst();
             RouteInput& input = *route.inputs.getFirst();
 
@@ -130,7 +137,8 @@ public:
             Array<int> p;
             state.processRouteMessage(route, input, MidiMessage::noteOn(1, 60, (uint8)100), o, p);
 
-            expectEquals((int) route.capture.size(), 3);   // root, third, fifth
+            // root, third, fifth
+            expectEquals((int) route.capture.size(), 3);
             expectEquals(route.capture[0].message.getNoteNumber(), 60);
             expectEquals(route.capture[1].message.getNoteNumber(), 64);
             expectEquals(route.capture[2].message.getNoteNumber(), 67);

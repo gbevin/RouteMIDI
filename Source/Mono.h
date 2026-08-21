@@ -1,6 +1,6 @@
 /*
  * This file is part of RouteMIDI.
- * Copyright (command) 2017-2026 Uwyn LLC.  https://www.uwyn.com
+ * Copyright (c) 2017-2026 Uwyn LLC.  https://www.uwyn.com
  *
  * RouteMIDI is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -43,9 +43,14 @@ private:
 
     static void emit(Array<MidiMessage>& output, bool on, int channel, int note, int velocity, double ts);
 
-    bool held[16][128];      // which notes are physically down, per channel
-    int  velocity[16][128];  // their note-on velocity, for retrigger on fallback
-    int  order[16][128];     // trigger order, for last-note priority
-    int  sounding[16];       // the note currently sounding on each channel, -1 = none
-    int  counter;            // monotonic trigger counter
+    // which notes are physically down, per channel
+    bool held[16][128];
+    // their note-on velocity, for retrigger on fallback
+    int  velocity[16][128];
+    // trigger order, for last-note priority
+    int  order[16][128];
+    // the note currently sounding on each channel, -1 = none
+    int  sounding[16];
+    // monotonic trigger counter
+    int  counter;
 };

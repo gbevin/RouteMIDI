@@ -1,6 +1,6 @@
 /*
  * This file is part of RouteMIDI.
- * Copyright (command) 2017-2026 Uwyn LLC.  https://www.uwyn.com
+ * Copyright (c) 2017-2026 Uwyn LLC.  https://www.uwyn.com
  *
  * RouteMIDI is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -29,10 +29,13 @@ namespace textmidi
 // how numbers and notes are rendered and parsed
 struct Format
 {
-    bool hexadecimal { false };    // numbers are hexadecimal unless suffixed
-                                   // ("...M" forces decimal, "...H" forces hex)
-    bool noteNumbers { false };    // print notes as numbers instead of names
-    int  octaveMiddleC { 3 };      // octave number that denotes middle C
+    // numbers are hexadecimal unless suffixed ("...M" forces decimal, "...H"
+    // forces hex)
+    bool hexadecimal { false };
+    // print notes as numbers instead of names
+    bool noteNumbers { false };
+    // octave number that denotes middle C
+    int  octaveMiddleC { 3 };
 };
 
 uint8 limit7Bit(int value);

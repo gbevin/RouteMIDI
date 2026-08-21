@@ -1,6 +1,6 @@
 /*
  * This file is part of RouteMIDI.
- * Copyright (command) 2017-2026 Uwyn LLC.  https://www.uwyn.com
+ * Copyright (c) 2017-2026 Uwyn LLC.  https://www.uwyn.com
  *
  * RouteMIDI is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -174,18 +174,29 @@ class ApplicationState;
 // settings).
 struct CompiledOption
 {
-    int    intValue { 0 };                    // dec/hex integer
-    int    value7 { 0 };                      // dec/hex 7-bit value
-    int    note { 0 };                        // note name or number
-    int    selNoteLo { 0 }, selNoteHi { 0 };  // "lo..hi" selector parsed as notes
-    int    sel7Lo { 0 },    sel7Hi { 0 };     // selector parsed as 7-bit values
-    int    selIntLo { 0 },  selIntHi { 0 };   // selector parsed as plain integers
-    double number { 0.0 };                    // floating point value
-    uint16 scaleMask { 0 };                   // scale name or degree list, 0 = none
-    int    pitchClass { 0 };                  // scale root (0-11)
-    mpe::Zone zone;                           // MPE zone token
+    // dec/hex integer
+    int    intValue { 0 };
+    // dec/hex 7-bit value
+    int    value7 { 0 };
+    // note name or number
+    int    note { 0 };
+    // "lo..hi" selector parsed as notes
+    int    selNoteLo { 0 }, selNoteHi { 0 };
+    // selector parsed as 7-bit values
+    int    sel7Lo { 0 },    sel7Hi { 0 };
+    // selector parsed as plain integers
+    int    selIntLo { 0 },  selIntHi { 0 };
+    // floating point value
+    double number { 0.0 };
+    // scale name or degree list, 0 = none
+    uint16 scaleMask { 0 };
+    // scale root (0-11)
+    int    pitchClass { 0 };
+    // MPE zone token
+    mpe::Zone zone;
     bool   zoneValid { false };
-    int    keyword { 0 };                     // 1 = hold, 2 = low, 3 = high
+    // 1 = hold, 2 = low, 3 = high
+    int    keyword { 0 };
 };
 
 struct ApplicationCommand
@@ -232,7 +243,8 @@ struct ApplicationCommand
     int expectedOptions_;
     StringArray optionsDescriptions_;
     StringArray commandDescriptions_;
-    String section_;                    // when set, a help header printed before this command
+    // when set, a help header printed before this command
+    String section_;
     StringArray opts_;
     bool negate_ { false };
 

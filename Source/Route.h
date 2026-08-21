@@ -1,6 +1,6 @@
 /*
  * This file is part of RouteMIDI.
- * Copyright (command) 2017-2026 Uwyn LLC.  https://www.uwyn.com
+ * Copyright (c) 2017-2026 Uwyn LLC.  https://www.uwyn.com
  *
  * RouteMIDI is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -35,19 +35,27 @@
 // per-route monotonic sequence number so a caller can ask for only what's new.
 struct CapturedMidi
 {
-    int64 seq;            // per-route sequence number, assigned in arrival order
-    String input;         // the input port the message came in on
-    MidiMessage message;  // the message as the route emitted it (post-processing)
+    // per-route sequence number, assigned in arrival order
+    int64 seq;
+    // the input port the message came in on
+    String input;
+    // the message as the route emitted it (post-processing)
+    MidiMessage message;
 };
 
 // A single MIDI input port of a route.
 struct RouteInput
 {
-    String inName;                        // requested name (may be a substring)
-    String fullInName;                    // resolved name once connected
-    String fullInIdentifier;              // resolved unique id once connected
-    bool isVirtual { false };             // created as a virtual port
-    bool isStdin { false };               // reads MIDI as text from standard input
+    // requested name (may be a substring)
+    String inName;
+    // resolved name once connected
+    String fullInName;
+    // resolved unique id once connected
+    String fullInIdentifier;
+    // created as a virtual port
+    bool isVirtual { false };
+    // reads MIDI as text from standard input
+    bool isStdin { false };
     std::unique_ptr<MidiInput> midiIn;
 
     // converter runtime state, kept per input because (N)RPN reassembly and
@@ -66,28 +74,43 @@ struct RouteInput
 
     // per-zone state (indexed [0] = Lower, [1] = Upper) so a Lower-zone and an
     // Upper-zone operation can run on the same input without sharing state
-    mpe::Allocator mpeAlloc[2];           // voice allocation state for MPE expansion
-    mpe::Collapser mpeCollapse[2];        // note tracking state for MPE collapse
-    mpe::Relocator mpeRelocate[2];        // collision tracking for MPE relocate
-    mpe::SensitivityDeclarer mpeSens[2];  // member Pitch Bend Sensitivity declaration
-    mpe::McmTracker mcm;                  // MPE zone reconfiguration detection (both zones)
+    // voice allocation state for MPE expansion
+    mpe::Allocator mpeAlloc[2];
+    // note tracking state for MPE collapse
+    mpe::Collapser mpeCollapse[2];
+    // collision tracking for MPE relocate
+    mpe::Relocator mpeRelocate[2];
+    // member Pitch Bend Sensitivity declaration
+    mpe::SensitivityDeclarer mpeSens[2];
+    // MPE zone reconfiguration detection (both zones)
+    mpe::McmTracker mcm;
 
-    LatchState latch;                     // held-note tracking for the latch transform
-    MonoState mono;                       // held-note tracking for the mono transform
-    SustainState sustain;                 // pedal tracking for the sustain transform
-    SustainState sostenuto;               // pedal tracking for the sostenuto transform
+    // held-note tracking for the latch transform
+    LatchState latch;
+    // held-note tracking for the mono transform
+    MonoState mono;
+    // pedal tracking for the sustain transform
+    SustainState sustain;
+    // pedal tracking for the sostenuto transform
+    SustainState sostenuto;
 };
 
 // A single MIDI output destination of a route.
 struct OutputDest
 {
-    String name;                          // requested name (may be a substring)
-    String fullName;                      // resolved name once connected
-    String fullOutIdentifier;             // unique id of the connected port
-    bool isVirtual { false };             // created as a virtual port
-    bool isStdout { false };              // writes MIDI as text to standard output
+    // requested name (may be a substring)
+    String name;
+    // resolved name once connected
+    String fullName;
+    // unique id of the connected port
+    String fullOutIdentifier;
+    // created as a virtual port
+    bool isVirtual { false };
+    // writes MIDI as text to standard output
+    bool isStdout { false };
     std::unique_ptr<MidiOutput> out;
-    std::unique_ptr<FileOutputStream> syxFile;  // captures SysEx to a .syx file
+    // captures SysEx to a .syx file
+    std::unique_ptr<FileOutputStream> syxFile;
 };
 
 // A route binds one or more MIDI input ports to one or more output ports,
@@ -96,29 +119,38 @@ struct OutputDest
 // to several outputs, or both.
 struct Route
 {
-    int id { 0 };                         // stable identifier, assigned at creation;
-                                          // unlike an index it survives the removal
-                                          // of other routes (used by the MCP tools)
+    // stable identifier, assigned at creation; unlike an index it survives the
+    // removal of other routes (used by the MCP tools)
+    int id { 0 };
 
     OwnedArray<RouteInput> inputs;
     OwnedArray<OutputDest> outputs;
 
-    Array<ApplicationCommand> filters;    // applied first, decide pass/block
-    Array<ApplicationCommand> transforms; // applied in order to passing messages
-    Array<ApplicationCommand> mpeOps;     // MPE zone relocate/collapse/expand rules
-    Array<ApplicationCommand> converters; // CC/CC14/RPN/NRPN inter-conversion rules
-    Array<conversion::Rule> convertRules; // converters compiled to numbers, rebuilt on demand
-    Array<ApplicationCommand> outputSplit; // 0 or 1: distribute MPE voices across the outputs
+    // applied first, decide pass/block
+    Array<ApplicationCommand> filters;
+    // applied in order to passing messages
+    Array<ApplicationCommand> transforms;
+    // MPE zone relocate/collapse/expand rules
+    Array<ApplicationCommand> mpeOps;
+    // CC/CC14/RPN/NRPN inter-conversion rules
+    Array<ApplicationCommand> converters;
+    // converters compiled to numbers, rebuilt on demand
+    Array<conversion::Rule> convertRules;
+    // 0 or 1: distribute MPE voices across the outputs
+    Array<ApplicationCommand> outputSplit;
 
-    mpe::Splitter mpeSplit;               // per-route voice-to-output allocation state
+    // per-route voice-to-output allocation state
+    mpe::Splitter mpeSplit;
 
-    bool panic { false };                 // send all-notes-off to outputs on disconnect/shutdown
+    // send all-notes-off to outputs on disconnect/shutdown
+    bool panic { false };
 
     // rolling buffer of routed messages for the MCP read_route tool; filled only
     // in MCP mode, guarded by the same lock as the routing path (midiCallbackLock_)
     static constexpr int captureCapacity = 1024;
     std::deque<CapturedMidi> capture;
-    int64 captureSeq { 0 };               // next sequence number to hand out
+    // next sequence number to hand out
+    int64 captureSeq { 0 };
 
     void captureMessage(const String& inputName, const MidiMessage& msg)
     {

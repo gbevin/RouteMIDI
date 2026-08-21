@@ -1,6 +1,6 @@
 /*
  * This file is part of RouteMIDI.
- * Copyright (command) 2017-2026 Uwyn LLC.  https://www.uwyn.com
+ * Copyright (c) 2017-2026 Uwyn LLC.  https://www.uwyn.com
  *
  * RouteMIDI is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -44,8 +44,10 @@ public:
         beginTest("Min-Center-Max upscale 7 -> 14 bits (min/center/max preserved)");
         {
             expectEquals(scaleValue(0,   7, 14, MinCenterMax), 0);
-            expectEquals(scaleValue(64,  7, 14, MinCenterMax), 8192);    // center
-            expectEquals(scaleValue(127, 7, 14, MinCenterMax), 16383);   // max
+            // center
+            expectEquals(scaleValue(64,  7, 14, MinCenterMax), 8192);
+            // max
+            expectEquals(scaleValue(127, 7, 14, MinCenterMax), 16383);
             expectEquals(scaleValue(100, 7, 14, MinCenterMax), 12873);
         }
 
@@ -71,14 +73,16 @@ public:
             expectEquals(scaleValue(10,  7, 16, ZeroExtension), 5120);
             expectEquals(scaleValue(64,  7, 16, ZeroExtension), 32768);
             expectEquals(scaleValue(87,  7, 16, ZeroExtension), 44544);
-            expectEquals(scaleValue(127, 7, 16, ZeroExtension), 65024);   // not full scale
+            // not full scale
+            expectEquals(scaleValue(127, 7, 16, ZeroExtension), 65024);
         }
 
         beginTest("Zero-Extension upscale 7 -> 14 bits");
         {
             expectEquals(scaleValue(0,   7, 14, ZeroExtension), 0);
             expectEquals(scaleValue(64,  7, 14, ZeroExtension), 8192);
-            expectEquals(scaleValue(127, 7, 14, ZeroExtension), 16256);   // not 16383
+            // not 16383
+            expectEquals(scaleValue(127, 7, 14, ZeroExtension), 16256);
         }
 
         beginTest("Zero-Extension downscale 16 -> 7 bits with rounding and clamp (Table 11)");
@@ -90,7 +94,8 @@ public:
             expectEquals(scaleValue(44730, 16, 7, ZeroExtension), 87);
             expectEquals(scaleValue(44800, 16, 7, ZeroExtension), 88);
             expectEquals(scaleValue(65024, 16, 7, ZeroExtension), 127);
-            expectEquals(scaleValue(65535, 16, 7, ZeroExtension), 127);   // clamped, not 128
+            // clamped, not 128
+            expectEquals(scaleValue(65535, 16, 7, ZeroExtension), 127);
         }
 
         beginTest("Equal resolutions are identity");

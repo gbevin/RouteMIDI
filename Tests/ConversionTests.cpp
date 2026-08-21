@@ -1,6 +1,6 @@
 /*
  * This file is part of RouteMIDI.
- * Copyright (command) 2017-2026 Uwyn LLC.  https://www.uwyn.com
+ * Copyright (c) 2017-2026 Uwyn LLC.  https://www.uwyn.com
  *
  * RouteMIDI is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -264,7 +264,7 @@ public:
         {
             auto out = runConvert(state, {"cc14", "1", "rpn", "5"}, cc14Input(1, 1, 12873));
             expect(parseLastRpn(out, rpn));
-            expect(! rpn.isNRPN);
+            expect(!rpn.isNRPN);
             expectEquals(rpn.parameterNumber, 5);
             expectEquals(rpn.value, 12873);
         }
@@ -285,7 +285,8 @@ public:
                                   { MidiMessage::controllerEvent(1, 7, 127) });
             expect(parseLastRpn(out, rpn));
             expectEquals(rpn.parameterNumber, 0);
-            expectEquals(rpn.value, 16256);   // zero-extension, not 16383
+            // zero-extension, not 16383
+            expectEquals(rpn.value, 16256);
         }
 
         beginTest("NRPN with same number still uses Min-Center-Max");
@@ -327,10 +328,14 @@ public:
             // through byte-for-byte - not be reassembled and re-emitted (which used
             // to duplicate the parameter select and add an intermediate 7-bit value)
             Array<MidiMessage> in;
-            in.add(MidiMessage::controllerEvent(1, 99, 32));   // param MSB (4129 >> 7)
-            in.add(MidiMessage::controllerEvent(1, 98, 33));   // param LSB (4129 & 127)
-            in.add(MidiMessage::controllerEvent(1, 6, 9));     // data MSB
-            in.add(MidiMessage::controllerEvent(1, 38, 44));   // data LSB
+            // param MSB (4129 >> 7)
+            in.add(MidiMessage::controllerEvent(1, 99, 32));
+            // param LSB (4129 & 127)
+            in.add(MidiMessage::controllerEvent(1, 98, 33));
+            // data MSB
+            in.add(MidiMessage::controllerEvent(1, 6, 9));
+            // data LSB
+            in.add(MidiMessage::controllerEvent(1, 38, 44));
             auto out = runConvert(state, {"nrpn", "4128", "cc", "2"}, in);
             expectEquals(out.size(), 4);
             expect(isController(out[0], 1, 99, 32));
@@ -346,18 +351,24 @@ public:
             // and replaced by the CC, so the matching deselect is dropped too - even
             // when the device closes with the universal RPN null after an NRPN select
             Array<MidiMessage> in;
-            in.add(MidiMessage::controllerEvent(1, 99, 32));    // NRPN 4128 select
+            // NRPN 4128 select
+            in.add(MidiMessage::controllerEvent(1, 99, 32));
             in.add(MidiMessage::controllerEvent(1, 98, 32));
-            in.add(MidiMessage::controllerEvent(1, 6, 3));      // data -> converted to CC 2
+            // data -> converted to CC 2
+            in.add(MidiMessage::controllerEvent(1, 6, 3));
             in.add(MidiMessage::controllerEvent(1, 38, 37));
-            in.add(MidiMessage::controllerEvent(1, 101, 127));  // RPN null closing 4128
+            // RPN null closing 4128
+            in.add(MidiMessage::controllerEvent(1, 101, 127));
             in.add(MidiMessage::controllerEvent(1, 100, 127));
             auto out = runConvert(state, {"nrpn", "4128", "cc", "2"}, in);
 
-            expect(lastCC(out, 2) >= 0);                        // the NRPN was converted
-            expectEquals(countController(out, 101, 127), 0);    // closing null consumed
+            // the NRPN was converted
+            expect(lastCC(out, 2) >= 0);
+            // closing null consumed
+            expectEquals(countController(out, 101, 127), 0);
             expectEquals(countController(out, 100, 127), 0);
-            expectEquals(countController(out, 99, 32), 0);      // 4128 selects consumed
+            // 4128 selects consumed
+            expectEquals(countController(out, 99, 32), 0);
             expectEquals(countController(out, 98, 32), 0);
         }
 
@@ -366,15 +377,18 @@ public:
             // a null that deselects a parameter the converter never intercepted must
             // reach the destination unchanged
             Array<MidiMessage> in;
-            in.add(MidiMessage::controllerEvent(1, 99, 32));    // NRPN 4129 select (untargeted)
+            // NRPN 4129 select (untargeted)
+            in.add(MidiMessage::controllerEvent(1, 99, 32));
             in.add(MidiMessage::controllerEvent(1, 98, 33));
             in.add(MidiMessage::controllerEvent(1, 6, 3));
             in.add(MidiMessage::controllerEvent(1, 38, 37));
-            in.add(MidiMessage::controllerEvent(1, 101, 127));  // RPN null closing 4129
+            // RPN null closing 4129
+            in.add(MidiMessage::controllerEvent(1, 101, 127));
             in.add(MidiMessage::controllerEvent(1, 100, 127));
             auto out = runConvert(state, {"nrpn", "4128", "cc", "2"}, in);
 
-            expectEquals(countController(out, 101, 127), 1);    // null survives
+            // null survives
+            expectEquals(countController(out, 101, 127), 1);
             expectEquals(countController(out, 100, 127), 1);
         }
 
@@ -385,18 +399,24 @@ public:
             // closes its parameter (param 4128 has LSB 32 > 31, so this stays a pure
             // framing test independent of the RPN zero-extension scaling)
             Array<MidiMessage> in;
-            in.add(MidiMessage::controllerEvent(1, 101, 32));   // RPN 4128 select
+            // RPN 4128 select
+            in.add(MidiMessage::controllerEvent(1, 101, 32));
             in.add(MidiMessage::controllerEvent(1, 100, 32));
-            in.add(MidiMessage::controllerEvent(1, 6, 3));      // data -> converted to CC 2
+            // data -> converted to CC 2
+            in.add(MidiMessage::controllerEvent(1, 6, 3));
             in.add(MidiMessage::controllerEvent(1, 38, 37));
-            in.add(MidiMessage::controllerEvent(1, 101, 127));  // RPN null closing 4128
+            // RPN null closing 4128
+            in.add(MidiMessage::controllerEvent(1, 101, 127));
             in.add(MidiMessage::controllerEvent(1, 100, 127));
             auto out = runConvert(state, {"rpn", "4128", "cc", "2"}, in);
 
-            expect(lastCC(out, 2) >= 0);                        // the RPN was converted
-            expectEquals(countController(out, 101, 127), 0);    // closing null consumed
+            // the RPN was converted
+            expect(lastCC(out, 2) >= 0);
+            // closing null consumed
+            expectEquals(countController(out, 101, 127), 0);
             expectEquals(countController(out, 100, 127), 0);
-            expectEquals(countController(out, 101, 32), 0);     // 4128 selects consumed
+            // 4128 selects consumed
+            expectEquals(countController(out, 101, 32), 0);
             expectEquals(countController(out, 100, 32), 0);
         }
 
@@ -408,17 +428,25 @@ public:
             // its null are forwarded untouched
             auto cc = [](int n, int v) { return MidiMessage::controllerEvent(1, n, v); };
             Array<MidiMessage> in;
-            in.add(cc(99, 32)); in.add(cc(98, 33)); in.add(cc(6, 9)); in.add(cc(38, 44));   // NRPN 4129
-            in.add(cc(101, 127)); in.add(cc(100, 127));                                     // 4129 null
-            in.add(cc(99, 32)); in.add(cc(98, 32)); in.add(cc(6, 3)); in.add(cc(38, 37));   // NRPN 4128
-            in.add(cc(101, 127)); in.add(cc(100, 127));                                     // 4128 null
+            // NRPN 4129
+            in.add(cc(99, 32)); in.add(cc(98, 33)); in.add(cc(6, 9)); in.add(cc(38, 44));
+            // 4129 null
+            in.add(cc(101, 127)); in.add(cc(100, 127));
+            // NRPN 4128
+            in.add(cc(99, 32)); in.add(cc(98, 32)); in.add(cc(6, 3)); in.add(cc(38, 37));
+            // 4128 null
+            in.add(cc(101, 127)); in.add(cc(100, 127));
             auto out = runConvert(state, {"nrpn", "4128", "cc", "2"}, in);
 
-            expectEquals(countController(out, 2, 3), 2);        // 4128 -> CC 2 (7-bit + 14-bit)
-            expectEquals(countController(out, 100, 127), 1);    // only 4129's null survives
+            // 4128 -> CC 2 (7-bit + 14-bit)
+            expectEquals(countController(out, 2, 3), 2);
+            // only 4129's null survives
+            expectEquals(countController(out, 100, 127), 1);
             expectEquals(countController(out, 101, 127), 1);
-            expectEquals(countController(out, 98, 33), 1);      // 4129 select forwarded once
-            expectEquals(countController(out, 98, 32), 0);      // 4128 select consumed
+            // 4129 select forwarded once
+            expectEquals(countController(out, 98, 33), 1);
+            // 4128 select consumed
+            expectEquals(countController(out, 98, 32), 0);
         }
 
         beginTest("Non Control Change messages pass through a converter route");
@@ -466,8 +494,10 @@ public:
             auto out = runConvert(state, {"pp", "60", "cc", "1"},
                 { MidiMessage::aftertouchChange(1, 60, 100), MidiMessage::aftertouchChange(1, 62, 100) });
             expectEquals(lastCC(out, 1), 100);
-            expectEquals(lastPolyPressure(out, 62), 100);   // note 62 untouched
-            expect(lastPolyPressure(out, 60) < 0);          // note 60 was converted away
+            // note 62 untouched
+            expectEquals(lastPolyPressure(out, 62), 100);
+            // note 60 was converted away
+            expect(lastPolyPressure(out, 60) < 0);
 
             // channel pressure sprays onto a target note as poly pressure
             auto back = runConvert(state, {"cp", "0", "pp", "60"}, { MidiMessage::channelPressureChange(1, 90) });
@@ -489,11 +519,16 @@ public:
             Array<MidiMessage> in;
             in.add(MidiMessage::noteOn(1, 60, (uint8)100));
             in.add(MidiMessage::noteOn(1, 64, (uint8)100));
-            in.add(MidiMessage::aftertouchChange(1, 60, 100));  // C loudest -> 100
-            in.add(MidiMessage::aftertouchChange(1, 64, 40));   // still 100 (suppressed)
-            in.add(MidiMessage::aftertouchChange(1, 60, 30));   // E now loudest -> 40
-            in.add(MidiMessage::noteOff(1, 64, (uint8)0));       // C now loudest -> 30
-            in.add(MidiMessage::noteOff(1, 60, (uint8)0));       // none held -> 0
+            // C loudest -> 100
+            in.add(MidiMessage::aftertouchChange(1, 60, 100));
+            // still 100 (suppressed)
+            in.add(MidiMessage::aftertouchChange(1, 64, 40));
+            // E now loudest -> 40
+            in.add(MidiMessage::aftertouchChange(1, 60, 30));
+            // C now loudest -> 30
+            in.add(MidiMessage::noteOff(1, 64, (uint8)0));
+            // none held -> 0
+            in.add(MidiMessage::noteOff(1, 60, (uint8)0));
 
             auto out = runConvert(state, {"pp", "-1", "cp", "0"}, in);
 
@@ -506,7 +541,8 @@ public:
                 }
             }
 
-            expectEquals(cps.size(), 4);           // 100, 40, 30, 0 (the 40-update is suppressed)
+            // 100, 40, 30, 0 (the 40-update is suppressed)
+            expectEquals(cps.size(), 4);
             expectEquals(cps[0], 100);
             expectEquals(cps[1], 40);
             expectEquals(cps[2], 30);
@@ -537,7 +573,8 @@ public:
 
             auto anyRule = normalizedConvert({ "in", "PortA", "convert", "pp", "cp", "out", "PortB" });
             expectEquals(anyRule[0], String("pp"));
-            expectEquals(anyRule[1], String("-1"));   // no note given -> any note
+            // no note given -> any note
+            expectEquals(anyRule[1], String("-1"));
             expectEquals(anyRule[2], String("cp"));
 
             auto noteRule = normalizedConvert({ "in", "PortA", "convert", "pp", "60", "cp", "out", "PortB" });
@@ -592,7 +629,7 @@ public:
         {
             auto out = runConverterCommand(state, RPN_ADD, {"5", "-1000"}, rpnInput(1, 5, 8000, false, true));
             expect(parseLastRpn(out, rpn));
-            expect(! rpn.isNRPN);
+            expect(!rpn.isNRPN);
             expectEquals(rpn.parameterNumber, 5);
             expectEquals(rpn.value, 7000);
 
@@ -609,13 +646,15 @@ public:
             expect(parseLastRpn(nrpn14, rpn));
             expect(rpn.isNRPN);
             expectEquals(rpn.parameterNumber, 1000);
-            expectEquals(rpn.value, 12383);                      // 16383 - 4000
+            // 16383 - 4000
+            expectEquals(rpn.value, 12383);
 
             // a 7-bit frame mirrors in the 0-127 range
             auto rpn7 = runConverterCommand(state, RPN_INVERT, {"5"}, rpnInput(1, 5, 100, false, false));
             expect(parseLastRpn(rpn7, rpn));
-            expect(! rpn.isNRPN);
-            expectEquals(rpn.value, 27);                         // 127 - 100
+            expect(!rpn.isNRPN);
+            // 127 - 100
+            expectEquals(rpn.value, 27);
         }
 
         beginTest("nrpnrescale and rpnrescale map a value range onto another");
@@ -631,7 +670,8 @@ public:
                                                 {"5", "1000", "16383", "16383", "0"},
                                                 rpnInput(1, 5, 100, false, true));
             expect(parseLastRpn(inverted, rpn));
-            expectEquals(rpn.value, 16383);                      // clamped to inlow
+            // clamped to inlow
+            expectEquals(rpn.value, 16383);
         }
 
         beginTest("an NRPN transform does not touch RPNs (and vice versa)");
@@ -639,14 +679,16 @@ public:
             // nrpnadd must ignore an RPN with the same parameter number
             auto out = runConverterCommand(state, NRPN_ADD, {"5", "100"}, rpnInput(1, 5, 8000, false, true));
             expect(parseLastRpn(out, rpn));
-            expect(! rpn.isNRPN);
-            expectEquals(rpn.value, 8000);   // unchanged
+            expect(!rpn.isNRPN);
+            // unchanged
+            expectEquals(rpn.value, 8000);
 
             // the same family separation holds for the invert transforms
             auto inv = runConverterCommand(state, NRPN_INVERT, {"5"}, rpnInput(1, 5, 8000, false, true));
             expect(parseLastRpn(inv, rpn));
-            expect(! rpn.isNRPN);
-            expectEquals(rpn.value, 8000);   // unchanged
+            expect(!rpn.isNRPN);
+            // unchanged
+            expectEquals(rpn.value, 8000);
         }
 
         beginTest("a value transform frames the regenerated parameter with a closing null");
@@ -656,7 +698,8 @@ public:
             auto nrpn = runConverterCommand(state, NRPN_ADD, {"1000", "5"}, rpnInput(1, 1000, 100, true, false));
             expect(parseLastRpn(nrpn, rpn));
             expectEquals(rpn.value, 105);
-            expectEquals(countController(nrpn, 99, 127), 1);   // NRPN null (CC 99/98 = 127)
+            // NRPN null (CC 99/98 = 127)
+            expectEquals(countController(nrpn, 99, 127), 1);
             expectEquals(countController(nrpn, 98, 127), 1);
 
             // an RPN transform closes with the universal RPN null (CC 101/100 = 127)
@@ -675,13 +718,17 @@ public:
             // twice (pairing is learned on the first LSB); from then on each pair
             // emits once, with the exact 14-bit value.
             Array<MidiMessage> in;
-            in.addArray(cc14Input(1, 6, 0));                     // pair 1: learning
-            in.addArray(cc14Input(1, 6, (44 << 7) | 8));         // pair 2
-            in.addArray(cc14Input(1, 6, (44 << 7) | 9));         // pair 3
+            // pair 1: learning
+            in.addArray(cc14Input(1, 6, 0));
+            // pair 2
+            in.addArray(cc14Input(1, 6, (44 << 7) | 8));
+            // pair 3
+            in.addArray(cc14Input(1, 6, (44 << 7) | 9));
             auto out = runConvert(state, {"cc14", "6", "nrpn", "6"}, in);
 
             auto values = collect14BitRpnValues(out);
-            expectEquals(values.size(), 4);          // 2 (learning pair) + 1 + 1
+            // 2 (learning pair) + 1 + 1
+            expectEquals(values.size(), 4);
             expectEquals(values[2], (44 << 7) | 8);
             expectEquals(values[3], (44 << 7) | 9);
         }
@@ -706,12 +753,16 @@ public:
             // same adaptive pairing as the 14-bit CC: the second identical NRPN
             // frame produces a single destination CC instead of two
             Array<MidiMessage> in;
-            in.addArray(rpnInput(1, 245, 12873, true, true));    // frame 1: learning
-            in.addArray(rpnInput(1, 245, 12873, true, true));    // frame 2
+            // frame 1: learning
+            in.addArray(rpnInput(1, 245, 12873, true, true));
+            // frame 2
+            in.addArray(rpnInput(1, 245, 12873, true, true));
             auto out = runConvert(state, {"nrpn", "245", "cc", "7"}, in);
 
-            expectEquals(out.size(), 3);                         // 2 (learning) + 1
-            expectEquals(countController(out, 7, 100), 3);       // 12873 >> 7 = 100
+            // 2 (learning) + 1
+            expectEquals(out.size(), 3);
+            // 12873 >> 7 = 100
+            expectEquals(countController(out, 7, 100), 3);
         }
 
         beginTest("a value transform regenerates a 14-bit pair once, at full resolution");
@@ -720,12 +771,15 @@ public:
             // learned each MSB+LSB pair is transformed once as a 14-bit value and
             // regenerated, rather than acting on the 7-bit MSB half of the pair
             Array<MidiMessage> in;
-            in.addArray(rpnInput(1, 1000, 8000, true, true));    // frame 1: learning
-            in.addArray(rpnInput(1, 1000, 8000, true, true));    // frame 2
+            // frame 1: learning
+            in.addArray(rpnInput(1, 1000, 8000, true, true));
+            // frame 2
+            in.addArray(rpnInput(1, 1000, 8000, true, true));
             auto out = runConverterCommand(state, NRPN_ADD, {"1000", "100"}, in);
 
             auto values = collect14BitRpnValues(out);
-            expectEquals(values.size(), 2);                      // one 14-bit regen per frame
+            // one 14-bit regen per frame
+            expectEquals(values.size(), 2);
             expectEquals(values[0], 8100);
             expectEquals(values[1], 8100);
             // frame 1's MSB half regenerates a clamped 7-bit NRPN while pairing is
@@ -740,21 +794,28 @@ public:
             // cc14 rule on controller 6: inside a selection CC 6/38 are (N)RPN data,
             // and only the bare pairs after the closing null convert as a 14-bit CC
             Array<MidiMessage> in;
-            in.add(MidiMessage::controllerEvent(1, 101, 0));     // RPN 0 select
+            // RPN 0 select
+            in.add(MidiMessage::controllerEvent(1, 101, 0));
             in.add(MidiMessage::controllerEvent(1, 100, 0));
-            in.add(MidiMessage::controllerEvent(1, 6, 24));      // sensitivity: protected
-            in.add(MidiMessage::controllerEvent(1, 101, 127));   // null closes the selection
+            // sensitivity: protected
+            in.add(MidiMessage::controllerEvent(1, 6, 24));
+            // null closes the selection
+            in.add(MidiMessage::controllerEvent(1, 101, 127));
             in.add(MidiMessage::controllerEvent(1, 100, 127));
-            in.add(MidiMessage::controllerEvent(1, 6, 40));      // bare pair: converts
+            // bare pair: converts
+            in.add(MidiMessage::controllerEvent(1, 6, 40));
             in.add(MidiMessage::controllerEvent(1, 38, 10));
             auto out = runConvert(state, {"cc14", "6", "pb", "0"}, in);
 
-            expectEquals(countController(out, 6, 24), 1);        // RPN data survived
-            expectEquals(countController(out, 101, 0), 1);       // selects and null too
+            // RPN data survived
+            expectEquals(countController(out, 6, 24), 1);
+            // selects and null too
+            expectEquals(countController(out, 101, 0), 1);
             expectEquals(countController(out, 100, 0), 1);
             expectEquals(countController(out, 101, 127), 1);
             expectEquals(countController(out, 100, 127), 1);
-            expectEquals(countPitchWheels(out), 2);              // only the bare pair
+            // only the bare pair
+            expectEquals(countPitchWheels(out), 2);
             expectEquals(lastPitchWheel(out), (40 << 7) | 10);
         }
 
@@ -768,19 +829,24 @@ public:
             cmds.add({ RPN_ADD, {"100", "10"} });
 
             Array<MidiMessage> in;
-            in.add(MidiMessage::controllerEvent(1, 101, 0));     // MCM: RPN 6, untargeted
+            // MCM: RPN 6, untargeted
+            in.add(MidiMessage::controllerEvent(1, 101, 0));
             in.add(MidiMessage::controllerEvent(1, 100, 6));
             in.add(MidiMessage::controllerEvent(1, 6, 15));
-            in.add(MidiMessage::controllerEvent(1, 101, 127));   // null
+            // null
+            in.add(MidiMessage::controllerEvent(1, 101, 127));
             in.add(MidiMessage::controllerEvent(1, 100, 127));
-            in.add(MidiMessage::controllerEvent(1, 6, 44));      // bare pair -> nrpn 6
+            // bare pair -> nrpn 6
+            in.add(MidiMessage::controllerEvent(1, 6, 44));
             in.add(MidiMessage::controllerEvent(1, 38, 8));
             auto out = runConverters(state, cmds, in);
 
-            expectEquals(countController(out, 6, 15), 1);        // the MCM passed through
+            // the MCM passed through
+            expectEquals(countController(out, 6, 15), 1);
             expectEquals(countController(out, 100, 6), 1);
             expect(parseLastRpn(out, rpn));
-            expect(rpn.isNRPN);                                  // the bare pair converted
+            // the bare pair converted
+            expect(rpn.isNRPN);
             expectEquals(rpn.parameterNumber, 6);
             expectEquals(rpn.value, (44 << 7) | 8);
         }
@@ -788,8 +854,10 @@ public:
         beginTest("cc14add offsets a 14-bit CC pair and regenerates it at full resolution");
         {
             Array<MidiMessage> in;
-            in.addArray(cc14Input(1, 7, 8000));                  // pair 1: learning
-            in.addArray(cc14Input(1, 7, 8000));                  // pair 2
+            // pair 1: learning
+            in.addArray(cc14Input(1, 7, 8000));
+            // pair 2
+            in.addArray(cc14Input(1, 7, 8000));
             auto out = runConverterCommand(state, CC14_ADD, {"7", "1000"}, in);
 
             // once pairing is learned each pair regenerates once as MSB+LSB
@@ -815,11 +883,14 @@ public:
             in.addArray(cc14Input(1, 7, 8000));
             auto out = runConverterCommand(state, CC14_INVERT, {"7"}, in);
 
-            expectEquals(countController(out, 7, 127), 2);       // 0 -> 16383 (and warm-up MSB 0 -> 127)
+            // 0 -> 16383 (and warm-up MSB 0 -> 127)
+            expectEquals(countController(out, 7, 127), 2);
             expectEquals(countController(out, 39, 127), 1);
-            expectEquals(countController(out, 7, 0), 1);         // 16383 -> 0
+            // 16383 -> 0
+            expectEquals(countController(out, 7, 0), 1);
             expectEquals(countController(out, 39, 0), 1);
-            expectEquals(lastCC(out, 7), (8383 >> 7) & 0x7f);    // 8000 -> 8383
+            // 8000 -> 8383
+            expectEquals(lastCC(out, 7), (8383 >> 7) & 0x7f);
             expectEquals(lastCC(out, 39), 8383 & 0x7f);
         }
 
@@ -831,9 +902,11 @@ public:
             in.addArray(cc14Input(1, 7, 16383));
             auto out = runConverterCommand(state, CC14_RESCALE,
                                            {"7", "0", "16383", "4096", "12287"}, in);
-            expectEquals(countController(out, 7, 32), 2);        // 0 -> 4096 (and its warm-up MSB)
+            // 0 -> 4096 (and its warm-up MSB)
+            expectEquals(countController(out, 7, 32), 2);
             expectEquals(countController(out, 39, 0), 1);
-            expectEquals(lastCC(out, 7), (12287 >> 7) & 0x7f);   // 16383 -> 12287
+            // 16383 -> 12287
+            expectEquals(lastCC(out, 7), (12287 >> 7) & 0x7f);
             expectEquals(lastCC(out, 39), 12287 & 0x7f);
 
             // reversed output bounds invert; out-of-range input clamps
@@ -842,7 +915,8 @@ public:
             low.addArray(cc14Input(1, 7, 100));
             auto inverted = runConverterCommand(state, CC14_RESCALE,
                                                 {"7", "1000", "16383", "16383", "0"}, low);
-            expectEquals(lastCC(inverted, 7), 127);              // clamped to inlow -> 16383
+            // clamped to inlow -> 16383
+            expectEquals(lastCC(inverted, 7), 127);
             expectEquals(lastCC(inverted, 39), 127);
         }
 
@@ -850,8 +924,10 @@ public:
         {
             // a 14-bit pair is pinned to the exact value
             Array<MidiMessage> in;
-            in.addArray(cc14Input(1, 7, 100));                   // pair 1: learning
-            in.addArray(cc14Input(1, 7, 12000));                 // pair 2
+            // pair 1: learning
+            in.addArray(cc14Input(1, 7, 100));
+            // pair 2
+            in.addArray(cc14Input(1, 7, 12000));
             auto out = runConverterCommand(state, CC14_SET, {"7", "8000"}, in);
             expectEquals(lastCC(out, 7), 8000 >> 7);
             expectEquals(lastCC(out, 39), 8000 & 0x7f);
@@ -869,23 +945,28 @@ public:
             auto rpn7 = runConverterCommand(state, RPN_SET, {"5", "8000"},
                                             rpnInput(1, 5, 100, false, false));
             expect(parseLastRpn(rpn7, rpn));
-            expect(! rpn.isNRPN);
+            expect(!rpn.isNRPN);
             expectEquals(rpn.value, 8000 >> 7);
         }
 
         beginTest("a cc14 transform leaves other controllers and (N)RPN work alone");
         {
             Array<MidiMessage> in;
-            in.add(MidiMessage::controllerEvent(1, 8, 100));     // unrelated 7-bit CC
-            in.add(MidiMessage::controllerEvent(1, 101, 0));     // RPN 0 select
+            // unrelated 7-bit CC
+            in.add(MidiMessage::controllerEvent(1, 8, 100));
+            // RPN 0 select
+            in.add(MidiMessage::controllerEvent(1, 101, 0));
             in.add(MidiMessage::controllerEvent(1, 100, 0));
-            in.add(MidiMessage::controllerEvent(1, 6, 24));      // sensitivity: protected
-            in.add(MidiMessage::controllerEvent(1, 101, 127));   // closing null
+            // sensitivity: protected
+            in.add(MidiMessage::controllerEvent(1, 6, 24));
+            // closing null
+            in.add(MidiMessage::controllerEvent(1, 101, 127));
             in.add(MidiMessage::controllerEvent(1, 100, 127));
             auto out = runConverterCommand(state, CC14_ADD, {"6", "1000"}, in);
 
             expectEquals(countController(out, 8, 100), 1);
-            expectEquals(countController(out, 6, 24), 1);        // RPN data survived
+            // RPN data survived
+            expectEquals(countController(out, 6, 24), 1);
             expectEquals(countController(out, 101, 0), 1);
             expectEquals(countController(out, 100, 0), 1);
             expectEquals(countController(out, 101, 127), 1);
@@ -900,7 +981,8 @@ public:
             expect(parseLastRpn(out, rpn));
             expect(rpn.isNRPN);
             expectEquals(rpn.parameterNumber, 7);
-            expectEquals(rpn.value, 8000);                       // untouched
+            // untouched
+            expectEquals(rpn.value, 8000);
         }
 
         beginTest("a convert rule claims a controller ahead of a cc14 transform");
@@ -925,17 +1007,21 @@ public:
             // were consumed by a rule, its increment is consumed too, so it does
             // not reach and modify whatever parameter is selected downstream
             Array<MidiMessage> in;
-            in.add(MidiMessage::controllerEvent(1, 99, 32));     // NRPN 4128: intercepted
+            // NRPN 4128: intercepted
+            in.add(MidiMessage::controllerEvent(1, 99, 32));
             in.add(MidiMessage::controllerEvent(1, 98, 32));
-            in.add(MidiMessage::controllerEvent(1, 96, 1));      // increment: consumed
-            in.add(MidiMessage::controllerEvent(1, 101, 127));   // null: consumed
+            // increment: consumed
+            in.add(MidiMessage::controllerEvent(1, 96, 1));
+            // null: consumed
+            in.add(MidiMessage::controllerEvent(1, 101, 127));
             in.add(MidiMessage::controllerEvent(1, 100, 127));
             auto out = runConvert(state, {"nrpn", "4128", "cc", "2"}, in);
             expectEquals(out.size(), 0);
 
             // for an untargeted parameter the increment passes through with its selects
             Array<MidiMessage> other;
-            other.add(MidiMessage::controllerEvent(1, 99, 32));  // NRPN 4129: untargeted
+            // NRPN 4129: untargeted
+            other.add(MidiMessage::controllerEvent(1, 99, 32));
             other.add(MidiMessage::controllerEvent(1, 98, 33));
             other.add(MidiMessage::controllerEvent(1, 96, 1));
             auto outOther = runConvert(state, {"nrpn", "4128", "cc", "2"}, other);
@@ -952,23 +1038,32 @@ public:
             // the closing null is consumed with the frame rather than passed
             // downstream (where it would deselect an unrelated parameter)
             Array<MidiMessage> in;
-            in.add(MidiMessage::controllerEvent(1, 99, 32));    // NRPN select MSB (4128)
-            in.add(MidiMessage::controllerEvent(1, 100, 32));   // stray RPN select LSB
-            in.add(MidiMessage::controllerEvent(1, 98, 32));    // NRPN select LSB completes 4128
-            in.add(MidiMessage::controllerEvent(1, 6, 3));      // data -> converted to CC 2
-            in.add(MidiMessage::controllerEvent(1, 101, 127));  // closing null
+            // NRPN select MSB (4128)
+            in.add(MidiMessage::controllerEvent(1, 99, 32));
+            // stray RPN select LSB
+            in.add(MidiMessage::controllerEvent(1, 100, 32));
+            // NRPN select LSB completes 4128
+            in.add(MidiMessage::controllerEvent(1, 98, 32));
+            // data -> converted to CC 2
+            in.add(MidiMessage::controllerEvent(1, 6, 3));
+            // closing null
+            in.add(MidiMessage::controllerEvent(1, 101, 127));
             in.add(MidiMessage::controllerEvent(1, 100, 127));
             auto out = runConvert(state, {"nrpn", "4128", "cc", "2"}, in);
 
-            expectEquals(lastCC(out, 2), 3);                    // the NRPN was converted
-            expectEquals(countController(out, 101, 127), 0);    // closing null consumed
+            // the NRPN was converted
+            expectEquals(lastCC(out, 2), 3);
+            // closing null consumed
+            expectEquals(countController(out, 101, 127), 0);
             expectEquals(countController(out, 100, 127), 0);
-            expectEquals(countController(out, 98, 32), 0);      // NRPN select consumed
+            // NRPN select consumed
+            expectEquals(countController(out, 98, 32), 0);
             // the ambiguous 99/100 pair read as an untargeted RPN selection and was
             // forwarded verbatim before the NRPN interpretation could win
             expectEquals(countController(out, 99, 32), 1);
             expectEquals(countController(out, 100, 32), 1);
-            expectEquals(out.size(), 3);                        // those two selects + CC 2
+            // those two selects + CC 2
+            expectEquals(out.size(), 3);
         }
 
         beginTest("one source fans out to every matching rule's destination");
@@ -999,8 +1094,10 @@ public:
             in.add(MidiMessage::aftertouchChange(1, 60, 90));
             auto out = runConverters(state, cmds, in);
 
-            expectEquals(lastCC(out, 1), 90);                    // the per-note rule
-            expectEquals(lastChannelPressure(out), 90);          // and the collapse
+            // the per-note rule
+            expectEquals(lastCC(out, 1), 90);
+            // and the collapse
+            expectEquals(lastChannelPressure(out), 90);
         }
     }
 };

@@ -1,6 +1,6 @@
 /*
  * This file is part of RouteMIDI.
- * Copyright (command) 2017-2026 Uwyn LLC.  https://www.uwyn.com
+ * Copyright (c) 2017-2026 Uwyn LLC.  https://www.uwyn.com
  *
  * RouteMIDI is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -76,10 +76,14 @@ void appendConfigMessage(Array<MidiMessage>& out, const Zone& zone, double times
 {
     const int ch = zone.managerChannel();
     const MidiMessage msgs[] = {
-        MidiMessage::controllerEvent(ch, 101, 0),            // RPN MSB
-        MidiMessage::controllerEvent(ch, 100, 6),            // RPN LSB = MPE Configuration
-        MidiMessage::controllerEvent(ch, 6, zone.members),   // Data Entry MSB = member count
-        MidiMessage::controllerEvent(ch, 101, 127),          // RPN null
+        // RPN MSB
+        MidiMessage::controllerEvent(ch, 101, 0),
+        // RPN LSB = MPE Configuration
+        MidiMessage::controllerEvent(ch, 100, 6),
+        // Data Entry MSB = member count
+        MidiMessage::controllerEvent(ch, 6, zone.members),
+        // RPN null
+        MidiMessage::controllerEvent(ch, 101, 127),
         MidiMessage::controllerEvent(ch, 100, 127)
     };
     for (auto m : msgs)
@@ -92,10 +96,14 @@ void appendConfigMessage(Array<MidiMessage>& out, const Zone& zone, double times
 void appendPitchBendSensitivity(Array<MidiMessage>& out, int channel, int semitones, double timestamp)
 {
     const MidiMessage msgs[] = {
-        MidiMessage::controllerEvent(channel, 101, 0),                       // RPN MSB
-        MidiMessage::controllerEvent(channel, 100, 0),                       // RPN LSB = Pitch Bend Sensitivity
-        MidiMessage::controllerEvent(channel, 6, jlimit(0, 96, semitones)),  // Data Entry MSB = semitones
-        MidiMessage::controllerEvent(channel, 101, 127),                     // RPN null
+        // RPN MSB
+        MidiMessage::controllerEvent(channel, 101, 0),
+        // RPN LSB = Pitch Bend Sensitivity
+        MidiMessage::controllerEvent(channel, 100, 0),
+        // Data Entry MSB = semitones
+        MidiMessage::controllerEvent(channel, 6, jlimit(0, 96, semitones)),
+        // RPN null
+        MidiMessage::controllerEvent(channel, 101, 127),
         MidiMessage::controllerEvent(channel, 100, 127)
     };
     for (auto m : msgs)
@@ -478,7 +486,8 @@ void relocate(Relocator& rel, const Zone& src, const Zone& dst,
         const int activeChannel = activeForBucket(bucket);
         if (activeChannel != 0 && ch != activeChannel)
         {
-            return;  // suppressed: another note owns this destination channel
+            // suppressed: another note owns this destination channel
+            return;
         }
     }
 
@@ -518,7 +527,8 @@ void collapse(Collapser& col, const Zone& src, int target,
     {
         if (memberCh < 1) return;
         const int value = col.expr.combinedBendValue(managerCh, memberCh);
-        if (value == col.lastBend) return;   // nothing changed on the target
+        // nothing changed on the target
+        if (value == col.lastBend) return;
         const int sense = col.expr.combinedSensitivity(managerCh, memberCh);
         if (sense != col.outSense)
         {
@@ -769,7 +779,8 @@ void rescaleBend(const Zone& zone, double from, double to,
 {
     if (!msg.isPitchWheel() || zone.memberIndexOf(msg.getChannel()) < 0 || to <= 0.0)
     {
-        output.add(msg);   // only member-channel pitch bend is rescaled
+        // only member-channel pitch bend is rescaled
+        output.add(msg);
         return;
     }
 
@@ -891,7 +902,8 @@ void split(Splitter& sp, const Zone& zone, int targetCh, int ports,
             if (change == ExpressionState::Bend)     { for (int p = 0; p < ports; ++p) emitPortBend(p);     return; }
             if (change == ExpressionState::Pressure) { for (int p = 0; p < ports; ++p) emitPortPressure(p); return; }
             if (change == ExpressionState::CC74)     { for (int p = 0; p < ports; ++p) emitPortCC74(p);     return; }
-            if (isSensitivityData(ch)) return;   // Manager RPN 0 data: consumed (captured above)
+            // Manager RPN 0 data: consumed (captured above)
+            if (isSensitivityData(ch)) return;
 
             // suppress the MPE Configuration Message (RPN 6) but let other RPNs
             // pass, replaying the selection that was held back
@@ -903,7 +915,8 @@ void split(Splitter& sp, const Zone& zone, int targetCh, int ports,
                 if (cc == 100) { sp.rpnLsb[ch] = v; sp.rpnSelectionSent[ch] = false; return; }
                 if (cc == 6 || cc == 38)
                 {
-                    if (sp.rpnMsb[ch] == 0 && sp.rpnLsb[ch] == 6) return;  // RPN 6 data: drop
+                    // RPN 6 data: drop
+                    if (sp.rpnMsb[ch] == 0 && sp.rpnLsb[ch] == 6) return;
                     if (!sp.rpnSelectionSent[ch])
                     {
                         if (sp.rpnMsb[ch] >= 0) emit(-1, rechannel(MidiMessage::controllerEvent(ch, 101, sp.rpnMsb[ch])));
@@ -979,7 +992,8 @@ void split(Splitter& sp, const Zone& zone, int targetCh, int ports,
     if (change == ExpressionState::Bend)     { emitPortBend(port);     return; }
     if (change == ExpressionState::Pressure) { emitPortPressure(port); return; }
     if (change == ExpressionState::CC74)     { emitPortCC74(port);     return; }
-    if (isSensitivityData(ch)) return;   // Member RPN 0 data: consumed
+    // Member RPN 0 data: consumed
+    if (isSensitivityData(ch)) return;
 
     // any other member message is forwarded rechanneled to the port
     emit(port, rechannel(msg));

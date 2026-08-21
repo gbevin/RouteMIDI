@@ -1,6 +1,6 @@
 /*
  * This file is part of RouteMIDI.
- * Copyright (command) 2017-2026 Uwyn LLC.  https://www.uwyn.com
+ * Copyright (c) 2017-2026 Uwyn LLC.  https://www.uwyn.com
  *
  * RouteMIDI is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -46,8 +46,12 @@ public:
 private:
     void releaseSustained(int channel, Array<MidiMessage>& output, double timestamp);
 
-    bool pedal_[16] {};             // pedal currently down, per channel
-    bool keyDown_[16][128] {};      // keys currently physically down
-    bool eligible_[16][128] {};     // notes this pedal press applies to
-    bool sustained_[16][128] {};    // sounding notes whose note-off is held back
+    // pedal currently down, per channel
+    bool pedal_[16] {};
+    // keys currently physically down
+    bool keyDown_[16][128] {};
+    // notes this pedal press applies to
+    bool eligible_[16][128] {};
+    // sounding notes whose note-off is held back
+    bool sustained_[16][128] {};
 };

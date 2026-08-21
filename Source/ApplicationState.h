@@ -1,6 +1,6 @@
 /*
  * This file is part of RouteMIDI.
- * Copyright (command) 2017-2026 Uwyn LLC.  https://www.uwyn.com
+ * Copyright (c) 2017-2026 Uwyn LLC.  https://www.uwyn.com
  *
  * RouteMIDI is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -78,7 +78,8 @@ public:
     Array<MidiMessage> applyTransforms(Route& route, RouteInput& input, const MidiMessage& msg);
     void processMpe(Route& route, RouteInput& input, const MidiMessage& msg, Array<MidiMessage>& output);
     void processConverters(Route& route, RouteInput& input, const MidiMessage& msg, Array<MidiMessage>& output);
-    void rebuildConvertRules(Route& route);   // compile route.converters to route.convertRules
+    // compile route.converters to route.convertRules
+    void rebuildConvertRules(Route& route);
     // Control (defined below) drives the internal lifecycle steps that the JUCE
     // application object and its timer otherwise run, so an ApplicationState can
     // be driven directly, without the application's event loop
@@ -187,10 +188,10 @@ private:
 
     OwnedArray<Route> routes_;
     int nextRouteId_ { 1 };
-    OwnedArray<Route>* parseTarget_ { nullptr };   // non-null while parsing into a
-                                                   // staging list instead of routes_
-    StringArray parseErrors_;                      // semantic errors of the last
-                                                   // parseParametersInto run
+    // non-null while parsing into a staging list instead of routes_
+    OwnedArray<Route>* parseTarget_ { nullptr };
+    // semantic errors of the last parseParametersInto run
+    StringArray parseErrors_;
 
     bool pendingNegate_;
 
@@ -198,10 +199,12 @@ private:
     // happen on the message thread, so these three are atomic
     std::atomic<bool> useHexadecimalsByDefault_ { false };
     std::atomic<bool> noteNumbersOutput_ { false };
-    std::atomic<int> octaveMiddleC_ { 3 };   // C3, the default middle C octave
+    // C3, the default middle C octave
+    std::atomic<int> octaveMiddleC_ { 3 };
     bool timestampOutput_;
     bool monitor_;
-    bool captureTraffic_ { false };   // record routed traffic for the MCP read_route tool
+    // record routed traffic for the MCP read_route tool
+    bool captureTraffic_ { false };
     bool monitorShowSource_;
 
     JavascriptEngine scriptEngine_;
@@ -214,8 +217,9 @@ private:
     std::unique_ptr<McpServer> mcpServer_;
 
     CriticalSection midiCallbackLock_;
-    StringArray parsingFiles_;   // identities of program files currently being
-                                 // parsed, to refuse a file that includes itself
+    // identities of program files currently being parsed, to refuse a file that
+    // includes itself
+    StringArray parsingFiles_;
 };
 
 // Direct control over the lifecycle steps that the JUCE application object and

@@ -1,6 +1,6 @@
 /*
  * This file is part of RouteMIDI.
- * Copyright (command) 2017-2026 Uwyn LLC.  https://www.uwyn.com
+ * Copyright (c) 2017-2026 Uwyn LLC.  https://www.uwyn.com
  *
  * RouteMIDI is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -35,8 +35,10 @@ namespace mpe
 {
     struct Zone
     {
-        bool lower { true };   // true = Lower Zone (manager 1), false = Upper Zone (manager 16)
-        int members { 15 };    // number of member channels, 1-15
+        // true = Lower Zone (manager 1), false = Upper Zone (manager 16)
+        bool lower { true };
+        // number of member channels, 1-15
+        int members { 15 };
 
         int managerChannel() const { return lower ? 1 : 16; }
 
@@ -106,7 +108,8 @@ namespace mpe
         bool reconfigures(const MidiMessage& msg);
 
         int rpnMsb[17], rpnLsb[17];
-        int lower, upper;   // last announced member count per zone, -1 = none yet
+        // last announced member count per zone, -1 = none yet
+        int lower, upper;
     };
 
     // Tracks the per-channel expression state of an incoming MPE stream so that
@@ -167,9 +170,12 @@ namespace mpe
         void reset();
 
         bool configSent { false };
-        bool bucketFilled { false };  // whether the zone's member channels were added yet
-        ChannelBucket bucket;         // member-channel allocator
-        int noteChannel[128];         // member channel (1-16) holding a note number, -1 = not held
+        // whether the zone's member channels were added yet
+        bool bucketFilled { false };
+        // member-channel allocator
+        ChannelBucket bucket;
+        // member channel (1-16) holding a note number, -1 = not held
+        int noteChannel[128];
     };
 
     // Per-input state used to collapse an MPE zone onto a single channel: it
@@ -187,15 +193,24 @@ namespace mpe
         // held, or 0 when no note is held
         int activeChannel() const;
 
-        int order { 0 };            // monotonically increasing note-trigger counter
-        int channelNote[17];        // note held on each member channel (index 1-16), -1 = none
-        int noteOrder[17];          // trigger order per member channel (higher = more recent)
-        int outSense { 0 };         // Pitch Bend Sensitivity last declared on the target, 0 = none
-        int lastBend { 8192 };      // last pitch bend value sent to the target (avoids redundant sends)
-        int lastCC74 { 0 };         // last CC 74 value sent to the target
-        int channelCC[17][128];     // last value of each CC held on each member channel, -1 = none
-        int targetCC[128];          // last value of each CC sent to the target, -1 = none
-        ExpressionState expr;       // Manager/Member expression cache for combining
+        // monotonically increasing note-trigger counter
+        int order { 0 };
+        // note held on each member channel (index 1-16), -1 = none
+        int channelNote[17];
+        // trigger order per member channel (higher = more recent)
+        int noteOrder[17];
+        // Pitch Bend Sensitivity last declared on the target, 0 = none
+        int outSense { 0 };
+        // last pitch bend value sent to the target (avoids redundant sends)
+        int lastBend { 8192 };
+        // last CC 74 value sent to the target
+        int lastCC74 { 0 };
+        // last value of each CC held on each member channel, -1 = none
+        int channelCC[17][128];
+        // last value of each CC sent to the target, -1 = none
+        int targetCC[128];
+        // Manager/Member expression cache for combining
+        ExpressionState expr;
     };
 
     // Per-input state used when relocating an MPE zone onto a smaller one, where
@@ -209,17 +224,27 @@ namespace mpe
 
         void reset();
 
-        int counter { 0 };   // monotonically increasing note-trigger counter
-        bool active[17];     // whether a note is held on each source member channel
-        int order[17];       // trigger order per source channel (higher = more recent)
-        int managerRpnMsb { -1 };  // RPN selection on the manager channel, to spot the MCM (RPN 6)
+        // monotonically increasing note-trigger counter
+        int counter { 0 };
+        // whether a note is held on each source member channel
+        bool active[17];
+        // trigger order per source channel (higher = more recent)
+        int order[17];
+        // RPN selection on the manager channel, to spot the MCM (RPN 6)
+        int managerRpnMsb { -1 };
         int managerRpnLsb { -1 };
-        int srcBend[17];         // last pitch bend held on each source member channel, -1 = none
-        int srcPressure[17];     // last channel pressure held on each source channel, -1 = none
-        int channelCC[17][128];  // last value of each CC held on each source channel, -1 = none
-        int destBend[17];        // last pitch bend sent to each destination channel
-        int destPressure[17];    // last channel pressure sent to each destination channel, -1 = none
-        int destCC[17][128];     // last value of each CC sent to each destination channel, -1 = none
+        // last pitch bend held on each source member channel, -1 = none
+        int srcBend[17];
+        // last channel pressure held on each source channel, -1 = none
+        int srcPressure[17];
+        // last value of each CC held on each source channel, -1 = none
+        int channelCC[17][128];
+        // last pitch bend sent to each destination channel
+        int destBend[17];
+        // last channel pressure sent to each destination channel, -1 = none
+        int destPressure[17];
+        // last value of each CC sent to each destination channel, -1 = none
+        int destCC[17][128];
     };
 
     // Per-route state used to fan an MPE zone out across a route's output ports,
@@ -239,23 +264,36 @@ namespace mpe
         // the oldest-allocated port, stolen when every port is busy
         int oldestPort(int ports);
 
-        int order { 0 };               // monotonically increasing allocation counter
-        int roundRobin { 0 };          // next port index to try when allocating
-        int channelPort[17];           // output port assigned to each member channel, -1 = none
-        std::vector<int> portChannel;  // member channel occupying each port, -1 = free
-        std::vector<int> portNote;     // note number sounding on each port, -1 = none
-        std::vector<int> portOrder;    // allocation order per port (for stealing)
-        std::vector<int> portOutSense; // Pitch Bend Sensitivity last declared on each port, 0 = none
-        std::vector<int> portLastBend; // last pitch bend value sent to each port
-        std::vector<int> portLastCC74; // last CC 74 value sent to each port
+        // monotonically increasing allocation counter
+        int order { 0 };
+        // next port index to try when allocating
+        int roundRobin { 0 };
+        // output port assigned to each member channel, -1 = none
+        int channelPort[17];
+        // member channel occupying each port, -1 = free
+        std::vector<int> portChannel;
+        // note number sounding on each port, -1 = none
+        std::vector<int> portNote;
+        // allocation order per port (for stealing)
+        std::vector<int> portOrder;
+        // Pitch Bend Sensitivity last declared on each port, 0 = none
+        std::vector<int> portOutSense;
+        // last pitch bend value sent to each port
+        std::vector<int> portLastBend;
+        // last CC 74 value sent to each port
+        std::vector<int> portLastCC74;
 
         // tracks the RPN selected on each channel so the MPE Configuration
         // Message (RPN 6) can be suppressed without disturbing other RPNs
-        int rpnMsb[17];                // last RPN MSB (CC 101) per channel, -1 = none
-        int rpnLsb[17];                // last RPN LSB (CC 100) per channel, -1 = none
-        bool rpnSelectionSent[17];     // whether the current selection has been forwarded
+        // last RPN MSB (CC 101) per channel, -1 = none
+        int rpnMsb[17];
+        // last RPN LSB (CC 100) per channel, -1 = none
+        int rpnLsb[17];
+        // whether the current selection has been forwarded
+        bool rpnSelectionSent[17];
 
-        ExpressionState expr;          // Manager/Member expression cache for combining
+        // Manager/Member expression cache for combining
+        ExpressionState expr;
     };
 
     //==========================================================================

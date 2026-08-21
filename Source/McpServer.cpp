@@ -1,6 +1,6 @@
 /*
  * This file is part of RouteMIDI.
- * Copyright (command) 2017-2026 Uwyn LLC.  https://www.uwyn.com
+ * Copyright (c) 2017-2026 Uwyn LLC.  https://www.uwyn.com
  *
  * RouteMIDI is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -741,7 +741,8 @@ static String collectProcessingCommands(const Array<ApplicationCommand>& table,
             continue;
         }
 
-        finishCurrent();   // a new command ends a variable-argument command
+        // a new command ends a variable-argument command
+        finishCurrent();
 
         if (cmd->command_ == NOT)
         {
@@ -761,7 +762,8 @@ static String collectProcessingCommands(const Array<ApplicationCommand>& table,
         remainingFixedArgs = jmax(0, cmd->expectedOptions_);
         if (remainingFixedArgs == 0 && cmd->expectedOptions_ >= 0 && cmd->command_ != CONVERT)
         {
-            finishCurrent();   // takes no arguments
+            // takes no arguments
+            finishCurrent();
         }
     }
     finishCurrent();
@@ -965,7 +967,8 @@ static String validateMcpCommandTokens(const Array<ApplicationCommand>& commands
             remainingFixedArgs = jmax(0, cmd->expectedOptions_);
             if (remainingFixedArgs == 0 && cmd->command_ != CONVERT && cmd->expectedOptions_ >= 0)
             {
-                current = nullptr;   // takes no arguments
+                // takes no arguments
+                current = nullptr;
             }
             continue;
         }
@@ -1016,7 +1019,8 @@ var McpServer::handleRequest(const var& message)
     {
         if (!hasId)
         {
-            return var();   // looks like a notification or a stray response: stay silent
+            // looks like a notification or a stray response: stay silent
+            return var();
         }
         return var(newMcpErrorResponse(id, -32600, "Invalid Request"));
     }
@@ -1325,9 +1329,11 @@ var McpServer::handleRequest(const var& message)
                 const ScopedLock sl(state_.midiCallbackLock_);
                 removed = state_.routes_.removeAndReturn(index);
             }
-            state_.sendPanic(*removed);   // release anything still sounding
-            state_.stopOutputSender();    // drains the panic and every queued send
-                                          // that still references the route's outputs
+            // release anything still sounding
+            state_.sendPanic(*removed);
+            // drains the panic and every queued send
+            // that still references the route's outputs
+            state_.stopOutputSender();
             // deleted outside the lock: closing the inputs can wait for an
             // in-flight MIDI callback, which needs the lock to finish
             delete removed;
@@ -1374,7 +1380,8 @@ var McpServer::handleRequest(const var& message)
             int inputIndex = 0;
             if (args->hasProperty("input") && !readIntArg(args->getProperty("input"), inputIndex))
             {
-                inputIndex = -1;   // rejected by the bounds check below
+                // rejected by the bounds check below
+                inputIndex = -1;
             }
             if (inputIndex < 0 || inputIndex >= route->inputs.size())
             {
@@ -1486,13 +1493,15 @@ var McpServer::handleRequest(const var& message)
             int64 after = -1;
             if (args->hasProperty("after") && !readInt64Arg(args->getProperty("after"), after))
             {
-                after = -1;   // a bad cursor reads as "everything currently buffered"
+                // a bad cursor reads as "everything currently buffered"
+                after = -1;
             }
             constexpr int defaultMax = 128;
             int maxMessages = defaultMax;
             if (args->hasProperty("max"))
             {
-                readIntArg(args->getProperty("max"), maxMessages);   // clamped next
+                // clamped next
+                readIntArg(args->getProperty("max"), maxMessages);
             }
             maxMessages = jlimit(1, Route::captureCapacity, maxMessages);
 
@@ -1620,7 +1629,8 @@ var McpServer::handleRequest(const var& message)
             int commandIndex = -1;
             if (!readIntArg(args->getProperty("index"), commandIndex))
             {
-                commandIndex = -1;   // rejected by the bounds check below
+                // rejected by the bounds check below
+                commandIndex = -1;
             }
             auto* container = stageContainer(*route, stage);
             if (container == nullptr)
@@ -1658,7 +1668,8 @@ var McpServer::handleRequest(const var& message)
             int commandIndex = -1;
             if (args->hasProperty("index") && !readIntArg(args->getProperty("index"), commandIndex))
             {
-                commandIndex = -1;   // rejected by the bounds check below
+                // rejected by the bounds check below
+                commandIndex = -1;
             }
             auto* container = stageContainer(*route, stage);
             if (container == nullptr)

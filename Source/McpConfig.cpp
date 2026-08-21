@@ -1,6 +1,6 @@
 /*
  * This file is part of RouteMIDI.
- * Copyright (command) 2017-2026 Uwyn LLC.  https://www.uwyn.com
+ * Copyright (c) 2017-2026 Uwyn LLC.  https://www.uwyn.com
  *
  * RouteMIDI is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -31,11 +31,16 @@ enum class Kind { jsonFile, cli };
 
 struct ClientInfo
 {
-    String  name;         // canonical name
-    String  displayName;  // for user-facing messages
-    Format  format;       // the format --print-mcp-config emits for it
-    Kind    kind;         // how --install-mcp handles it
-    String  cliCommand;   // the command to run, for a cli client
+    // canonical name
+    String  name;
+    // for user-facing messages
+    String  displayName;
+    // the format --print-mcp-config emits for it
+    Format  format;
+    // how --install-mcp handles it
+    Kind    kind;
+    // the command to run, for a cli client
+    String  cliCommand;
 };
 
 // the known clients; the first match on name or alias wins
@@ -117,7 +122,7 @@ String serverBlock(const String& exePath, const String& client)
     if (client.isNotEmpty())
     {
         ClientInfo info;
-        if (! lookupClient(client, info))
+        if (!lookupClient(client, info))
         {
             return {};
         }
@@ -137,7 +142,7 @@ StringArray supportedClients()
 File configPathForClient(const String& client)
 {
     ClientInfo info;
-    if (! lookupClient(client, info) || info.kind != Kind::jsonFile)
+    if (!lookupClient(client, info) || info.kind != Kind::jsonFile)
     {
         return {};
     }
@@ -208,12 +213,12 @@ Result mergeConfigFile(const File& configFile, const String& exePath, String& su
     const bool wasUpdate = serversObj->hasProperty("routemidi");
     serversObj->setProperty("routemidi", serverEntry(exePath));
 
-    if (! configFile.getParentDirectory().createDirectory())
+    if (!configFile.getParentDirectory().createDirectory())
     {
         return Result::fail("couldn't create the folder for "
                             + configFile.getFullPathName());
     }
-    if (! configFile.replaceWithText(JSON::toString(root) + newLine))
+    if (!configFile.replaceWithText(JSON::toString(root) + newLine))
     {
         return Result::fail("couldn't write " + configFile.getFullPathName());
     }
@@ -228,7 +233,7 @@ Result mergeConfigFile(const File& configFile, const String& exePath, String& su
 Result installToClient(const String& client, const String& exePath, String& summary)
 {
     ClientInfo info;
-    if (! lookupClient(client, info))
+    if (!lookupClient(client, info))
     {
         return Result::fail("unknown MCP client \"" + client + "\"; supported: "
                             + supportedClients().joinIntoString(", ")

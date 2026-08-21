@@ -1,6 +1,6 @@
 /*
  * This file is part of RouteMIDI.
- * Copyright (command) 2017-2026 Uwyn LLC.  https://www.uwyn.com
+ * Copyright (c) 2017-2026 Uwyn LLC.  https://www.uwyn.com
  *
  * RouteMIDI is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -51,9 +51,12 @@ int parseSpec(const StringArray& opts, String& srcType, String& srcNum,
     }
     else if (st == Pp)
     {
-        if (i >= opts.size()) return -1;                    // still need the dsttype
-        if (parseType(opts[i], tmp)) srcNum = "-1";         // a type follows: any note
-        else                         srcNum = opts[i++];    // otherwise it's the note
+        // still need the dsttype
+        if (i >= opts.size()) return -1;
+        // a type follows: any note
+        if (parseType(opts[i], tmp)) srcNum = "-1";
+        // otherwise it's the note
+        else                         srcNum = opts[i++];
     }
 
     if (i >= opts.size() || ! parseType(opts[i], dt)) return -1;
@@ -199,7 +202,8 @@ State::State()
 void State::trackSelect(int ch, int cc, int value)
 {
     selection.trackSelect(ch, cc, value);
-    valMsb[ch - 1] = -1;   // a (re)selection starts a fresh data-entry value
+    // a (re)selection starts a fresh data-entry value
+    valMsb[ch - 1] = -1;
 }
 
 //==============================================================================
@@ -235,7 +239,7 @@ static void convertNonController(const Array<Rule>& rules, State& state,
         bool anyNotePP = false;
         for (const auto& r : rules)
         {
-            if (! r.isTransform && r.src == Pp && r.srcNum == -1) { anyNotePP = true; break; }
+            if (!r.isTransform && r.src == Pp && r.srcNum == -1) { anyNotePP = true; break; }
         }
 
         if (anyNotePP)
@@ -247,14 +251,14 @@ static void convertNonController(const Array<Rule>& rules, State& state,
 
             // a note-on only adds a note at zero pressure, which never raises the
             // maximum, so only poly pressure and note-offs need to re-emit
-            if (! msg.isNoteOn())
+            if (!msg.isNoteOn())
             {
                 const int maxP = state.pressure.maxPressure(ch);
                 if (state.pressure.changed(ch, maxP))
                 {
                     for (const auto& r : rules)
                     {
-                        if (! r.isTransform && r.src == Pp && r.srcNum == -1)
+                        if (!r.isTransform && r.src == Pp && r.srcNum == -1)
                         {
                             emit(output, ch, maxP, 7, r.dst, r.dstNum, r.method, ts);
                         }
@@ -268,12 +272,13 @@ static void convertNonController(const Array<Rule>& rules, State& state,
                 // collapse consumes it, so any-note and per-note conversions coexist
                 for (const auto& r : rules)
                 {
-                    if (! r.isTransform && r.src == Pp && r.srcNum == msg.getNoteNumber())
+                    if (!r.isTransform && r.src == Pp && r.srcNum == msg.getNoteNumber())
                     {
                         emit(output, ch, msg.getAfterTouchValue(), 7, r.dst, r.dstNum, r.method, ts);
                     }
                 }
-                return;   // the poly pressure is consumed by the collapse
+                // the poly pressure is consumed by the collapse
+                return;
             }
             // note-ons and note-offs fall through to pass the note message onward
         }
@@ -402,7 +407,7 @@ static void convertRpnSet(const Array<Rule>& rules, State& state,
     {
         for (const auto& r : rules)
         {
-            if (! r.isTransform && ((r.src == Rpn && ! isNRPN) || (r.src == Nrpn && isNRPN))
+            if (!r.isTransform && ((r.src == Rpn && ! isNRPN) || (r.src == Nrpn && isNRPN))
                 && r.srcNum == param)
             {
                 return true;
@@ -432,7 +437,8 @@ static void convertRpnSet(const Array<Rule>& rules, State& state,
     // (100/101) after selecting with NRPN (98/99), as the LinnStrument does.
     if (cc >= 98 && cc <= 101)
     {
-        if (state.selBufLen[ch - 1] >= 4)   // shouldn't happen; drain as a safety valve
+        // shouldn't happen; drain as a safety valve
+        if (state.selBufLen[ch - 1] >= 4)
         {
             flushSelects();
         }
@@ -456,11 +462,13 @@ static void convertRpnSet(const Array<Rule>& rules, State& state,
                                      : paramIntercepted(param, nrpnSel);
             if (drop)
             {
-                state.selBufLen[ch - 1] = 0;   // replaced by the conversion output
+                // replaced by the conversion output
+                state.selBufLen[ch - 1] = 0;
             }
             else
             {
-                flushSelects();                // pass through unchanged
+                // pass through unchanged
+                flushSelects();
             }
             // a real select updates which parameter is active; a null deselects
             state.selIntercepted[ch - 1] = isNull ? false : drop;
@@ -501,7 +509,8 @@ static void convertRpnSet(const Array<Rule>& rules, State& state,
             state.valMsb[ch - 1] = val;
             value = val;
         }
-        else if (state.valMsb[ch - 1] >= 0)   // an LSB needs an MSB to pair with
+        // an LSB needs an MSB to pair with
+        else if (state.valMsb[ch - 1] >= 0)
         {
             value = (state.valMsb[ch - 1] << 7) | val;
             bits = 14;
@@ -531,10 +540,12 @@ static void convertRpnSet(const Array<Rule>& rules, State& state,
                 if (r.isTransform) continue;
                 if (((r.src == Rpn && ! nrpn) || (r.src == Nrpn && nrpn)) && r.srcNum == param)
                 {
-                    state.selBufLen[ch - 1] = 0;        // drop any dangling selects
-                    state.selIntercepted[ch - 1] = true;   // and consume the closing null
+                    // drop any dangling selects
+                    state.selBufLen[ch - 1] = 0;
+                    // and consume the closing null
+                    state.selIntercepted[ch - 1] = true;
                     converted = true;
-                    if (! awaitLsb)
+                    if (!awaitLsb)
                     {
                         emit(output, ch, value, bits, r.dst, r.dstNum, r.method, ts);
                     }
@@ -552,7 +563,7 @@ static void convertRpnSet(const Array<Rule>& rules, State& state,
             const int maxValue = (bits == 14) ? 16383 : 127;
             for (const auto& r : rules)
             {
-                if (! r.isTransform || ! isRpnTransform(r.op) || r.nrpn != nrpn || r.param != param)
+                if (!r.isTransform || ! isRpnTransform(r.op) || r.nrpn != nrpn || r.param != param)
                 {
                     continue;
                 }
@@ -569,7 +580,7 @@ static void convertRpnSet(const Array<Rule>& rules, State& state,
                 // add would land 128x too big)
                 state.selBufLen[ch - 1] = 0;
                 state.selIntercepted[ch - 1] = true;
-                if (! awaitLsb)
+                if (!awaitLsb)
                 {
                     emitRpn(output, ch, param, newValue, nrpn, bits == 14, ts);
                 }
@@ -606,7 +617,7 @@ static bool convertCc(const Array<Rule>& rules, State& state,
         bool transformTargeted = false;
         for (const auto& r : rules)
         {
-            if (! r.isTransform && r.src == Cc14 && (r.srcNum & 0x1f) == n)
+            if (!r.isTransform && r.src == Cc14 && (r.srcNum & 0x1f) == n)
             {
                 convertTargeted = true;
             }
@@ -627,7 +638,7 @@ static bool convertCc(const Array<Rule>& rules, State& state,
                 {
                     for (const auto& r : rules)
                     {
-                        if (! r.isTransform && r.src == Cc14 && (r.srcNum & 0x1f) == n)
+                        if (!r.isTransform && r.src == Cc14 && (r.srcNum & 0x1f) == n)
                         {
                             emit(output, ch, value, bits, r.dst, r.dstNum, r.method, ts);
                         }
@@ -658,7 +669,8 @@ static bool convertCc(const Array<Rule>& rules, State& state,
                 state.ccMsbValid[ch - 1][n] = true;
                 if (state.cc14LsbSeen[ch - 1][n])
                 {
-                    state.cc14LsbSeen[ch - 1][n] = false;   // re-learned on the next LSB
+                    // re-learned on the next LSB
+                    state.cc14LsbSeen[ch - 1][n] = false;
                 }
                 else
                 {
@@ -686,7 +698,7 @@ static bool convertCc(const Array<Rule>& rules, State& state,
 void processMessage(const Array<Rule>& rules, State& state,
                     const MidiMessage& msg, Array<MidiMessage>& output)
 {
-    if (! msg.isController())
+    if (!msg.isController())
     {
         convertNonController(rules, state, msg, output);
         return;
@@ -732,7 +744,8 @@ void processMessage(const Array<Rule>& rules, State& state,
         return;
     }
 
-    output.add(msg);   // not managed by any conversion rule: forward unchanged
+    // not managed by any conversion rule: forward unchanged
+    output.add(msg);
 }
 
 } // namespace conversion

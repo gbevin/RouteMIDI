@@ -1,6 +1,6 @@
 /*
  * This file is part of RouteMIDI.
- * Copyright (command) 2017-2026 Uwyn LLC.  https://www.uwyn.com
+ * Copyright (c) 2017-2026 Uwyn LLC.  https://www.uwyn.com
  *
  * RouteMIDI is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -45,6 +45,8 @@ struct ParamSelection
     // whether the current selection arrived via the NRPN selects (CC 98/99)
     bool isNrpn(int channel) const { return nrpn[channel - 1]; }
 
-    int  msb[16], lsb[16];   // last select bytes seen, -1 = never
-    bool nrpn[16];           // whether the selection came in via 98/99
+    // last select bytes seen, -1 = never
+    int  msb[16], lsb[16];
+    // whether the selection came in via 98/99
+    bool nrpn[16];
 };

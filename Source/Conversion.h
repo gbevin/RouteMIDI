@@ -1,6 +1,6 @@
 /*
  * This file is part of RouteMIDI.
- * Copyright (command) 2017-2026 Uwyn LLC.  https://www.uwyn.com
+ * Copyright (c) 2017-2026 Uwyn LLC.  https://www.uwyn.com
  *
  * RouteMIDI is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -114,26 +114,38 @@ void emit(Array<MidiMessage>& out, int channel, int srcValue, int srcBits,
 // converter stage matches rules without re-parsing option strings per message.
 struct Rule
 {
-    bool isTransform = false;             // false: convert; true: rpn/nrpn value transform
+    // false: convert; true: rpn/nrpn value transform
+    bool isTransform = false;
 
     // convert fields
     Type src = Cc7;
     Type dst = Cc7;
-    int  srcNum = 0;                      // controller/parameter, or note; -1 = any note (pp source)
-    int  dstNum = 0;                      // controller/parameter, or note (pp destination)
-    int  srcBits = 7;                     // resolution of the source value
+    // controller/parameter, or note; -1 = any note (pp source)
+    int  srcNum = 0;
+    // controller/parameter, or note (pp destination)
+    int  dstNum = 0;
+    // resolution of the source value
+    int  srcBits = 7;
     bitscaling::ScaleMethod method = bitscaling::MinCenterMax;
 
     // transform fields (add/scale/curve/invert/rescale on a 14-bit CC or an
     // rpn/nrpn parameter)
-    CommandIndex op = CONVERT;            // a CC14_*, NRPN_* or RPN_* transform
-    bool   nrpn = false;                  // an (N)RPN transform targets an NRPN (vs RPN)
-    int    param = 0;                     // parameter or MSB controller the transform acts on
-    int    addAmount = 0;                 // add offset
-    double factor = 1.0;                  // scale factor
-    double gamma = 1.0;                   // curve gamma
-    int    inLo = 0, inHi = 16383;        // rescale input range (14-bit resolution)
-    int    outLo = 0, outHi = 16383;      // rescale output range (14-bit resolution)
+    // a CC14_*, NRPN_* or RPN_* transform
+    CommandIndex op = CONVERT;
+    // an (N)RPN transform targets an NRPN (vs RPN)
+    bool   nrpn = false;
+    // parameter or MSB controller the transform acts on
+    int    param = 0;
+    // add offset
+    int    addAmount = 0;
+    // scale factor
+    double factor = 1.0;
+    // curve gamma
+    double gamma = 1.0;
+    // rescale input range (14-bit resolution)
+    int    inLo = 0, inHi = 16383;
+    // rescale output range (14-bit resolution)
+    int    outLo = 0, outHi = 16383;
 };
 
 // Per-input state for the "any note" poly-pressure collapse (convert pp -> a
@@ -164,8 +176,10 @@ struct PressureCollapse
         return true;
     }
 
-    int pressure[16][128];  // held-note pressures per channel, -1 = note not held
-    int lastMax[16];        // last combined value emitted per channel, -1 = none yet
+    // held-note pressures per channel, -1 = note not held
+    int pressure[16][128];
+    // last combined value emitted per channel, -1 = none yet
+    int lastMax[16];
 };
 
 // The per-input runtime state of the converter stage: (N)RPN reassembly and
@@ -185,31 +199,38 @@ struct State
     int  selectedParam(int ch) const   { return selection.param(ch); }
     bool selectionIsNrpn(int ch) const { return selection.isNrpn(ch); }
 
-    ParamSelection selection;       // the stream's (N)RPN parameter selection
+    // the stream's (N)RPN parameter selection
+    ParamSelection selection;
 
     // --- raw select CCs awaiting classification ------------------------------
     // buffered until their MSB+LSB pair is complete, then either dropped (the
     // parameter is a rule target) or forwarded verbatim
     MidiMessage selBuf[16][4];
     int  selBufLen[16] {};
-    bool selIntercepted[16] {};     // the selected parameter is a rule target, so
-                                    // its closing null (in either RPN or NRPN
-                                    // form) is consumed too
+    // the selected parameter is a rule target, so its closing null (in either
+    // RPN or NRPN form) is consumed too
+    bool selIntercepted[16] {};
 
     // --- (N)RPN data-entry value assembly -------------------------------------
-    int valMsb[16];                 // last data-entry MSB (CC 6) since the last
-                                    // select, -1 = none; pairs with CC 38
+    // last data-entry MSB (CC 6) since the last select, -1 = none; pairs with
+    // CC 38
+    int valMsb[16];
 
     // --- adaptive MSB+LSB pairing ---------------------------------------------
     // once an LSB has been seen for a source, the MSB half of the next pair is
     // consumed silently and the pair emits once, exactly, on its LSB; the flag
     // clears on each suppression so an MSB-only sender loses at most one value
-    int  rpn14Param[16][2];         // last param with an LSB, per [0]=RPN/[1]=NRPN
-    int  ccMsb[16][32] {};          // last 14-bit CC MSB, per channel and controller
-    bool ccMsbValid[16][32] {};     // whether an MSB has been seen yet
-    bool cc14LsbSeen[16][32] {};    // whether the controller's last pair had an LSB
+    // last param with an LSB, per [0]=RPN/[1]=NRPN
+    int  rpn14Param[16][2];
+    // last 14-bit CC MSB, per channel and controller
+    int  ccMsb[16][32] {};
+    // whether an MSB has been seen yet
+    bool ccMsbValid[16][32] {};
+    // whether the controller's last pair had an LSB
+    bool cc14LsbSeen[16][32] {};
 
-    PressureCollapse pressure;      // held-note tracking for the any-note pp source
+    // held-note tracking for the any-note pp source
+    PressureCollapse pressure;
 };
 
 // runs one message through the converter stage: matching rules emit their

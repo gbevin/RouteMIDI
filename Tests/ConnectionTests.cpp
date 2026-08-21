@@ -1,6 +1,6 @@
 /*
  * This file is part of RouteMIDI.
- * Copyright (command) 2017-2026 Uwyn LLC.  https://www.uwyn.com
+ * Copyright (c) 2017-2026 Uwyn LLC.  https://www.uwyn.com
  *
  * RouteMIDI is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -85,8 +85,10 @@ public:
         const String outName = "RouteMIDI RTOut " + Uuid().toString();
 
         CaptureMidiCallback capture;
-        auto virtualDest   = MidiInput::createNewDevice(outName, &capture);   // shows up as an output
-        auto virtualSource = MidiOutput::createNewDevice(inName);             // shows up as an input
+        // shows up as an output
+        auto virtualDest   = MidiInput::createNewDevice(outName, &capture);
+        // shows up as an input
+        auto virtualSource = MidiOutput::createNewDevice(inName);
         if (virtualDest == nullptr || virtualSource == nullptr)
         {
             logMessage("  skipped: virtual MIDI not available on this system");
@@ -94,7 +96,7 @@ public:
         }
         virtualDest->start();
 
-        if (! waitForPort([] { return MidiInput::getAvailableDevices();  }, inName,  true, 3000) ||
+        if (!waitForPort([] { return MidiInput::getAvailableDevices();  }, inName,  true, 3000) ||
             ! waitForPort([] { return MidiOutput::getAvailableDevices(); }, outName, true, 3000))
         {
             logMessage("  skipped: virtual ports never appeared in the device lists");
@@ -145,13 +147,15 @@ public:
 
             ApplicationState state;
             StringArray params { "in", portName };
-            state.parseParameters(params);   // port does not exist yet: stays waiting
+            // port does not exist yet: stays waiting
+            state.parseParameters(params);
 
             auto& routes = state.getRoutes();
             expect(routes.size() == 1);
             expect(routes[0]->inputs.size() == 1);
             auto* input = routes[0]->inputs[0];
-            expect(input->midiIn == nullptr);   // nothing to connect to yet
+            // nothing to connect to yet
+            expect(input->midiIn == nullptr);
 
             // publish a virtual source so the name shows up as an available input;
             // if the backend cannot create one (e.g. headless CI), skip the test
@@ -161,7 +165,7 @@ public:
                 logMessage("  skipped: virtual MIDI not available on this system");
                 return;
             }
-            if (! waitForPort([] { return MidiInput::getAvailableDevices(); }, portName, true, 3000))
+            if (!waitForPort([] { return MidiInput::getAvailableDevices(); }, portName, true, 3000))
             {
                 logMessage("  skipped: virtual input never appeared in the device list");
                 return;
@@ -174,7 +178,7 @@ public:
 
             // remove the port; a reconcile pass should notice it is gone and drop it
             virtualSource.reset();
-            if (! waitForPort([] { return MidiInput::getAvailableDevices(); }, portName, false, 3000))
+            if (!waitForPort([] { return MidiInput::getAvailableDevices(); }, portName, false, 3000))
             {
                 logMessage("  note: port lingered in the list; skipping disconnect check");
                 return;
@@ -190,14 +194,16 @@ public:
             const String portName = "RouteMIDI TestOut " + Uuid().toString();
 
             ApplicationState state;
-            StringArray params { "in", "-", "out", portName };   // stdin in, waiting out
+            // stdin in, waiting out
+            StringArray params { "in", "-", "out", portName };
             state.parseParameters(params);
 
             auto& routes = state.getRoutes();
             expect(routes.size() == 1);
             expect(routes[0]->outputs.size() == 1);
             auto* dest = routes[0]->outputs[0];
-            expect(dest->out == nullptr);   // nothing to open yet
+            // nothing to open yet
+            expect(dest->out == nullptr);
 
             // publish a virtual destination so the name shows up as an available output
             NullMidiCallback nullCallback;
@@ -207,7 +213,7 @@ public:
                 logMessage("  skipped: virtual MIDI not available on this system");
                 return;
             }
-            if (! waitForPort([] { return MidiOutput::getAvailableDevices(); }, portName, true, 3000))
+            if (!waitForPort([] { return MidiOutput::getAvailableDevices(); }, portName, true, 3000))
             {
                 logMessage("  skipped: virtual output never appeared in the device list");
                 return;
@@ -228,7 +234,7 @@ public:
                 logMessage("  skipped: virtual MIDI not available on this system");
                 return;
             }
-            if (! waitForPort([] { return MidiInput::getAvailableDevices(); }, inName, true, 3000))
+            if (!waitForPort([] { return MidiInput::getAvailableDevices(); }, inName, true, 3000))
             {
                 logMessage("  skipped: the virtual input never appeared");
                 return;
@@ -269,7 +275,7 @@ public:
                 return;
             }
             virtualDest->start();
-            if (! waitForPort([] { return MidiOutput::getAvailableDevices(); }, outName, true, 3000))
+            if (!waitForPort([] { return MidiOutput::getAvailableDevices(); }, outName, true, 3000))
             {
                 logMessage("  skipped: the virtual port never appeared");
                 return;
@@ -294,7 +300,8 @@ public:
             }
 
             ApplicationState::Control(state).startOutputSender();
-            state.shutdown();   // panic-enabled route: drains the safety net before returning
+            // panic-enabled route: drains the safety net before returning
+            state.shutdown();
 
             // sustain off, sostenuto off and all-notes-off on every channel
             const uint32 startTime = Time::getMillisecondCounter();
@@ -336,7 +343,7 @@ public:
                 return;
             }
             virtualDest->start();
-            if (! waitForPort([] { return MidiInput::getAvailableDevices();  }, inName,  true, 3000) ||
+            if (!waitForPort([] { return MidiInput::getAvailableDevices();  }, inName,  true, 3000) ||
                 ! waitForPort([] { return MidiOutput::getAvailableDevices(); }, outName, true, 3000))
             {
                 logMessage("  skipped: virtual ports never appeared in the device lists");
@@ -361,7 +368,7 @@ public:
 
             // unplug the destination: the reconcile pass must drop the dead port
             virtualDest = nullptr;
-            if (! waitForPort([] { return MidiOutput::getAvailableDevices(); }, outName, false, 3000))
+            if (!waitForPort([] { return MidiOutput::getAvailableDevices(); }, outName, false, 3000))
             {
                 logMessage("  skipped: the virtual port never left the device list");
                 return;
@@ -414,7 +421,8 @@ public:
                 {
                     const auto& m = received.getReference(0);
                     expect(m.isNoteOn());
-                    expectEquals(m.getNoteNumber(), 72);        // 60 + 12
+                    // 60 + 12
+                    expectEquals(m.getNoteNumber(), 72);
                     expectEquals(m.getChannel(), 1);
                     expectEquals((int) m.getVelocity(), 100);
                 }
@@ -432,7 +440,8 @@ public:
                 {
                     const auto& m = received.getReference(0);
                     expect(m.isNoteOn());
-                    expectEquals(m.getChannel(), 5);            // remapped 1 -> 5
+                    // remapped 1 -> 5
+                    expectEquals(m.getChannel(), 5);
                     expectEquals(m.getNoteNumber(), 64);
                 }
             }
@@ -455,7 +464,7 @@ public:
                 return;
             }
             virtualDest->start();
-            if (! waitForPort([] { return MidiOutput::getAvailableDevices(); }, outName, true, 3000))
+            if (!waitForPort([] { return MidiOutput::getAvailableDevices(); }, outName, true, 3000))
             {
                 logMessage("  skipped: virtual ports never appeared in the device lists");
                 return;
@@ -508,7 +517,8 @@ public:
             {
                 const auto& m = capture.received.getReference(0);
                 expect(m.isNoteOn());
-                expectEquals(m.getNoteNumber(), 72);   // 60 + 12
+                // 60 + 12
+                expectEquals(m.getNoteNumber(), 72);
             }
         } ();
 
@@ -527,7 +537,7 @@ public:
                 return;
             }
             virtualDest->start();
-            if (! waitForPort([] { return MidiInput::getAvailableDevices();  }, inName,  true, 3000) ||
+            if (!waitForPort([] { return MidiInput::getAvailableDevices();  }, inName,  true, 3000) ||
                 ! waitForPort([] { return MidiOutput::getAvailableDevices(); }, outName, true, 3000))
             {
                 logMessage("  skipped: virtual ports never appeared in the device lists");
@@ -579,7 +589,7 @@ public:
                 return;
             }
             virtualDest->start();
-            if (! waitForPort([] { return MidiInput::getAvailableDevices();  }, inName,  true, 3000) ||
+            if (!waitForPort([] { return MidiInput::getAvailableDevices();  }, inName,  true, 3000) ||
                 ! waitForPort([] { return MidiOutput::getAvailableDevices(); }, outName, true, 3000))
             {
                 logMessage("  skipped: virtual ports never appeared in the device lists");
@@ -635,7 +645,8 @@ public:
                     ++note;
                     if ((note & 63) == 0)
                     {
-                        Thread::sleep(1);   // brief yields keep the flood fast but fair
+                        // brief yields keep the flood fast but fair
+                        Thread::sleep(1);
                     }
                 }
             });
@@ -659,9 +670,10 @@ public:
                     const var stopped = mcp(String(R"({"jsonrpc":"2.0","id":3,"method":"tools/call","params":)")
                                             + R"({"name":"stop_route","arguments":{"route":)"
                                             + String(sideId) + "}}}");
-                    expect(! stopped.getProperty("result", var()).getProperty("isError", var()));
+                    expect(!stopped.getProperty("result", var()).getProperty("isError", var()));
                 }
-                expectEquals(state.getRoutes().size(), 1);   // only the live route remains
+                // only the live route remains
+                expectEquals(state.getRoutes().size(), 1);
 
                 // the live stream survived the churn and is still flowing
                 expect(waitForMoreThan(receivedCount(), 3000));
@@ -671,7 +683,7 @@ public:
                 const var stopLive = mcp(String(R"({"jsonrpc":"2.0","id":4,"method":"tools/call","params":)")
                                          + R"({"name":"stop_route","arguments":{"route":)"
                                          + String(liveId) + "}}}");
-                expect(! stopLive.getProperty("result", var()).getProperty("isError", var()));
+                expect(!stopLive.getProperty("result", var()).getProperty("isError", var()));
                 expectEquals(state.getRoutes().size(), 0);
             }
 
@@ -704,7 +716,7 @@ public:
                 return;
             }
             virtualDest->start();
-            if (! waitForPort([] { return MidiInput::getAvailableDevices();  }, goneName,  true, 3000) ||
+            if (!waitForPort([] { return MidiInput::getAvailableDevices();  }, goneName,  true, 3000) ||
                 ! waitForPort([] { return MidiInput::getAvailableDevices();  }, floodName, true, 3000) ||
                 ! waitForPort([] { return MidiOutput::getAvailableDevices(); }, outName,   true, 3000))
             {
@@ -755,7 +767,7 @@ public:
             {
                 // unplug the port, then reconcile the loss under the flood
                 goneSource = nullptr;
-                if (! waitForPort([] { return MidiInput::getAvailableDevices(); }, goneName, false, 3000))
+                if (!waitForPort([] { return MidiInput::getAvailableDevices(); }, goneName, false, 3000))
                 {
                     logMessage("  port removal not observed, ending after "
                                + String(completedCycles) + " cycles");
@@ -798,7 +810,7 @@ public:
                 std::cerr.rdbuf(previous);
             }
 
-            expect(! deadlocked, "closing a lost input deadlocked against a live MIDI stream");
+            expect(!deadlocked, "closing a lost input deadlocked against a live MIDI stream");
             // a pass means nothing unless the scenario actually ran
             expect(completedCycles > 0, "no unplug cycle completed; the deadlock scenario was never exercised");
 
@@ -838,7 +850,7 @@ public:
                 return;
             }
             virtualDest->start();
-            if (! waitForPort([] { return MidiInput::getAvailableDevices();  }, inName,  true, 3000) ||
+            if (!waitForPort([] { return MidiInput::getAvailableDevices();  }, inName,  true, 3000) ||
                 ! waitForPort([] { return MidiOutput::getAvailableDevices(); }, outName, true, 3000))
             {
                 logMessage("  skipped: virtual ports never appeared in the device lists");

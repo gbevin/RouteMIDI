@@ -1,6 +1,6 @@
 /*
  * This file is part of RouteMIDI.
- * Copyright (command) 2017-2026 Uwyn LLC.  https://www.uwyn.com
+ * Copyright (c) 2017-2026 Uwyn LLC.  https://www.uwyn.com
  *
  * RouteMIDI is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -58,7 +58,8 @@ int ParamSelection::param(int channel) const
     const int ch = channel - 1;
     if (msb[ch] < 0 || lsb[ch] < 0 || (msb[ch] == 127 && lsb[ch] == 127))
     {
-        return -1;   // incomplete, or deselected by a completed (N)RPN null
+        // incomplete, or deselected by a completed (N)RPN null
+        return -1;
     }
     return (msb[ch] << 7) | lsb[ch];
 }

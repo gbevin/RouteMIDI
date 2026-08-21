@@ -1,6 +1,6 @@
 /*
  * This file is part of RouteMIDI.
- * Copyright (command) 2017-2026 Uwyn LLC.  https://www.uwyn.com
+ * Copyright (c) 2017-2026 Uwyn LLC.  https://www.uwyn.com
  *
  * RouteMIDI is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -473,7 +473,8 @@ public:
             expectEquals((int)state.asNoteNumber("Db3"), 61);
             expectEquals((int)state.asNoteNumber("C-2"), 0);
             expectEquals((int)state.asNoteNumber("G8"),  127);
-            expectEquals((int)state.asNoteNumber("64"),  64);   // plain numbers still work
+            // plain numbers still work
+            expectEquals((int)state.asNoteNumber("64"),  64);
         }
 
         beginTest("Octave for middle C shifts the note names");
@@ -617,7 +618,7 @@ public:
                 // has never heard of must be denied, not silently allowed
                 ApplicationCommand unknown;
                 unknown.command_ = static_cast<CommandIndex>(9999);
-                expect(! ::schema::availableViaMcp(unknown));
+                expect(!::schema::availableViaMcp(unknown));
             }
         }
 
@@ -647,7 +648,8 @@ public:
                 return -1;
             };
 
-            expectEquals(noteOnPort(2, 60), 0);   // first voice takes port 0 and holds it
+            // first voice takes port 0 and holds it
+            expectEquals(noteOnPort(2, 60), 0);
 
             // replacing the split configuration starts the allocation over, so
             // the next voice must land on port 0 again instead of continuing
@@ -667,8 +669,9 @@ public:
             const var sc = r.getProperty("result", var()).getProperty("structuredContent", var());
             // the route is active but its ports don't exist, so it is not connected
             expect(sc.hasProperty("connected"));
-            expect(! (bool) sc.getProperty("connected", var(true)));
-            expect(! sc.hasProperty("running"));   // the uninformative constant is gone
+            expect(!(bool) sc.getProperty("connected", var(true)));
+            // the uninformative constant is gone
+            expect(!sc.hasProperty("running"));
         }
 
         beginTest("get_schema reflects the current session number base and octave");
@@ -699,7 +702,7 @@ public:
                 const var r = mcp(state, String("{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\","
                     "\"params\":{\"name\":\"start_route\",\"arguments\":{\"commands\":[\"in\",\"In")
                     + String(i) + "\",\"out\",\"Out" + String(i) + "\"]}}}", true);
-                if (! (bool) r.getProperty("result", var()).getProperty("isError", var()))
+                if (!(bool) r.getProperty("result", var()).getProperty("isError", var()))
                 {
                     ++started;
                 }
@@ -812,7 +815,7 @@ public:
             {
                 const String name = tool.getProperty("name", var()).toString();
                 const var outputSchema = tool.getProperty("outputSchema", var());
-                expect(! outputSchema.isVoid(), name + " declares no outputSchema");
+                expect(!outputSchema.isVoid(), name + " declares no outputSchema");
                 expect(outputSchema.getProperty("type", var()).toString() == "object");
                 declared[name] = outputSchema;
             }
@@ -824,9 +827,9 @@ public:
             {
                 const var response = mcp(state, requestJson, true);
                 const var result = response.getProperty("result", var());
-                expect(! (bool) result.getProperty("isError", var()), toolName + " unexpectedly failed");
+                expect(!(bool) result.getProperty("isError", var()), toolName + " unexpectedly failed");
                 const var structured = result.getProperty("structuredContent", var());
-                expect(! structured.isVoid(), toolName + " returned no structuredContent");
+                expect(!structured.isVoid(), toolName + " returned no structuredContent");
                 const String error = conforms(structured, declared[toolName]);
                 expect(error.isEmpty(), toolName + ": " + error);
                 return structured;
@@ -885,13 +888,13 @@ public:
             const var pong = mcp(state, R"json({"jsonrpc":"2.0","id":1,"method":"ping"})json");
             expect(pong.getDynamicObject() != nullptr);
             expect(pong.getProperty("result", var()).isObject());
-            expect(! pong.getProperty("result", var()).hasProperty("isError"));
+            expect(!pong.getProperty("result", var()).hasProperty("isError"));
 
             // an unknown tool is a protocol error, not a successful isError result
             const var unknown = mcp(state, R"json({"jsonrpc":"2.0","id":2,"method":"tools/call",
                 "params":{"name":"no_such_tool","arguments":{}}})json");
             expectEquals((int) unknown.getProperty("error", var()).getProperty("code", var()), -32602);
-            expect(! unknown.hasProperty("result"));
+            expect(!unknown.hasProperty("result"));
 
             // a well-formed message with an id but no method is Invalid Request
             const var noMethod = mcp(state, R"json({"jsonrpc":"2.0","id":3,"foo":"bar"})json");
@@ -1045,7 +1048,8 @@ public:
             auto structured = response.getProperty("result", var()).getProperty("structuredContent", var());
             expectEquals((int)structured.getProperty("routesBefore", var()), 0);
             expectEquals((int)structured.getProperty("routesAfter", var()), 1);
-            expect(structured.hasProperty("connected"));   // active; connected reflects port state
+            // active; connected reflects port state
+            expect(structured.hasProperty("connected"));
             expectEquals(state.getRoutes().size(), 1);
             expectEquals(state.getRoutes()[0]->transforms.size(), 1);
             expect(state.getRoutes()[0]->transforms[0].command_ == TRANSPOSE);
@@ -1062,7 +1066,7 @@ public:
                 if (inputs != nullptr && inputs->size() == 1)
                 {
                     expect(inputs->getReference(0).getProperty("name", var()).toString() == "NoSuchInput");
-                    expect(! inputs->getReference(0).getProperty("connected", var()));
+                    expect(!inputs->getReference(0).getProperty("connected", var()));
                 }
             }
         }
@@ -1146,7 +1150,7 @@ public:
                 "params": { "name": "start_route", "arguments": {
                     "commands": ["in", "A", "mpemono", "lower", "1", "out", "B"] } }
             })json", true);
-            expect(! good.getProperty("result", var()).getProperty("isError", var()));
+            expect(!good.getProperty("result", var()).getProperty("isError", var()));
             expectEquals(state.getRoutes().size(), 1);
             expectEquals(state.getRoutes()[0]->mpeOps.size(), 1);
         }
@@ -1165,7 +1169,7 @@ public:
                 "params": { "name": "start_route", "arguments": {
                     "commands": ["in", "A", "transp", "12", "out", "B"] } }
             })json", true);
-            expect(! route.getProperty("result", var()).getProperty("isError", var()));
+            expect(!route.getProperty("result", var()).getProperty("isError", var()));
             {
                 // "12" still parses as decimal: 60 + 12 = 72 (hex mode carried
                 // over would make it 60 + 0x12 = 78)
@@ -1181,7 +1185,8 @@ public:
                 "params": { "name": "start_route", "arguments": {
                     "commands": ["omc", "5", "in", "C", "mpemono", "middle", "1", "out", "D"] } }
             })json", true);
-            expectEquals((int) state.asNoteNumber("C3"), 60);   // omc 5 would make this 36
+            // omc 5 would make this 36
+            expectEquals((int) state.asNoteNumber("C3"), 60);
 
             // a successful call keeps its settings, as on the command line
             const var hexRoute = mcp(state, R"json({
@@ -1189,7 +1194,7 @@ public:
                 "params": { "name": "start_route", "arguments": {
                     "commands": ["hex", "in", "E", "transp", "12", "out", "F"] } }
             })json", true);
-            expect(! hexRoute.getProperty("result", var()).getProperty("isError", var()));
+            expect(!hexRoute.getProperty("result", var()).getProperty("isError", var()));
             {
                 // "12" now parses as hexadecimal: 60 + 0x12 = 78
                 Array<MidiMessage> out = state.applyTransforms(*state.getRoutes()[1],
@@ -1214,7 +1219,8 @@ public:
             })json", true);
             expectEquals(state.getRoutes().size(), 2);
             expectEquals(state.getRoutes()[1]->filters.size(), 1);
-            expect(! state.getRoutes()[1]->filters[0].negate_);   // the stray "not" did not attach
+            // the stray "not" did not attach
+            expect(!state.getRoutes()[1]->filters[0].negate_);
         }
 
         beginTest("MCP start_route rejects stdout monitoring and file capture");
@@ -1288,7 +1294,7 @@ public:
                 "params": { "name": "start_route", "arguments": {
                     "commands": ["in", "mon", "out", "syf"] } }
             })json", true);
-            expect(! portNamedMon.getProperty("result", var()).getProperty("isError", var()));
+            expect(!portNamedMon.getProperty("result", var()).getProperty("isError", var()));
             expectEquals(state.getRoutes().size(), 1);
             expect(state.getRoutes()[0]->inputs[0]->inName == "mon");
             expect(state.getRoutes()[0]->outputs[0]->name == "syf");
@@ -1313,7 +1319,7 @@ public:
                 + path + R"json(", "out", "B"] } } })json", true);
             expect(started.getProperty("result", var()).getProperty("isError", var()));
             expect(mcpText(started).contains("JavaScript"));
-            expect(! JSON::toString(started, true).contains(secret));
+            expect(!JSON::toString(started, true).contains(secret));
             expectEquals(state.getRoutes().size(), 0);
 
             // the same protection holds when editing a running route
@@ -1328,7 +1334,7 @@ public:
                     "route": 1, "commands": ["jsf", ")json")
                 + path + R"json("] } } })json", true);
             expect(added.getProperty("result", var()).getProperty("isError", var()));
-            expect(! JSON::toString(added, true).contains(secret));
+            expect(!JSON::toString(added, true).contains(secret));
             expectEquals(state.getRoutes()[0]->transforms.size(), 0);
 
             secretFile.deleteFile();
@@ -1426,7 +1432,8 @@ public:
                     "commands": ["in", "MpeStateIn", "mpexp", "1", "lower", "out", "MpeStateOut"] } }
             })json", true);
             expect(announces(state, 60));
-            expect(! announces(state, 61));   // announced once, then quiet
+            // announced once, then quiet
+            expect(!announces(state, 61));
 
             // removing and re-adding the operation starts it over
             mcp(state, R"json({
@@ -1457,7 +1464,8 @@ public:
                 "params": { "name": "start_route", "arguments": {
                     "commands": ["in", "TruncIn", "transp", "12", "out", "TruncOut"] } }
             })json", true);
-            expectEquals(state.getRoutes().size(), 1);   // this is route id 1
+            // this is route id 1
+            expectEquals(state.getRoutes().size(), 1);
 
             // 4294967297 == (1 << 32) | 1: a plain (int) cast would wrap it to 1
             // and stop the live route; it must be refused as a missing route
@@ -1466,7 +1474,8 @@ public:
                 "params": { "name": "stop_route", "arguments": { "route": 4294967297 } }
             })json");
             expect(stopped.getProperty("result", var()).getProperty("isError", var()));
-            expectEquals(state.getRoutes().size(), 1);   // route 1 survived
+            // route 1 survived
+            expectEquals(state.getRoutes().size(), 1);
 
             // an index of 4294967296 truncates to 0; it must not remove command 0
             const var removed = mcp(state, R"json({
@@ -1475,7 +1484,8 @@ public:
                     "route": 1, "stage": "transforms", "index": 4294967296 } }
             })json");
             expect(removed.getProperty("result", var()).getProperty("isError", var()));
-            expectEquals(state.getRoutes()[0]->transforms.size(), 1);   // transpose still there
+            // transpose still there
+            expectEquals(state.getRoutes()[0]->transforms.size(), 1);
         }
 
         beginTest("MCP route lifecycle: list, edit and stop a running route");
@@ -1532,7 +1542,7 @@ public:
                     "route": )json") + String(routeId) + R"json(,
                     "stage": "transforms", "index": 1,
                     "commands": ["scale", "D", "minor"] } } })json", true);
-            expect(! replaced.getProperty("result", var()).getProperty("isError", var()));
+            expect(!replaced.getProperty("result", var()).getProperty("isError", var()));
             expectEquals(state.getRoutes()[0]->transforms.size(), 2);
             expect(state.getRoutes()[0]->transforms[1].opts_[0] == "D");
 
@@ -1557,13 +1567,13 @@ public:
                 "jsonrpc": "2.0", "id": 15, "method": "tools/call",
                 "params": { "name": "panic_route", "arguments": { "route": )json")
                 + String(routeId) + "} } }", true);
-            expect(! panicked.getProperty("result", var()).getProperty("isError", var()));
+            expect(!panicked.getProperty("result", var()).getProperty("isError", var()));
 
             const var stopped = mcp(state, String(R"json({
                 "jsonrpc": "2.0", "id": 16, "method": "tools/call",
                 "params": { "name": "stop_route", "arguments": { "route": )json")
                 + String(routeId) + "} } }", true);
-            expect(! stopped.getProperty("result", var()).getProperty("isError", var()));
+            expect(!stopped.getProperty("result", var()).getProperty("isError", var()));
             expectEquals(state.getRoutes().size(), 0);
         }
 
@@ -1628,14 +1638,15 @@ public:
             auto structured = response.getProperty("result", var()).getProperty("structuredContent", var());
             expectEquals((int)structured.getProperty("route", var()), 1);
             expectEquals((int)structured.getProperty("injected", var()), 2);
-            expect(! structured.getProperty("zoneReset", var()));
+            expect(!structured.getProperty("zoneReset", var()));
             auto* emitted = structured.getProperty("emitted", var()).getArray();
             expect(emitted != nullptr && emitted->size() == 2);
             if (emitted != nullptr && emitted->size() == 2)
             {
                 const String first = emitted->getReference(0).getProperty("message", var()).toString();
                 const String second = emitted->getReference(1).getProperty("message", var()).toString();
-                expect(first.contains("note-on") && first.contains("C4"));    // 60 + 12
+                // 60 + 12
+                expect(first.contains("note-on") && first.contains("C4"));
                 expect(second.contains("note-off") && second.contains("C4"));
 
                 // each emitted entry names the output ports it was sent to
@@ -1813,7 +1824,7 @@ public:
             };
 
             // the first MPE Configuration Message announces the zone: no reset
-            expect(! zoneReset(R"json({
+            expect(!zoneReset(R"json({
                 "jsonrpc": "2.0", "id": 51, "method": "tools/call",
                 "params": { "name": "inject_midi", "arguments": { "route": 1, "messages": [
                     "channel 1 control-change 101 0",
@@ -1857,8 +1868,10 @@ public:
             // the long form parses too, and out-of-range arguments clamp
             auto longForm = parseLine("control-change-14 40 20000");
             expectEquals(longForm.size(), 2);
-            expectEquals(longForm[0].getControllerNumber(), 31);   // 40 clamps to 31
-            expectEquals(longForm[0].getControllerValue(), 127);   // 20000 clamps to 16383
+            // 40 clamps to 31
+            expectEquals(longForm[0].getControllerNumber(), 31);
+            // 20000 clamps to 16383
+            expectEquals(longForm[0].getControllerValue(), 127);
             expectEquals(longForm[1].getControllerValue(), 127);
         }
 
@@ -1946,9 +1959,12 @@ public:
             // and monitoring words (dec, omc, mon, nn, ts, src) stay global
             expectEquals(state.getRoutes().size(), 1);
             Route& route = *state.getRoutes().getFirst();
-            expectEquals(route.filters.size(), 3);       // ch, not clock, not cp
-            expectEquals(route.transforms.size(), 7);    // transp scale velclip veladd chset pbscale ccadd
-            expectEquals(route.converters.size(), 1);    // convert cc 1 cc 11
+            // ch, not clock, not cp
+            expectEquals(route.filters.size(), 3);
+            // transp scale velclip veladd chset pbscale ccadd
+            expectEquals(route.transforms.size(), 7);
+            // convert cc 1 cc 11
+            expectEquals(route.converters.size(), 1);
             expect(route.mpeOps.isEmpty());
             RouteInput& input = *route.inputs.getFirst();
 
@@ -1957,7 +1973,7 @@ public:
             auto run = [&state, &route, &input](const MidiMessage& msg)
             {
                 Array<MidiMessage> out;
-                if (! state.passesFilters(route, input, msg))
+                if (!state.passesFilters(route, input, msg))
                 {
                     return out;
                 }
@@ -1981,29 +1997,36 @@ public:
             expectEquals(a.size(), 1);
             expect(a[0].isNoteOn());
             expectEquals(a[0].getChannel(), 5);
-            expectEquals(a[0].getNoteNumber(), 72);           // 61 +12 -> 73, snapped down to 72
-            expectEquals((int)a[0].getVelocity(), 110);       // 100 (within 40-120) +10
+            // 61 +12 -> 73, snapped down to 72
+            expectEquals(a[0].getNoteNumber(), 72);
+            // 100 (within 40-120) +10
+            expectEquals((int)a[0].getVelocity(), 110);
 
             // a soft note has its velocity clamped up to the floor before the boost
             auto b = run(MidiMessage::noteOn(1, 60, (uint8)20));
             expectEquals(b.size(), 1);
-            expectEquals(b[0].getNoteNumber(), 72);           // 60 +12 -> 72, already in scale
-            expectEquals((int)b[0].getVelocity(), 50);        // 20 -> clamped 40 -> +10
+            // 60 +12 -> 72, already in scale
+            expectEquals(b[0].getNoteNumber(), 72);
+            // 20 -> clamped 40 -> +10
+            expectEquals((int)b[0].getVelocity(), 50);
 
             // the mod wheel is trimmed by ccadd and converted to CC 11 on channel 5
             auto c = run(MidiMessage::controllerEvent(1, 1, 90));
             expectEquals(c.size(), 1);
             expect(c[0].isController());
             expectEquals(c[0].getChannel(), 5);
-            expectEquals(c[0].getControllerNumber(), 11);     // convert cc 1 -> cc 11
-            expectEquals(c[0].getControllerValue(), 85);      // 90 - 5 (ccadd), 7-bit unchanged by convert
+            // convert cc 1 -> cc 11
+            expectEquals(c[0].getControllerNumber(), 11);
+            // 90 - 5 (ccadd), 7-bit unchanged by convert
+            expectEquals(c[0].getControllerValue(), 85);
 
             // pitch bend is halved around centre and moved to channel 5
             auto d = run(MidiMessage::pitchWheel(1, 12288));
             expectEquals(d.size(), 1);
             expect(d[0].isPitchWheel());
             expectEquals(d[0].getChannel(), 5);
-            expectEquals(d[0].getPitchWheelValue(), 10240);   // 8192 + (12288-8192)/2
+            // 8192 + (12288-8192)/2
+            expectEquals(d[0].getPitchWheelValue(), 10240);
 
             // clock and channel pressure are blacklisted, and a wrong channel is out
             expect(run(MidiMessage::midiClock()).isEmpty());

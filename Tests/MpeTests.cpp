@@ -1,6 +1,6 @@
 /*
  * This file is part of RouteMIDI.
- * Copyright (command) 2017-2026 Uwyn LLC.  https://www.uwyn.com
+ * Copyright (c) 2017-2026 Uwyn LLC.  https://www.uwyn.com
  *
  * RouteMIDI is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -80,7 +80,8 @@ public:
             expectEquals(lower.memberChannel(14), 16);
             expectEquals(lower.memberIndexOf(2), 0);
             expectEquals(lower.memberIndexOf(16), 14);
-            expectEquals(lower.memberIndexOf(1), -1);   // manager is not a member
+            // manager is not a member
+            expectEquals(lower.memberIndexOf(1), -1);
             expect(lower.contains(1) && lower.contains(16) && !lower.contains(0));
 
             mpe::Zone upper; upper.lower = false; upper.members = 7;
@@ -89,8 +90,10 @@ public:
             expectEquals(upper.memberChannel(6), 9);
             expectEquals(upper.memberIndexOf(15), 0);
             expectEquals(upper.memberIndexOf(9), 6);
-            expectEquals(upper.memberIndexOf(8), -1);   // outside the 7 members
-            expectEquals(upper.memberIndexOf(16), -1);  // manager is not a member
+            // outside the 7 members
+            expectEquals(upper.memberIndexOf(8), -1);
+            // manager is not a member
+            expectEquals(upper.memberIndexOf(16), -1);
         }
 
         beginTest("ExpressionState combines Manager and Member bend per the MPE spec");
@@ -103,11 +106,14 @@ public:
             // used whenever no Pitch Bend Sensitivity RPN has been provided
             expectEquals((int) es.bendSense[1], 2);
             expectEquals((int) es.bendSense[2], 48);
-            expectEquals(es.combinedSensitivity(1, 2), 50);   // 2 + 48 by default
+            // 2 + 48 by default
+            expectEquals(es.combinedSensitivity(1, 2), 50);
 
             // Appendix C receiver example: Member +7 (value 9387), Manager +2 (value 16383)
-            es.update(zone, MidiMessage::pitchWheel(1, 16383));   // Manager
-            es.update(zone, MidiMessage::pitchWheel(2, 9387));    // Member channel 2
+            // Manager
+            es.update(zone, MidiMessage::pitchWheel(1, 16383));
+            // Member channel 2
+            es.update(zone, MidiMessage::pitchWheel(2, 9387));
             expect(std::abs(es.bendSemitones(2) - 7.0) < 0.01);
             expect(std::abs(es.bendSemitones(1) - 2.0) < 0.01);
 
@@ -126,10 +132,12 @@ public:
             // RPN 0 on a single Member Channel applies to all Member Channels
             es.update(zone, MidiMessage::controllerEvent(5, 101, 0));
             es.update(zone, MidiMessage::controllerEvent(5, 100, 0));
-            es.update(zone, MidiMessage::controllerEvent(5, 6, 24));   // 24 semitones
+            // 24 semitones
+            es.update(zone, MidiMessage::controllerEvent(5, 6, 24));
             expectEquals((int) es.bendSense[2], 24);
             expectEquals((int) es.bendSense[16], 24);
-            expectEquals((int) es.bendSense[1], 2);   // Manager unaffected
+            // Manager unaffected
+            expectEquals((int) es.bendSense[1], 2);
 
             // RPN 0 on the Manager Channel only affects the Manager
             es.update(zone, MidiMessage::controllerEvent(1, 101, 0));
@@ -141,7 +149,8 @@ public:
             // an MPE Configuration Message restores the defaults (section 2.2.5)
             es.update(zone, MidiMessage::controllerEvent(1, 101, 0));
             es.update(zone, MidiMessage::controllerEvent(1, 100, 6));
-            es.update(zone, MidiMessage::controllerEvent(1, 6, 15));   // MCM: 15 members
+            // MCM: 15 members
+            es.update(zone, MidiMessage::controllerEvent(1, 6, 15));
             expectEquals((int) es.bendSense[1], 2);
             expectEquals((int) es.bendSense[2], 48);
         }
@@ -152,13 +161,13 @@ public:
             auto cc = [](int ch, int n, int v) { return MidiMessage::controllerEvent(ch, n, v); };
 
             // first MCM for the Lower zone (15 members): configures, not a change
-            expect(! t.reconfigures(cc(1, 101, 0)));
-            expect(! t.reconfigures(cc(1, 100, 6)));
-            expect(! t.reconfigures(cc(1, 6, 15)));
+            expect(!t.reconfigures(cc(1, 101, 0)));
+            expect(!t.reconfigures(cc(1, 100, 6)));
+            expect(!t.reconfigures(cc(1, 6, 15)));
 
             // the same MCM again: no change
             t.reconfigures(cc(1, 101, 0)); t.reconfigures(cc(1, 100, 6));
-            expect(! t.reconfigures(cc(1, 6, 15)));
+            expect(!t.reconfigures(cc(1, 6, 15)));
 
             // a different member count: a reconfiguration
             t.reconfigures(cc(1, 101, 0)); t.reconfigures(cc(1, 100, 6));
@@ -170,10 +179,10 @@ public:
 
             // the Upper zone is tracked independently (first MCM, not a change)
             t.reconfigures(cc(16, 101, 0)); t.reconfigures(cc(16, 100, 6));
-            expect(! t.reconfigures(cc(16, 6, 7)));
+            expect(!t.reconfigures(cc(16, 6, 7)));
 
             // an ordinary RPN 6-less controller is never a reconfiguration
-            expect(! t.reconfigures(cc(1, 7, 100)));
+            expect(!t.reconfigures(cc(1, 7, 100)));
         }
 
         beginTest("ExpressionState combines pressure and CC74 with the maximum");
@@ -182,12 +191,16 @@ public:
             mpe::ExpressionState es;
             es.resetForZone(zone);
 
-            es.update(zone, MidiMessage::channelPressureChange(1, 40));   // Manager
-            es.update(zone, MidiMessage::channelPressureChange(2, 90));   // Member
+            // Manager
+            es.update(zone, MidiMessage::channelPressureChange(1, 40));
+            // Member
+            es.update(zone, MidiMessage::channelPressureChange(2, 90));
             expectEquals(es.combinedPressure(1, 2), 90);
 
-            es.update(zone, MidiMessage::controllerEvent(1, 74, 100));    // Manager CC74
-            es.update(zone, MidiMessage::controllerEvent(2, 74, 30));     // Member CC74
+            // Manager CC74
+            es.update(zone, MidiMessage::controllerEvent(1, 74, 100));
+            // Member CC74
+            es.update(zone, MidiMessage::controllerEvent(2, 74, 30));
             expectEquals(es.combinedCC74(1, 2), 100);
         }
 
@@ -198,9 +211,10 @@ public:
             expect(mpe::parseZone("upper", z) && !z.lower && z.members == 15);
             expect(mpe::parseZone("l:7", z) && z.lower && z.members == 7);
             expect(mpe::parseZone("U:5", z) && !z.lower && z.members == 5);
-            expect(mpe::parseZone("lower:99", z) && z.members == 15);  // clamped
-            expect(! mpe::parseZone("x", z));
-            expect(! mpe::parseZone("", z));
+            // clamped
+            expect(mpe::parseZone("lower:99", z) && z.members == 15);
+            expect(!mpe::parseZone("x", z));
+            expect(!mpe::parseZone("", z));
         }
 
         ApplicationState state;
@@ -212,30 +226,41 @@ public:
 
             // lower zone with 7 members: manager 1, members 2-8
             expect(  manager.matches(state, MidiMessage::controllerEvent(1, 7, 64), 0));
-            expect(! manager.matches(state, MidiMessage::controllerEvent(2, 7, 64), 0));
+            expect(!manager.matches(state, MidiMessage::controllerEvent(2, 7, 64), 0));
 
             expect(  member.matches(state, MidiMessage::noteOn(2, 60, (uint8)100), 0));
             expect(  member.matches(state, MidiMessage::noteOn(8, 60, (uint8)100), 0));
-            expect(! member.matches(state, MidiMessage::noteOn(9, 60, (uint8)100), 0));  // beyond 7 members
-            expect(! member.matches(state, MidiMessage::noteOn(1, 60, (uint8)100), 0));  // manager, not member
+            // beyond 7 members
+            expect(!member.matches(state, MidiMessage::noteOn(9, 60, (uint8)100), 0));
+            // manager, not member
+            expect(!member.matches(state, MidiMessage::noteOn(1, 60, (uint8)100), 0));
 
             // mpezone passes the whole zone (manager and members), to isolate one
             // zone of a two-zone controller
             auto zone = makeCommand(MPE_ZONE, {"lower:7"});
-            expect(  zone.matches(state, MidiMessage::controllerEvent(1, 7, 64), 0));   // manager
-            expect(  zone.matches(state, MidiMessage::noteOn(2, 60, (uint8)100), 0));   // member
-            expect(  zone.matches(state, MidiMessage::noteOn(8, 60, (uint8)100), 0));   // member
-            expect(! zone.matches(state, MidiMessage::noteOn(9, 60, (uint8)100), 0));   // upper zone, dropped
-            expect(! zone.matches(state, MidiMessage::controllerEvent(16, 7, 64), 0));  // upper manager, dropped
+            // manager
+            expect(  zone.matches(state, MidiMessage::controllerEvent(1, 7, 64), 0));
+            // member
+            expect(  zone.matches(state, MidiMessage::noteOn(2, 60, (uint8)100), 0));
+            // member
+            expect(  zone.matches(state, MidiMessage::noteOn(8, 60, (uint8)100), 0));
+            // upper zone, dropped
+            expect(!zone.matches(state, MidiMessage::noteOn(9, 60, (uint8)100), 0));
+            // upper manager, dropped
+            expect(!zone.matches(state, MidiMessage::controllerEvent(16, 7, 64), 0));
         }
 
         beginTest("relocate remaps the Lower zone onto the Upper zone");
         {
             Array<MidiMessage> in;
-            in.add(MidiMessage::controllerEvent(1, 74, 64));            // manager message
-            in.add(MidiMessage::noteOn(2, 60, (uint8)100));            // first member
-            in.add(MidiMessage::pitchWheel(3, 9000));                  // second member
-            in.add(MidiMessage::noteOn(7, 64, (uint8)100));            // unrelated channel? no, ch7 is a member
+            // manager message
+            in.add(MidiMessage::controllerEvent(1, 74, 64));
+            // first member
+            in.add(MidiMessage::noteOn(2, 60, (uint8)100));
+            // second member
+            in.add(MidiMessage::pitchWheel(3, 9000));
+            // unrelated channel? no, ch7 is a member
+            in.add(MidiMessage::noteOn(7, 64, (uint8)100));
 
             auto out = runMpe(state, MPE_RELOCATE, {"lower:15", "upper:15"}, in);
             expectEquals(out.size(), 4);
@@ -280,7 +305,8 @@ public:
                     if (m.getChannel() == 3) bend3 = m.getPitchWheelValue();
                 }
             }
-            expectEquals(bendCount, 2);     // both per-note bends pass through
+            // both per-note bends pass through
+            expectEquals(bendCount, 2);
             expectEquals(bend2, 9000);
             expectEquals(bend3, 5000);
         }
@@ -290,12 +316,18 @@ public:
             // lower:4 (members 2-5) -> lower:2 (members 2-3): source channels 2 and
             // 4 both fold onto destination channel 2
             Array<MidiMessage> in;
-            in.add(MidiMessage::noteOn(2, 60, (uint8)100));            // older note
-            in.add(MidiMessage::noteOn(4, 64, (uint8)100));            // newest -> owns ch 2
-            in.add(MidiMessage::pitchWheel(2, 9000));                  // older: suppressed
-            in.add(MidiMessage::pitchWheel(4, 5000));                  // active: passes
-            in.add(MidiMessage::channelPressureChange(2, 50));        // older: suppressed
-            in.add(MidiMessage::channelPressureChange(4, 70));        // active: passes (as channel pressure)
+            // older note
+            in.add(MidiMessage::noteOn(2, 60, (uint8)100));
+            // newest -> owns ch 2
+            in.add(MidiMessage::noteOn(4, 64, (uint8)100));
+            // older: suppressed
+            in.add(MidiMessage::pitchWheel(2, 9000));
+            // active: passes
+            in.add(MidiMessage::pitchWheel(4, 5000));
+            // older: suppressed
+            in.add(MidiMessage::channelPressureChange(2, 50));
+            // active: passes (as channel pressure)
+            in.add(MidiMessage::channelPressureChange(4, 70));
             auto out = runMpe(state, MPE_RELOCATE, {"lower:4", "lower:2"}, in);
 
             int bend = -1, bendCount = 0, cp = -1, cpCount = 0;
@@ -305,9 +337,11 @@ public:
                 if (m.isChannelPressure())  { cp = m.getChannelPressureValue(); ++cpCount; expectEquals(m.getChannel(), 2); }
             }
             expectEquals(bendCount, 1);
-            expectEquals(bend, 5000);       // the active note's bend
+            // the active note's bend
+            expectEquals(bend, 5000);
             expectEquals(cpCount, 1);
-            expectEquals(cp, 70);           // pressure stays channel pressure, last note wins
+            // pressure stays channel pressure, last note wins
+            expectEquals(cp, 70);
         }
 
         beginTest("mpebend rescales member-channel pitch bend to a new range");
@@ -315,9 +349,12 @@ public:
             // a controller using 48 semitones feeding a synth fixed at 12: a +7
             // semitone bend (value 9387) must become the same +7 at 12 semitones
             Array<MidiMessage> in;
-            in.add(MidiMessage::pitchWheel(2, 9387));         // member, +7 st at 48
-            in.add(MidiMessage::pitchWheel(1, 10000));        // manager: left alone
-            in.add(MidiMessage::controllerEvent(2, 74, 50));  // not pitch bend: left alone
+            // member, +7 st at 48
+            in.add(MidiMessage::pitchWheel(2, 9387));
+            // manager: left alone
+            in.add(MidiMessage::pitchWheel(1, 10000));
+            // not pitch bend: left alone
+            in.add(MidiMessage::controllerEvent(2, 74, 50));
             auto out = runMpe(state, MPE_BEND, {"lower:15", "48", "12"}, in);
 
             int memberBend = -1, managerBend = -1; bool cc74Seen = false;
@@ -329,14 +366,17 @@ public:
             }
             // 8192 + (9387-8192) * 48/12 = 8192 + 1195*4 = 12972
             expectEquals(memberBend, 12972);
-            expectEquals(managerBend, 10000);  // manager bend unchanged
-            expect(cc74Seen);                  // non-bend messages pass through
+            // manager bend unchanged
+            expectEquals(managerBend, 10000);
+            // non-bend messages pass through
+            expect(cc74Seen);
         }
 
         beginTest("mpesens declares the member Pitch Bend Sensitivity before the first note");
         {
             Array<MidiMessage> in;
-            in.add(MidiMessage::noteOn(2, 60, (uint8)100));   // first note triggers the declaration
+            // first note triggers the declaration
+            in.add(MidiMessage::noteOn(2, 60, (uint8)100));
             auto out = runMpe(state, MPE_SENS, {"lower:3", "24"}, in);
 
             // RPN 0 = 24 declared on every member channel (2, 3, 4), before the note
@@ -353,8 +393,10 @@ public:
                 }
             }
             expectEquals(sense, 24);
-            expect(! onManager);             // member channels only, not the manager
-            expect(lastSenseIdx < noteIdx);  // declared before the Note On
+            // member channels only, not the manager
+            expect(!onManager);
+            // declared before the Note On
+            expect(lastSenseIdx < noteIdx);
         }
 
         beginTest("mpesens re-declares the sensitivity after an MPE Configuration Message");
@@ -364,7 +406,8 @@ public:
             Array<MidiMessage> in;
             in.add(MidiMessage::controllerEvent(1, 101, 0));
             in.add(MidiMessage::controllerEvent(1, 100, 6));
-            in.add(MidiMessage::controllerEvent(1, 6, 3));    // MCM: lower, 3 members
+            // MCM: lower, 3 members
+            in.add(MidiMessage::controllerEvent(1, 6, 3));
             auto out = runMpe(state, MPE_SENS, {"lower:3", "24"}, in);
 
             bool mcmForwarded = false;
@@ -380,8 +423,10 @@ public:
                     memberSense = m.getControllerValue();
                 }
             }
-            expect(mcmForwarded);          // the MCM passes through untouched
-            expectEquals(memberSense, 24); // and our sensitivity follows it
+            // the MCM passes through untouched
+            expect(mcmForwarded);
+            // and our sensitivity follows it
+            expectEquals(memberSense, 24);
         }
 
         beginTest("relocate rewrites the MCM member count to the destination zone");
@@ -397,7 +442,8 @@ public:
             int memberCount = -1;
             for (const auto& m : out)
             {
-                expectEquals(m.getChannel(), 1);   // lower -> lower manager stays channel 1
+                // lower -> lower manager stays channel 1
+                expectEquals(m.getChannel(), 1);
                 if (m.isController() && m.getControllerNumber() == 6) memberCount = m.getControllerValue();
             }
             expectEquals(memberCount, 8);
@@ -406,11 +452,16 @@ public:
         beginTest("relocate falls back to the remaining note after a collision releases");
         {
             Array<MidiMessage> in;
-            in.add(MidiMessage::noteOn(2, 60, (uint8)100));            // older note (ch 2)
-            in.add(MidiMessage::noteOn(4, 64, (uint8)100));            // newest -> owns dst ch 2
-            in.add(MidiMessage::noteOff(4, 64, (uint8)0));            // it releases
-            in.add(MidiMessage::pitchWheel(2, 7000));                 // ch 2 owns dst ch 2 again
-            in.add(MidiMessage::pitchWheel(4, 3000));                 // ch 4 no longer held: suppressed
+            // older note (ch 2)
+            in.add(MidiMessage::noteOn(2, 60, (uint8)100));
+            // newest -> owns dst ch 2
+            in.add(MidiMessage::noteOn(4, 64, (uint8)100));
+            // it releases
+            in.add(MidiMessage::noteOff(4, 64, (uint8)0));
+            // ch 2 owns dst ch 2 again
+            in.add(MidiMessage::pitchWheel(2, 7000));
+            // ch 4 no longer held: suppressed
+            in.add(MidiMessage::pitchWheel(4, 3000));
             auto out = runMpe(state, MPE_RELOCATE, {"lower:4", "lower:2"}, in);
 
             int bend = -1, bendCount = 0;
@@ -428,10 +479,14 @@ public:
             // note B's starting bend arrives before its note-on, while note A
             // still owns the channel with a large bend
             Array<MidiMessage> in;
-            in.add(MidiMessage::noteOn(2, 60, (uint8)100));            // note A
-            in.add(MidiMessage::pitchWheel(2, 12000));                 // A bends up
-            in.add(MidiMessage::pitchWheel(3, 8192));                  // B's starting bend
-            in.add(MidiMessage::noteOn(3, 64, (uint8)100));            // note B
+            // note A
+            in.add(MidiMessage::noteOn(2, 60, (uint8)100));
+            // A bends up
+            in.add(MidiMessage::pitchWheel(2, 12000));
+            // B's starting bend
+            in.add(MidiMessage::pitchWheel(3, 8192));
+            // note B
+            in.add(MidiMessage::noteOn(3, 64, (uint8)100));
             auto out = runMpe(state, MPE_RELOCATE, {"lower:15", "lower:1"}, in);
 
             // B's bend must reach the destination before B's note-on
@@ -458,11 +513,16 @@ public:
             // note A declares its bend before its note-on and never repeats it;
             // when the interloper releases, A's bend must be restored
             Array<MidiMessage> in;
-            in.add(MidiMessage::pitchWheel(2, 12000));                 // A's starting bend
-            in.add(MidiMessage::noteOn(2, 60, (uint8)100));            // note A
-            in.add(MidiMessage::noteOn(4, 64, (uint8)100));            // interloper owns dst
-            in.add(MidiMessage::pitchWheel(4, 5000));                  // interloper bends
-            in.add(MidiMessage::noteOff(4, 64, (uint8)0));            // it releases
+            // A's starting bend
+            in.add(MidiMessage::pitchWheel(2, 12000));
+            // note A
+            in.add(MidiMessage::noteOn(2, 60, (uint8)100));
+            // interloper owns dst
+            in.add(MidiMessage::noteOn(4, 64, (uint8)100));
+            // interloper bends
+            in.add(MidiMessage::pitchWheel(4, 5000));
+            // it releases
+            in.add(MidiMessage::noteOff(4, 64, (uint8)0));
             auto out = runMpe(state, MPE_RELOCATE, {"lower:4", "lower:2"}, in);
 
             Array<int> bends;
@@ -474,9 +534,12 @@ public:
                 }
             }
             expectEquals(bends.size(), 3);
-            expectEquals(bends[0], 12000);   // A's own bend
-            expectEquals(bends[1], 5000);    // the interloper's
-            expectEquals(bends[2], 12000);   // A restored on release
+            // A's own bend
+            expectEquals(bends[0], 12000);
+            // the interloper's
+            expectEquals(bends[1], 5000);
+            // A restored on release
+            expectEquals(bends[2], 12000);
         }
 
         beginTest("relocate does not replay a released note's expression on the next note");
@@ -485,12 +548,18 @@ public:
             // note on A's old channel without a starting bend must not inherit
             // A's stale bend
             Array<MidiMessage> in;
-            in.add(MidiMessage::noteOn(2, 60, (uint8)100));            // note A
-            in.add(MidiMessage::pitchWheel(2, 12000));                 // A bends
-            in.add(MidiMessage::noteOff(2, 60, (uint8)0));            // A releases
-            in.add(MidiMessage::noteOn(4, 64, (uint8)100));            // interloper
-            in.add(MidiMessage::pitchWheel(4, 5000));                  // moves the dst bend
-            in.add(MidiMessage::noteOn(2, 62, (uint8)100));            // new note, no bend sent
+            // note A
+            in.add(MidiMessage::noteOn(2, 60, (uint8)100));
+            // A bends
+            in.add(MidiMessage::pitchWheel(2, 12000));
+            // A releases
+            in.add(MidiMessage::noteOff(2, 60, (uint8)0));
+            // interloper
+            in.add(MidiMessage::noteOn(4, 64, (uint8)100));
+            // moves the dst bend
+            in.add(MidiMessage::pitchWheel(4, 5000));
+            // new note, no bend sent
+            in.add(MidiMessage::noteOn(2, 62, (uint8)100));
             auto out = runMpe(state, MPE_RELOCATE, {"lower:4", "lower:2"}, in);
 
             Array<int> bends;
@@ -501,7 +570,8 @@ public:
                     bends.add(m.getPitchWheelValue());
                 }
             }
-            expectEquals(bends.size(), 2);   // 12000 and 5000, no stale replay
+            // 12000 and 5000, no stale replay
+            expectEquals(bends.size(), 2);
             expectEquals(bends[0], 12000);
             expectEquals(bends[1], 5000);
         }
@@ -512,12 +582,18 @@ public:
             // from two notes sharing a destination channel must not fight: only the
             // active note's copy reaches the destination
             Array<MidiMessage> in;
-            in.add(MidiMessage::noteOn(2, 60, (uint8)100));           // older note
-            in.add(MidiMessage::noteOn(4, 64, (uint8)100));           // newest -> owns dst ch 2
-            in.add(MidiMessage::controllerEvent(2, 6, 24));           // older MSB: suppressed
-            in.add(MidiMessage::controllerEvent(2, 38, 8));           // older LSB: suppressed
-            in.add(MidiMessage::controllerEvent(4, 6, 21));           // active MSB: passes
-            in.add(MidiMessage::controllerEvent(4, 38, 118));         // active LSB: passes
+            // older note
+            in.add(MidiMessage::noteOn(2, 60, (uint8)100));
+            // newest -> owns dst ch 2
+            in.add(MidiMessage::noteOn(4, 64, (uint8)100));
+            // older MSB: suppressed
+            in.add(MidiMessage::controllerEvent(2, 6, 24));
+            // older LSB: suppressed
+            in.add(MidiMessage::controllerEvent(2, 38, 8));
+            // active MSB: passes
+            in.add(MidiMessage::controllerEvent(4, 6, 21));
+            // active LSB: passes
+            in.add(MidiMessage::controllerEvent(4, 38, 118));
             auto out = runMpe(state, MPE_RELOCATE, {"lower:4", "lower:2"}, in);
 
             int msb = -1, lsb = -1, msbCount = 0, lsbCount = 0;
@@ -539,13 +615,20 @@ public:
             // owns the channel
             // and its held CC 6/38 must be re-sent so the receiver stops holding ch4's
             Array<MidiMessage> in;
-            in.add(MidiMessage::noteOn(2, 60, (uint8)100));           // older note
-            in.add(MidiMessage::noteOn(4, 64, (uint8)100));           // newest -> owns dst ch 2
-            in.add(MidiMessage::controllerEvent(2, 6, 24));           // ch2 holds MSB 24 (suppressed)
-            in.add(MidiMessage::controllerEvent(2, 38, 8));           // ch2 holds LSB 8
-            in.add(MidiMessage::controllerEvent(4, 6, 21));           // ch4 active: passes
-            in.add(MidiMessage::controllerEvent(4, 38, 118));         // ch4 active: passes
-            in.add(MidiMessage::noteOff(4, 64, (uint8)0));           // ch4 releases -> ch2 regains
+            // older note
+            in.add(MidiMessage::noteOn(2, 60, (uint8)100));
+            // newest -> owns dst ch 2
+            in.add(MidiMessage::noteOn(4, 64, (uint8)100));
+            // ch2 holds MSB 24 (suppressed)
+            in.add(MidiMessage::controllerEvent(2, 6, 24));
+            // ch2 holds LSB 8
+            in.add(MidiMessage::controllerEvent(2, 38, 8));
+            // ch4 active: passes
+            in.add(MidiMessage::controllerEvent(4, 6, 21));
+            // ch4 active: passes
+            in.add(MidiMessage::controllerEvent(4, 38, 118));
+            // ch4 releases -> ch2 regains
+            in.add(MidiMessage::noteOff(4, 64, (uint8)0));
             auto out = runMpe(state, MPE_RELOCATE, {"lower:4", "lower:2"}, in);
 
             int lastMsb = -1, lastLsb = -1;
@@ -565,26 +648,35 @@ public:
         beginTest("collapse folds every zone channel onto one channel");
         {
             Array<MidiMessage> in;
-            in.add(MidiMessage::noteOn(1, 60, (uint8)100));   // manager
-            in.add(MidiMessage::noteOn(2, 64, (uint8)100));   // member
-            in.add(MidiMessage::noteOn(5, 67, (uint8)100));   // member
-            in.add(MidiMessage::noteOn(11, 70, (uint8)100));  // outside a 4-member zone (ch 1-5)
+            // manager
+            in.add(MidiMessage::noteOn(1, 60, (uint8)100));
+            // member
+            in.add(MidiMessage::noteOn(2, 64, (uint8)100));
+            // member
+            in.add(MidiMessage::noteOn(5, 67, (uint8)100));
+            // outside a 4-member zone (ch 1-5)
+            in.add(MidiMessage::noteOn(11, 70, (uint8)100));
 
             auto out = runMpe(state, MPE_COLLAPSE, {"lower:4", "1"}, in);
             expectEquals(out.size(), 4);
             expectEquals(out[0].getChannel(), 1);
             expectEquals(out[1].getChannel(), 1);
             expectEquals(out[2].getChannel(), 1);
-            expectEquals(out[3].getChannel(), 11);  // untouched
+            // untouched
+            expectEquals(out[3].getChannel(), 11);
         }
 
         beginTest("collapse turns per-note channel pressure into poly aftertouch");
         {
             Array<MidiMessage> in;
-            in.add(MidiMessage::noteOn(2, 60, (uint8)100));            // note on member 2
-            in.add(MidiMessage::noteOn(3, 64, (uint8)100));            // note on member 3
-            in.add(MidiMessage::channelPressureChange(2, 90));        // pressure for note 60
-            in.add(MidiMessage::channelPressureChange(3, 40));        // pressure for note 64
+            // note on member 2
+            in.add(MidiMessage::noteOn(2, 60, (uint8)100));
+            // note on member 3
+            in.add(MidiMessage::noteOn(3, 64, (uint8)100));
+            // pressure for note 60
+            in.add(MidiMessage::channelPressureChange(2, 90));
+            // pressure for note 64
+            in.add(MidiMessage::channelPressureChange(3, 40));
 
             auto out = runMpe(state, MPE_COLLAPSE, {"lower:15", "1"}, in);
 
@@ -594,7 +686,8 @@ public:
             int at60 = -1, at64 = -1;
             for (const auto& m : out)
             {
-                expect(! m.isChannelPressure());  // none survive as channel pressure
+                // none survive as channel pressure
+                expect(!m.isChannelPressure());
                 if (m.isAftertouch() && m.getNoteNumber() == 60) at60 = m.getAfterTouchValue();
                 if (m.isAftertouch() && m.getNoteNumber() == 64) at64 = m.getAfterTouchValue();
             }
@@ -613,12 +706,18 @@ public:
         beginTest("collapse applies pitch bend and CC74 for the active note only");
         {
             Array<MidiMessage> in;
-            in.add(MidiMessage::noteOn(2, 60, (uint8)100));           // older note
-            in.add(MidiMessage::noteOn(3, 64, (uint8)100));           // newest note -> active
-            in.add(MidiMessage::pitchWheel(2, 7000));                 // from older note: suppressed
-            in.add(MidiMessage::pitchWheel(3, 9000));                 // from active note: passes
-            in.add(MidiMessage::controllerEvent(2, 74, 20));          // older timbre: suppressed
-            in.add(MidiMessage::controllerEvent(3, 74, 100));         // active timbre: passes
+            // older note
+            in.add(MidiMessage::noteOn(2, 60, (uint8)100));
+            // newest note -> active
+            in.add(MidiMessage::noteOn(3, 64, (uint8)100));
+            // from older note: suppressed
+            in.add(MidiMessage::pitchWheel(2, 7000));
+            // from active note: passes
+            in.add(MidiMessage::pitchWheel(3, 9000));
+            // older timbre: suppressed
+            in.add(MidiMessage::controllerEvent(2, 74, 20));
+            // active timbre: passes
+            in.add(MidiMessage::controllerEvent(3, 74, 100));
 
             auto out = runMpe(state, MPE_COLLAPSE, {"lower:15", "1"}, in);
 
@@ -627,7 +726,8 @@ public:
             {
                 if (m.isPitchWheel()) { bend = m.getPitchWheelValue(); ++bendCount; expectEquals(m.getChannel(), 1); }
                 if (m.isController() && m.getControllerNumber() == 74) { timbre = m.getControllerValue(); ++timbreCount; }
-                if (m.isController() && m.getControllerNumber() == 6) sense = m.getControllerValue();   // RPN 0 data entry
+                // RPN 0 data entry
+                if (m.isController() && m.getControllerNumber() == 6) sense = m.getControllerValue();
             }
             // only the active note's bend survived, summed with the (neutral) Manager
             // bend at 48 + 2 = 50 semitone range: 9000 -> ~4.73 st -> value 8968
@@ -635,7 +735,8 @@ public:
             expectEquals(sense, 50);
             expectEquals(bend, 8968);
             expectEquals(timbreCount, 1);
-            expectEquals(timbre, 100);       // Max(Manager 0, Member 100)
+            // Max(Manager 0, Member 100)
+            expectEquals(timbre, 100);
         }
 
         beginTest("collapse forwards a per-note 14-bit CC for the active note only");
@@ -645,12 +746,18 @@ public:
             // expression: only the active note's copy may reach the mono target,
             // otherwise both held touches fight over the same 14-bit value
             Array<MidiMessage> in;
-            in.add(MidiMessage::noteOn(2, 60, (uint8)100));           // older note
-            in.add(MidiMessage::noteOn(3, 64, (uint8)100));           // newest note -> active
-            in.add(MidiMessage::controllerEvent(2, 6, 24));           // older MSB: suppressed
-            in.add(MidiMessage::controllerEvent(2, 38, 8));           // older LSB: suppressed
-            in.add(MidiMessage::controllerEvent(3, 6, 21));           // active MSB: passes
-            in.add(MidiMessage::controllerEvent(3, 38, 118));         // active LSB: passes
+            // older note
+            in.add(MidiMessage::noteOn(2, 60, (uint8)100));
+            // newest note -> active
+            in.add(MidiMessage::noteOn(3, 64, (uint8)100));
+            // older MSB: suppressed
+            in.add(MidiMessage::controllerEvent(2, 6, 24));
+            // older LSB: suppressed
+            in.add(MidiMessage::controllerEvent(2, 38, 8));
+            // active MSB: passes
+            in.add(MidiMessage::controllerEvent(3, 6, 21));
+            // active LSB: passes
+            in.add(MidiMessage::controllerEvent(3, 38, 118));
 
             auto out = runMpe(state, MPE_COLLAPSE, {"lower:15", "1"}, in);
 
@@ -672,13 +779,20 @@ public:
             // when ch3 releases, ch2 owns the channel again and its own held CC 6/38
             // must be re-sent so the mono synth stops holding ch3's values.
             Array<MidiMessage> in;
-            in.add(MidiMessage::noteOn(2, 60, (uint8)100));           // older note
-            in.add(MidiMessage::noteOn(3, 64, (uint8)100));           // newest note -> active
-            in.add(MidiMessage::controllerEvent(2, 6, 24));           // ch2 holds MSB 24 (suppressed while ch3 active)
-            in.add(MidiMessage::controllerEvent(2, 38, 8));           // ch2 holds LSB 8
-            in.add(MidiMessage::controllerEvent(3, 6, 21));           // ch3 active: passes
-            in.add(MidiMessage::controllerEvent(3, 38, 118));         // ch3 active: passes
-            in.add(MidiMessage::noteOff(3, 64, (uint8)0));           // ch3 releases -> ch2 regains channel
+            // older note
+            in.add(MidiMessage::noteOn(2, 60, (uint8)100));
+            // newest note -> active
+            in.add(MidiMessage::noteOn(3, 64, (uint8)100));
+            // ch2 holds MSB 24 (suppressed while ch3 active)
+            in.add(MidiMessage::controllerEvent(2, 6, 24));
+            // ch2 holds LSB 8
+            in.add(MidiMessage::controllerEvent(2, 38, 8));
+            // ch3 active: passes
+            in.add(MidiMessage::controllerEvent(3, 6, 21));
+            // ch3 active: passes
+            in.add(MidiMessage::controllerEvent(3, 38, 118));
+            // ch3 releases -> ch2 regains channel
+            in.add(MidiMessage::noteOff(3, 64, (uint8)0));
 
             auto out = runMpe(state, MPE_COLLAPSE, {"lower:15", "1"}, in);
 
@@ -701,11 +815,16 @@ public:
         beginTest("collapse falls back to the previous note when the active one releases");
         {
             Array<MidiMessage> in;
-            in.add(MidiMessage::noteOn(2, 60, (uint8)100));           // older note (member 2)
-            in.add(MidiMessage::noteOn(3, 64, (uint8)100));           // newest note (member 3) -> active
-            in.add(MidiMessage::noteOff(3, 64, (uint8)0));           // active releases
-            in.add(MidiMessage::pitchWheel(2, 5000));                // member 2 is active again
-            in.add(MidiMessage::pitchWheel(3, 6000));                // member 3 no longer held: suppressed
+            // older note (member 2)
+            in.add(MidiMessage::noteOn(2, 60, (uint8)100));
+            // newest note (member 3) -> active
+            in.add(MidiMessage::noteOn(3, 64, (uint8)100));
+            // active releases
+            in.add(MidiMessage::noteOff(3, 64, (uint8)0));
+            // member 2 is active again
+            in.add(MidiMessage::pitchWheel(2, 5000));
+            // member 3 no longer held: suppressed
+            in.add(MidiMessage::pitchWheel(3, 6000));
 
             auto out = runMpe(state, MPE_COLLAPSE, {"lower:15", "1"}, in);
 
@@ -715,7 +834,8 @@ public:
                 if (m.isPitchWheel()) { bend = m.getPitchWheelValue(); ++bendCount; }
             }
             expectEquals(bendCount, 1);
-            expectEquals(bend, 5128);        // member 2's 5000 summed with neutral Manager at 50-st range
+            // member 2's 5000 summed with neutral Manager at 50-st range
+            expectEquals(bend, 5128);
         }
 
         beginTest("collapse sums Manager and Member pitch bend (Appendix C)");
@@ -723,8 +843,10 @@ public:
             // Appendix C receiver example: Member +7 (9387) and Manager +2 (16383)
             Array<MidiMessage> in;
             in.add(MidiMessage::noteOn(2, 60, (uint8)100));
-            in.add(MidiMessage::pitchWheel(1, 16383));               // Manager +2 semitones
-            in.add(MidiMessage::pitchWheel(2, 9387));                // Member +7 semitones
+            // Manager +2 semitones
+            in.add(MidiMessage::pitchWheel(1, 16383));
+            // Member +7 semitones
+            in.add(MidiMessage::pitchWheel(2, 9387));
             auto out = runMpe(state, MPE_COLLAPSE, {"lower:15", "1"}, in);
 
             int lastBend = -1, sense = -1;
@@ -733,18 +855,24 @@ public:
                 if (m.isPitchWheel()) lastBend = m.getPitchWheelValue();
                 if (m.isController() && m.getControllerNumber() == 6) sense = m.getControllerValue();
             }
-            expectEquals(sense, 50);         // 2 + 48
-            expectEquals(lastBend, 9667);    // ~9 semitones at 50-semitone range
+            // 2 + 48
+            expectEquals(sense, 50);
+            // ~9 semitones at 50-semitone range
+            expectEquals(lastBend, 9667);
         }
 
         beginTest("collapse combines Manager and Member pressure/CC74 with the maximum (Appendix D)");
         {
             Array<MidiMessage> in;
             in.add(MidiMessage::noteOn(2, 60, (uint8)100));
-            in.add(MidiMessage::channelPressureChange(1, 40));       // Manager pressure
-            in.add(MidiMessage::channelPressureChange(2, 90));       // Member pressure
-            in.add(MidiMessage::controllerEvent(1, 74, 100));        // Manager CC74
-            in.add(MidiMessage::controllerEvent(2, 74, 30));         // Member CC74
+            // Manager pressure
+            in.add(MidiMessage::channelPressureChange(1, 40));
+            // Member pressure
+            in.add(MidiMessage::channelPressureChange(2, 90));
+            // Manager CC74
+            in.add(MidiMessage::controllerEvent(1, 74, 100));
+            // Member CC74
+            in.add(MidiMessage::controllerEvent(2, 74, 30));
             auto out = runMpe(state, MPE_COLLAPSE, {"lower:15", "1"}, in);
 
             int lastAt = -1, lastCC74 = -1;
@@ -753,8 +881,10 @@ public:
                 if (m.isAftertouch() && m.getNoteNumber() == 60) lastAt = m.getAfterTouchValue();
                 if (m.isController() && m.getControllerNumber() == 74) lastCC74 = m.getControllerValue();
             }
-            expectEquals(lastAt, 90);        // Max(Manager 40, Member 90)
-            expectEquals(lastCC74, 100);     // Max(Manager 100, Member 30)
+            // Max(Manager 40, Member 90)
+            expectEquals(lastAt, 90);
+            // Max(Manager 100, Member 30)
+            expectEquals(lastCC74, 100);
         }
 
         beginTest("two single-zone collapses in one route keep independent per-zone state");
@@ -763,15 +893,20 @@ public:
             // share state: the Upper collapse needs Manager sensitivity 2 on
             // channel 16, not the 48 that the Lower collapse leaves there
             Route route;
-            route.mpeOps.add(makeCommand(MPE_COLLAPSE, {"lower:7", "1"}));   // Lower -> ch 1
-            route.mpeOps.add(makeCommand(MPE_COLLAPSE, {"upper:7", "2"}));   // Upper -> ch 2
+            // Lower -> ch 1
+            route.mpeOps.add(makeCommand(MPE_COLLAPSE, {"lower:7", "1"}));
+            // Upper -> ch 2
+            route.mpeOps.add(makeCommand(MPE_COLLAPSE, {"upper:7", "2"}));
             route.inputs.add(new RouteInput());
             auto& input = *route.inputs[0];
 
             Array<MidiMessage> in;
-            in.add(MidiMessage::noteOn(2, 60, (uint8)100));     // Lower member -> ch 1
-            in.add(MidiMessage::noteOn(9, 64, (uint8)100));     // Upper member -> ch 2
-            in.add(MidiMessage::pitchWheel(16, 16383));         // Upper Manager bend, +2 semitones
+            // Lower member -> ch 1
+            in.add(MidiMessage::noteOn(2, 60, (uint8)100));
+            // Upper member -> ch 2
+            in.add(MidiMessage::noteOn(9, 64, (uint8)100));
+            // Upper Manager bend, +2 semitones
+            in.add(MidiMessage::pitchWheel(16, 16383));
 
             Array<MidiMessage> out;
             for (const auto& m : in)
@@ -786,15 +921,19 @@ public:
                 if (m.isNoteOn() && m.getChannel() == 2) ++onCh2;
                 if (m.isController() && m.getControllerNumber() == 6 && m.getChannel() == 2) upperSense = m.getControllerValue();
             }
-            expectEquals(onCh1, 1);        // Lower note collapsed to its channel
-            expectEquals(onCh2, 1);        // Upper note collapsed to its channel
-            expectEquals(upperSense, 50);  // 2 (ch 16 Manager) + 48 (member); 96 if state were shared
+            // Lower note collapsed to its channel
+            expectEquals(onCh1, 1);
+            // Upper note collapsed to its channel
+            expectEquals(onCh2, 1);
+            // 2 (ch 16 Manager) + 48 (member); 96 if state were shared
+            expectEquals(upperSense, 50);
         }
 
         beginTest("collapse sends a note's initial expression before its Note On (section 2.4)");
         {
             Array<MidiMessage> in;
-            in.add(MidiMessage::pitchWheel(1, 10000));        // Manager bend, before any note
+            // Manager bend, before any note
+            in.add(MidiMessage::pitchWheel(1, 10000));
             in.add(MidiMessage::noteOn(2, 60, (uint8)100));
             auto out = runMpe(state, MPE_COLLAPSE, {"lower:15", "1"}, in);
 
@@ -805,7 +944,8 @@ public:
                 if (out[i].isNoteOn())     noteIdx = i;
             }
             expect(bendIdx >= 0 && noteIdx >= 0);
-            expect(bendIdx < noteIdx);   // the combined bend precedes the Note On
+            // the combined bend precedes the Note On
+            expect(bendIdx < noteIdx);
         }
 
         beginTest("expand emits the configuration message before the first note");
@@ -819,7 +959,8 @@ public:
             expect(out[0].isController() && out[0].getControllerNumber() == 101 && out[0].getControllerValue() == 0);
             expect(out[1].isController() && out[1].getControllerNumber() == 100 && out[1].getControllerValue() == 6);
             expect(out[2].isController() && out[2].getControllerNumber() == 6   && out[2].getControllerValue() == 15);
-            expect(out[1].getChannel() == 1);  // sent on the manager channel
+            // sent on the manager channel
+            expect(out[1].getChannel() == 1);
             // then the note, on the first member channel
             const auto& note = out[out.size() - 1];
             expect(note.isNoteOn());
@@ -883,7 +1024,8 @@ public:
                 if (m.isNoteOff()) ++noteOffs;
             }
             expectEquals(noteOns, 2);
-            expectEquals(noteOffs, 0);   // shared, not stolen
+            // shared, not stolen
+            expectEquals(noteOffs, 0);
 
             // both notes can be released independently afterwards (on the shared channel)
             Array<MidiMessage> in2;
@@ -905,9 +1047,12 @@ public:
             // 3-member zone: after using and releasing channel 2, the next note
             // takes channel 3 (reuse is postponed), matching the channel bucket
             Array<MidiMessage> in;
-            in.add(MidiMessage::noteOn(1, 60, (uint8)100));   // -> member 2
-            in.add(MidiMessage::noteOff(1, 60, (uint8)0));    // release 2
-            in.add(MidiMessage::noteOn(1, 64, (uint8)100));   // -> member 3, not 2
+            // -> member 2
+            in.add(MidiMessage::noteOn(1, 60, (uint8)100));
+            // release 2
+            in.add(MidiMessage::noteOff(1, 60, (uint8)0));
+            // -> member 3, not 2
+            in.add(MidiMessage::noteOn(1, 64, (uint8)100));
             auto out = runMpe(state, MPE_EXPAND, {"1", "lower:3"}, in);
 
             Array<int> onChannels;
@@ -917,7 +1062,8 @@ public:
             }
             expectEquals(onChannels.size(), 2);
             expectEquals(onChannels[0], 2);
-            expectEquals(onChannels[1], 3);   // postponed reuse of channel 2
+            // postponed reuse of channel 2
+            expectEquals(onChannels[1], 3);
         }
 
         beginTest("expand zeroes Channel Pressure before Note On and Note Off (Appendix A.4.2)");
@@ -957,17 +1103,22 @@ public:
         beginTest("expand turns polyphonic aftertouch into per-channel channel pressure");
         {
             Array<MidiMessage> in;
-            in.add(MidiMessage::noteOn(1, 60, (uint8)100));          // -> member channel 2
-            in.add(MidiMessage::noteOn(1, 64, (uint8)100));          // -> member channel 3
-            in.add(MidiMessage::aftertouchChange(1, 60, 77));       // poly pressure for note 60
-            in.add(MidiMessage::aftertouchChange(1, 64, 33));       // poly pressure for note 64
+            // -> member channel 2
+            in.add(MidiMessage::noteOn(1, 60, (uint8)100));
+            // -> member channel 3
+            in.add(MidiMessage::noteOn(1, 64, (uint8)100));
+            // poly pressure for note 60
+            in.add(MidiMessage::aftertouchChange(1, 60, 77));
+            // poly pressure for note 64
+            in.add(MidiMessage::aftertouchChange(1, 64, 33));
 
             auto out = runMpe(state, MPE_EXPAND, {"1", "lower:15"}, in);
 
             int cp2 = -1, cp3 = -1;
             for (const auto& m : out)
             {
-                expect(! m.isAftertouch());  // none survive as poly aftertouch
+                // none survive as poly aftertouch
+                expect(!m.isAftertouch());
                 if (m.isChannelPressure() && m.getChannel() == 2) cp2 = m.getChannelPressureValue();
                 if (m.isChannelPressure() && m.getChannel() == 3) cp3 = m.getChannelPressureValue();
             }
@@ -1003,7 +1154,8 @@ public:
             Array<MidiMessage> in;
             in.add(MidiMessage::noteOn(2, 60, (uint8)100));
             in.add(MidiMessage::noteOn(3, 64, (uint8)100));
-            in.add(MidiMessage::noteOn(4, 67, (uint8)100));   // no free port -> steal port 0
+            // no free port -> steal port 0
+            in.add(MidiMessage::noteOn(4, 67, (uint8)100));
             auto r = runSplit(state, {"lower:15"}, 2, in);
 
             // on, on, then (note-off for the stolen note 60) + (note-on 67), all on port 0
@@ -1020,7 +1172,8 @@ public:
         {
             Array<MidiMessage> in;
             in.add(MidiMessage::noteOn(2, 60, (uint8)100));
-            in.add(MidiMessage::pitchWheel(2, 9000));         // expression for that note
+            // expression for that note
+            in.add(MidiMessage::pitchWheel(2, 9000));
             auto r = runSplit(state, {"lower:15"}, 4, in);
 
             int notePort = -2, bendPort = -3, bend = -1, sense = -1;
@@ -1030,16 +1183,21 @@ public:
                 if (r.msgs[i].isPitchWheel()) { bend = r.msgs[i].getPitchWheelValue(); bendPort = r.ports[i]; expectEquals(r.msgs[i].getChannel(), 1); }
                 if (r.msgs[i].isController() && r.msgs[i].getControllerNumber() == 6) sense = r.msgs[i].getControllerValue();
             }
-            expectEquals(bendPort, notePort);   // bend goes to the note's port
-            expectEquals(sense, 50);            // combined sensitivity declared on the port
-            expectEquals(bend, 8968);           // 9000 + neutral Manager at 50-semitone range
+            // bend goes to the note's port
+            expectEquals(bendPort, notePort);
+            // combined sensitivity declared on the port
+            expectEquals(sense, 50);
+            // 9000 + neutral Manager at 50-semitone range
+            expectEquals(bend, 8968);
         }
 
         beginTest("split folds zone-wide Manager bend into each active note's port");
         {
             Array<MidiMessage> in;
-            in.add(MidiMessage::noteOn(2, 60, (uint8)100));   // -> a port
-            in.add(MidiMessage::pitchWheel(1, 10000));        // Manager bend (zone-wide)
+            // -> a port
+            in.add(MidiMessage::noteOn(2, 60, (uint8)100));
+            // Manager bend (zone-wide)
+            in.add(MidiMessage::pitchWheel(1, 10000));
             auto r = runSplit(state, {"lower:15"}, 3, in);
 
             int notePort = -2, bendPort = -3, bend = -1;
@@ -1051,15 +1209,18 @@ public:
             // the Manager bend is applied to the note's port (not broadcast as -1)
             expectEquals(bendPort, notePort);
             expect(bendPort >= 0);
-            expectEquals(bend, 8264);           // +2-st Manager at 10000 summed onto the note
+            // +2-st Manager at 10000 summed onto the note
+            expectEquals(bend, 8264);
         }
 
         beginTest("split sums Manager and Member bend per port (Appendix C)");
         {
             Array<MidiMessage> in;
             in.add(MidiMessage::noteOn(2, 60, (uint8)100));
-            in.add(MidiMessage::pitchWheel(1, 16383));        // Manager +2 semitones
-            in.add(MidiMessage::pitchWheel(2, 9387));         // Member +7 semitones
+            // Manager +2 semitones
+            in.add(MidiMessage::pitchWheel(1, 16383));
+            // Member +7 semitones
+            in.add(MidiMessage::pitchWheel(2, 9387));
             auto r = runSplit(state, {"lower:15"}, 3, in);
 
             int lastBend = -1, sense = -1;
@@ -1076,10 +1237,14 @@ public:
         {
             Array<MidiMessage> in;
             in.add(MidiMessage::noteOn(2, 60, (uint8)100));
-            in.add(MidiMessage::channelPressureChange(1, 40));   // Manager
-            in.add(MidiMessage::channelPressureChange(2, 90));   // Member
-            in.add(MidiMessage::controllerEvent(1, 74, 100));    // Manager CC74
-            in.add(MidiMessage::controllerEvent(2, 74, 30));     // Member CC74
+            // Manager
+            in.add(MidiMessage::channelPressureChange(1, 40));
+            // Member
+            in.add(MidiMessage::channelPressureChange(2, 90));
+            // Manager CC74
+            in.add(MidiMessage::controllerEvent(1, 74, 100));
+            // Member CC74
+            in.add(MidiMessage::controllerEvent(2, 74, 30));
             auto r = runSplit(state, {"lower:15"}, 3, in);
 
             int lastCp = -1, lastCC74 = -1;
@@ -1088,14 +1253,17 @@ public:
                 if (m.isChannelPressure()) lastCp = m.getChannelPressureValue();
                 if (m.isController() && m.getControllerNumber() == 74) lastCC74 = m.getControllerValue();
             }
-            expectEquals(lastCp, 90);     // Max(Manager 40, Member 90)
-            expectEquals(lastCC74, 100);  // Max(Manager 100, Member 30)
+            // Max(Manager 40, Member 90)
+            expectEquals(lastCp, 90);
+            // Max(Manager 100, Member 30)
+            expectEquals(lastCC74, 100);
         }
 
         beginTest("split sends a note's initial expression before its Note On (section 2.4)");
         {
             Array<MidiMessage> in;
-            in.add(MidiMessage::pitchWheel(1, 10000));        // Manager bend, before any note
+            // Manager bend, before any note
+            in.add(MidiMessage::pitchWheel(1, 10000));
             in.add(MidiMessage::noteOn(2, 60, (uint8)100));
             auto r = runSplit(state, {"lower:15"}, 3, in);
 
@@ -1112,7 +1280,8 @@ public:
         beginTest("split drops expression with no active note on its channel");
         {
             Array<MidiMessage> in;
-            in.add(MidiMessage::pitchWheel(2, 9000));         // member channel, but no note held
+            // member channel, but no note held
+            in.add(MidiMessage::pitchWheel(2, 9000));
             auto r = runSplit(state, {"lower:15"}, 3, in);
             expectEquals(r.msgs.size(), 0);
         }
@@ -1122,7 +1291,8 @@ public:
             Array<MidiMessage> in;
             in.add(MidiMessage::noteOn(2, 60, (uint8)100));
             in.add(MidiMessage::noteOff(2, 60, (uint8)0));
-            in.add(MidiMessage::noteOn(3, 64, (uint8)100));   // reuses the freed port, no steal
+            // reuses the freed port, no steal
+            in.add(MidiMessage::noteOn(3, 64, (uint8)100));
             auto r = runSplit(state, {"lower:15"}, 1, in);
 
             int noteOns = 0, noteOffs = 0;
@@ -1133,7 +1303,8 @@ public:
                 expectEquals(m.getChannel(), 1);
             }
             expectEquals(noteOns, 2);
-            expectEquals(noteOffs, 1);     // only the explicit note-off, no stolen one
+            // only the explicit note-off, no stolen one
+            expectEquals(noteOffs, 1);
             for (const auto& p : r.ports)
             {
                 expectEquals(p, 0);
@@ -1159,7 +1330,8 @@ public:
             in.add(MidiMessage::controllerEvent(1, 101, 127));
             in.add(MidiMessage::controllerEvent(1, 100, 127));
             auto r = runSplit(state, {"lower:15"}, 2, in);
-            expectEquals(r.msgs.size(), 0);   // the whole MCM is dropped
+            // the whole MCM is dropped
+            expectEquals(r.msgs.size(), 0);
         }
 
         beginTest("split lets other RPNs through, replaying their selection");
@@ -1172,11 +1344,13 @@ public:
             in.add(MidiMessage::controllerEvent(1, 6, 5));
             auto r = runSplit(state, {"lower:15"}, 2, in);
 
-            expectEquals(r.msgs.size(), 3);   // selection (101, 100) replayed, then data (6)
+            // selection (101, 100) replayed, then data (6)
+            expectEquals(r.msgs.size(), 3);
             for (int i = 0; i < r.msgs.size(); ++i)
             {
                 expect(r.msgs[i].isController());
-                expectEquals(r.ports[i], -1);          // broadcast to all ports
+                // broadcast to all ports
+                expectEquals(r.ports[i], -1);
                 expectEquals(r.msgs[i].getChannel(), 1);
             }
             expectEquals(r.msgs[0].getControllerNumber(), 101);
