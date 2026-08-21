@@ -214,8 +214,8 @@ private:
     std::unique_ptr<McpServer> mcpServer_;
 
     CriticalSection midiCallbackLock_;
-    StringArray parsingFiles_;   // program files currently being parsed, to
-                                 // refuse a file that includes itself
+    StringArray parsingFiles_;   // identities of program files currently being
+                                 // parsed, to refuse a file that includes itself
 };
 
 // Direct control over the lifecycle steps that the JUCE application object and

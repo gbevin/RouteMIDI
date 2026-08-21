@@ -830,14 +830,18 @@ void ApplicationState::parseParameters(StringArray& parameters)
 void ApplicationState::parseFile(File file)
 {
     // a program file can load other program files; refuse one that is already
-    // being parsed further up the chain, since that would recurse forever
-    const String path = file.getLinkedTarget().getFullPathName();
-    if (parsingFiles_.contains(path))
+    // being parsed further up the chain, since that would recurse forever;
+    // the filesystem identifier sees through symlinks and path spellings,
+    // the resolved path is the fallback when no identifier is available
+    const uint64 identity = file.getFileIdentifier();
+    const String key = identity != 0 ? String(identity)
+                                     : file.getLinkedTarget().getFullPathName();
+    if (parsingFiles_.contains(key))
     {
-        std::cerr << "Program file \"" << path << "\" includes itself, ignoring" << std::endl;
+        std::cerr << "Program file \"" << file.getFullPathName() << "\" includes itself, ignoring" << std::endl;
         return;
     }
-    parsingFiles_.add(path);
+    parsingFiles_.add(key);
 
     StringArray parameters;
 
@@ -850,7 +854,7 @@ void ApplicationState::parseFile(File file)
 
     parseParameters(parameters);
 
-    parsingFiles_.removeString(path);
+    parsingFiles_.removeString(key);
 }
 
 void ApplicationState::executeCommand(ApplicationCommand& cmd)
