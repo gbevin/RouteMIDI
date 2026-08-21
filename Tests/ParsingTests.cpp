@@ -532,7 +532,10 @@ public:
                 expect(chord != nullptr);
                 if (chord != nullptr)
                 {
+                    // chord takes any number of intervals: unbounded maxArgs
                     expect(chord->getProperty("arity").toString() == "variable");
+                    expectEquals((int)chord->getProperty("minArgs"), 1);
+                    expect(chord->getProperty("maxArgs").isVoid());
                 }
 
                 // the contract carries a version to gate on, and no volatile index

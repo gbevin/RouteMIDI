@@ -263,6 +263,14 @@ String commandsJson(const Array<ApplicationCommand>& commands, int octaveMiddleC
             command->setProperty("minArgs", 2);
             command->setProperty("maxArgs", 4);
         }
+        else if (cmd.command_ == CHORD)
+        {
+            // chord stacks a note at every given interval, so it takes any
+            // number of arguments; a null maxArgs means unbounded
+            command->setProperty("arity", "variable");
+            command->setProperty("minArgs", 1);
+            command->setProperty("maxArgs", var());
+        }
         else if (cmd.expectedOptions_ < 0)
         {
             command->setProperty("arity", "variable");

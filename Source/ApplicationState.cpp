@@ -416,8 +416,8 @@ void ApplicationState::shutdown()
     }
 
     {
-        // the inputs stay open until destruction, so their callbacks can still
-        // fire; the lock keeps them out of the state and files touched here
+        // the inputs are closed above, so no callback can interleave here; the
+        // lock stays for consistency with every other sendPanic caller
         const ScopedLock sl(midiCallbackLock_);
         for (auto* route : routes_)
         {
