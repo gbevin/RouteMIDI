@@ -1068,6 +1068,35 @@ public:
             expect(announces(state, 63));
         }
 
+        beginTest("MCP rejects out-of-int-range route ids and indices instead of wrapping");
+        {
+            ApplicationState state;
+            mcp(state, R"json({
+                "jsonrpc": "2.0", "id": 40, "method": "tools/call",
+                "params": { "name": "start_route", "arguments": {
+                    "commands": ["in", "TruncIn", "transp", "12", "out", "TruncOut"] } }
+            })json", true);
+            expectEquals(state.getRoutes().size(), 1);   // this is route id 1
+
+            // 4294967297 == (1 << 32) | 1: a plain (int) cast would wrap it to 1
+            // and stop the live route; it must be refused as a missing route
+            const var stopped = mcp(state, R"json({
+                "jsonrpc": "2.0", "id": 41, "method": "tools/call",
+                "params": { "name": "stop_route", "arguments": { "route": 4294967297 } }
+            })json");
+            expect(stopped.getProperty("result", var()).getProperty("isError", var()));
+            expectEquals(state.getRoutes().size(), 1);   // route 1 survived
+
+            // an index of 4294967296 truncates to 0; it must not remove command 0
+            const var removed = mcp(state, R"json({
+                "jsonrpc": "2.0", "id": 42, "method": "tools/call",
+                "params": { "name": "remove_command", "arguments": {
+                    "route": 1, "stage": "transforms", "index": 4294967296 } }
+            })json");
+            expect(removed.getProperty("result", var()).getProperty("isError", var()));
+            expectEquals(state.getRoutes()[0]->transforms.size(), 1);   // transpose still there
+        }
+
         beginTest("MCP route lifecycle: list, edit and stop a running route");
         {
             ApplicationState state;

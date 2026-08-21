@@ -43,6 +43,47 @@ static DynamicObject* newObject()
     return new DynamicObject();
 }
 
+// reads a JSON number as an int, rejecting non-integers and anything outside
+// int range: a client's oversized id must be refused, never silently wrapped
+// (JUCE promotes an int with bit 31 set to int64, and a plain (int) cast would
+// truncate it onto a real route or command index)
+static bool readIntArg(const var& v, int& out)
+{
+    if (v.isInt())    { out = (int) v; return true; }
+    if (v.isInt64())
+    {
+        const int64 n = (int64) v;
+        if (n < std::numeric_limits<int>::min() || n > std::numeric_limits<int>::max()) return false;
+        out = (int) n;
+        return true;
+    }
+    if (v.isDouble())
+    {
+        const double d = (double) v;
+        if (d < (double) std::numeric_limits<int>::min() ||
+            d > (double) std::numeric_limits<int>::max() || d != std::floor(d)) return false;
+        out = (int) d;
+        return true;
+    }
+    return false;
+}
+
+// the same, widened to int64 for the read_route cursor (a hostile double there
+// would otherwise saturate and wedge the client)
+static bool readInt64Arg(const var& v, int64& out)
+{
+    if (v.isInt())   { out = (int64) (int) v; return true; }
+    if (v.isInt64()) { out = (int64) v; return true; }
+    if (v.isDouble())
+    {
+        const double d = (double) v;
+        if (d < -9223372036854775808.0 || d >= 9223372036854775808.0 || d != std::floor(d)) return false;
+        out = (int64) d;
+        return true;
+    }
+    return false;
+}
+
 static Array<var> midiDeviceNames(const Array<MidiDeviceInfo>& devices)
 {
     Array<var> names;
@@ -1054,7 +1095,11 @@ var McpServer::handleRequest(const var& message)
             {
                 return "Missing route id";
             }
-            const int routeId = (int) args->getProperty("route");
+            int routeId;
+            if (!readIntArg(args->getProperty("route"), routeId))
+            {
+                return "Invalid route id";
+            }
             for (int i = 0; i < state_.routes_.size(); ++i)
             {
                 if (state_.routes_[i]->id == routeId)
@@ -1147,7 +1192,11 @@ var McpServer::handleRequest(const var& message)
                 return toolError("Missing messages array");
             }
 
-            const int inputIndex = args->hasProperty("input") ? (int) args->getProperty("input") : 0;
+            int inputIndex = 0;
+            if (args->hasProperty("input") && !readIntArg(args->getProperty("input"), inputIndex))
+            {
+                inputIndex = -1;   // rejected by the bounds check below
+            }
             if (inputIndex < 0 || inputIndex >= route->inputs.size())
             {
                 return toolError("No input at index " + String(inputIndex));
@@ -1255,10 +1304,17 @@ var McpServer::handleRequest(const var& message)
 
             // -1 (the default) means "everything currently buffered": every seq is
             // greater than -1. A real cursor returns only strictly newer messages.
-            const int64 after = args->hasProperty("after")
-                                ? (int64) (double) args->getProperty("after") : (int64) -1;
+            int64 after = -1;
+            if (args->hasProperty("after") && !readInt64Arg(args->getProperty("after"), after))
+            {
+                after = -1;   // a bad cursor reads as "everything currently buffered"
+            }
             constexpr int defaultMax = 128;
-            int maxMessages = args->hasProperty("max") ? (int) args->getProperty("max") : defaultMax;
+            int maxMessages = defaultMax;
+            if (args->hasProperty("max"))
+            {
+                readIntArg(args->getProperty("max"), maxMessages);   // clamped next
+            }
             maxMessages = jlimit(1, Route::captureCapacity, maxMessages);
 
             Array<var> messages;
@@ -1367,7 +1423,11 @@ var McpServer::handleRequest(const var& message)
             // replace_command: exactly one command, in the stage being replaced,
             // swapped in place so it keeps its position
             const String stage = args->getProperty("stage").toString();
-            const int commandIndex = (int) args->getProperty("index");
+            int commandIndex = -1;
+            if (!readIntArg(args->getProperty("index"), commandIndex))
+            {
+                commandIndex = -1;   // rejected by the bounds check below
+            }
             auto* container = stageContainer(*route, stage);
             if (container == nullptr)
             {
@@ -1401,7 +1461,11 @@ var McpServer::handleRequest(const var& message)
                 return toolError(error);
             }
             const String stage = args->getProperty("stage").toString();
-            const int commandIndex = args->hasProperty("index") ? (int) args->getProperty("index") : -1;
+            int commandIndex = -1;
+            if (args->hasProperty("index") && !readIntArg(args->getProperty("index"), commandIndex))
+            {
+                commandIndex = -1;   // rejected by the bounds check below
+            }
             auto* container = stageContainer(*route, stage);
             if (container == nullptr)
             {
