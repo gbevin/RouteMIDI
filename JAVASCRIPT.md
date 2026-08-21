@@ -83,9 +83,15 @@ Util.sleep(<milliseconds>);
 `Util.command` with a single string splits it on whitespace, honoring double
 quotes: `Util.command('say "two words"')` passes `two words` as one argument,
 without the quotes. With several arguments each one reaches the program
-exactly as given, which avoids quoting altogether.
+exactly as given, which avoids quoting altogether. It waits for the program
+to finish and prints its output, so it blocks just like `Util.sleep` does,
+for as long as the program runs.
 
-Because the script runs synchronously as each message passes through, `Util.sleep` blocks the whole route for its duration: the current message and every message queued behind it are held up. It's fine for pacing a generated or offline stream, but avoid it when routing a live instrument.
+Because the script runs synchronously as each message passes through,
+`Util.sleep` and `Util.command` block every route in the process for their
+duration: the current message and every message queued behind it are held
+up. They're fine for pacing a generated or offline stream or triggering a
+quick program, but avoid them when routing a live instrument.
 
 ## Sending OSC messages
 
