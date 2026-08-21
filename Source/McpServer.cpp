@@ -869,52 +869,15 @@ static bool readMcpMessage(String& body)
 // string for allowed commands.
 static String mcpCommandDenialReason(const ApplicationCommand& cmd)
 {
+    // schema::availableViaMcp is the allow-list: default-closed, so a future
+    // command must be deliberately added there before a remote client can use
+    // it. This function only supplies the reasons for the denied ones
     if (schema::availableViaMcp(cmd))
     {
         return {};
     }
     switch (cmd.command_)
     {
-        // routing and topology
-        case INPUT:
-        case OUTPUT:
-        case VIRTUAL_IN:
-        case VIRTUAL_OUT:
-        case PANIC:
-        // number and note conventions
-        case DECIMAL:
-        case HEXADECIMAL:
-        case OCTAVE_MIDDLE_C:
-        // filter modifier
-        case NOT:
-        // conversions and MPE operations
-        case CONVERT:
-        case CC14_ADD:
-        case CC14_SCALE:
-        case CC14_CURVE:
-        case CC14_INVERT:
-        case CC14_RESCALE:
-        case CC14_SET:
-        case NRPN_ADD:
-        case NRPN_SCALE:
-        case NRPN_CURVE:
-        case NRPN_INVERT:
-        case NRPN_RESCALE:
-        case NRPN_SET:
-        case RPN_ADD:
-        case RPN_SCALE:
-        case RPN_CURVE:
-        case RPN_INVERT:
-        case RPN_RESCALE:
-        case RPN_SET:
-        case MPE_RELOCATE:
-        case MPE_COLLAPSE:
-        case MPE_EXPAND:
-        case MPE_BEND:
-        case MPE_SENS:
-        case MPE_SPLIT:
-            return {};
-
         case LIST:
             return "Use the list_midi_ports MCP tool instead of the list command.";
         case MONITOR:
@@ -938,11 +901,6 @@ static String mcpCommandDenialReason(const ApplicationCommand& cmd)
 
         default:
             break;
-    }
-
-    if (cmd.isFilter() || cmd.isTransform())
-    {
-        return {};
     }
     return "\"" + cmd.param_ + "\" is not available in MCP mode.";
 }

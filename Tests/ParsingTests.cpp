@@ -20,6 +20,7 @@
 
 #include "../Source/ApplicationState.h"
 #include "../Source/McpServer.h"
+#include "../Source/Schema.h"
 
 namespace
 {
@@ -573,6 +574,12 @@ public:
                 expect((bool) findCommand("transp")->getProperty("mcpAvailable"));
                 expect((bool) findCommand("cc")->getProperty("mcpAvailable"));
                 expect((bool) findCommand("convert")->getProperty("mcpAvailable"));
+
+                // the MCP allow-list is default-closed: a command the predicate
+                // has never heard of must be denied, not silently allowed
+                ApplicationCommand unknown;
+                unknown.command_ = static_cast<CommandIndex>(9999);
+                expect(! ::schema::availableViaMcp(unknown));
             }
         }
 
