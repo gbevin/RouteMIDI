@@ -20,6 +20,8 @@
 
 #include "Schema.h"
 
+#include <csignal>
+
 #include "ApplicationState.h"
 
 #if JUCE_WINDOWS
@@ -1556,6 +1558,11 @@ void McpServer::start()
 #if JUCE_WINDOWS
     // newline-delimited framing must not go through text-mode CRLF translation
     _setmode(_fileno(stdout), _O_BINARY);
+#else
+    // if the client dies mid-response, a write to the closed stdout pipe would
+    // raise SIGPIPE and terminate the process before shutdown() runs its panic
+    // and SysEx flush; ignore it so the failed write just ends the loop instead
+    std::signal(SIGPIPE, SIG_IGN);
 #endif
 
     // stdin is read on a background thread so the message loop keeps running
