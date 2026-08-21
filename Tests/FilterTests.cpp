@@ -202,6 +202,67 @@ public:
             expect(  state.passesFilters(low, lowPairing, MidiMessage::controllerEvent(1, 39, 120)));
         }
 
+        beginTest("System Real-Time filters match their exact messages");
+        {
+            const MidiMessage clock = MidiMessage::midiClock();
+            const MidiMessage start = MidiMessage::midiStart();
+            const MidiMessage stop  = MidiMessage::midiStop();
+            const MidiMessage cont  = MidiMessage::midiContinue();
+            const MidiMessage sense(0xfe);
+            const MidiMessage reset(0xff);
+
+            expect(  makeCommand(START).matches(state, start, 0));
+            expect(! makeCommand(START).matches(state, stop, 0));
+            expect(  makeCommand(STOP).matches(state, stop, 0));
+            expect(! makeCommand(STOP).matches(state, start, 0));
+            expect(  makeCommand(CONTINUE).matches(state, cont, 0));
+            expect(! makeCommand(CONTINUE).matches(state, clock, 0));
+            expect(  makeCommand(ACTIVE_SENSING).matches(state, sense, 0));
+            expect(! makeCommand(ACTIVE_SENSING).matches(state, reset, 0));
+            expect(  makeCommand(RESET).matches(state, reset, 0));
+            expect(! makeCommand(RESET).matches(state, sense, 0));
+
+            // the composite passes the whole family, nothing else
+            auto sr = makeCommand(SYSTEM_REALTIME);
+            expect(  sr.matches(state, clock, 0));
+            expect(  sr.matches(state, start, 0));
+            expect(  sr.matches(state, stop, 0));
+            expect(  sr.matches(state, cont, 0));
+            expect(  sr.matches(state, sense, 0));
+            expect(  sr.matches(state, reset, 0));
+            expect(! sr.matches(state, MidiMessage::songPositionPointer(0), 0));
+            expect(! sr.matches(state, MidiMessage::noteOn(1, 60, (uint8)100), 0));
+        }
+
+        beginTest("System Common filters match their exact messages");
+        {
+            const MidiMessage tc  = MidiMessage::quarterFrame(3, 5);
+            const MidiMessage spp = MidiMessage::songPositionPointer(1234);
+            const MidiMessage ss(0xf3, 42);
+            const MidiMessage tun(0xf6);
+            const uint8 syxData[] = { 0x7d, 0x11, 0x22 };
+            const MidiMessage syx = MidiMessage::createSysExMessage(syxData, 3);
+
+            expect(  makeCommand(TIME_CODE).matches(state, tc, 0));
+            expect(! makeCommand(TIME_CODE).matches(state, spp, 0));
+            expect(  makeCommand(SONG_POSITION).matches(state, spp, 0));
+            expect(! makeCommand(SONG_POSITION).matches(state, tc, 0));
+            expect(  makeCommand(SONG_SELECT).matches(state, ss, 0));
+            expect(! makeCommand(SONG_SELECT).matches(state, tun, 0));
+            expect(  makeCommand(TUNE_REQUEST).matches(state, tun, 0));
+            expect(! makeCommand(TUNE_REQUEST).matches(state, ss, 0));
+
+            // the composite passes the whole family, nothing else
+            auto sc = makeCommand(SYSTEM_COMMON);
+            expect(  sc.matches(state, syx, 0));
+            expect(  sc.matches(state, tc, 0));
+            expect(  sc.matches(state, spp, 0));
+            expect(  sc.matches(state, ss, 0));
+            expect(  sc.matches(state, tun, 0));
+            expect(! sc.matches(state, MidiMessage::midiClock(), 0));
+            expect(! sc.matches(state, MidiMessage::noteOn(1, 60, (uint8)100), 0));
+        }
+
         beginTest("inscale passes only notes that belong to the key");
         {
             Route route;
