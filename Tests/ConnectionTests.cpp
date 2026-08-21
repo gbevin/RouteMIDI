@@ -216,6 +216,69 @@ public:
             expect(dest->fullName.contains(portName));
         }
 
+        beginTest("shutdown's panic sends the full safety net to a connected output");
+        {
+            const String outName = "RouteMIDI Panic " + Uuid().toString();
+            CaptureMidiCallback capture;
+            auto virtualDest = MidiInput::createNewDevice(outName, &capture);
+            if (virtualDest == nullptr)
+            {
+                logMessage("  skipped: virtual MIDI not available on this system");
+                return;
+            }
+            virtualDest->start();
+            if (! waitForPort([] { return MidiOutput::getAvailableDevices(); }, outName, true, 3000))
+            {
+                logMessage("  skipped: the virtual port never appeared");
+                return;
+            }
+
+            ApplicationState state;
+            {
+                StringArray params;
+                params.add("in");  params.add("RouteMIDI PanicIn Unconnected");
+                params.add("panic");
+                params.add("out"); params.add(outName);
+                auto* previous = std::cerr.rdbuf(nullptr);
+                state.parseParameters(params);
+                ApplicationState::Control(state).reconcileConnections();
+                std::cerr.rdbuf(previous);
+            }
+            auto& routes = state.getRoutes();
+            if (routes.isEmpty() || routes[0]->outputs.isEmpty() || routes[0]->outputs[0]->out == nullptr)
+            {
+                logMessage("  skipped: could not open the virtual port in this process");
+                return;
+            }
+
+            ApplicationState::Control(state).startOutputSender();
+            state.shutdown();   // panic-enabled route: drains the safety net before returning
+
+            // sustain off, sostenuto off and all-notes-off on every channel
+            const uint32 startTime = Time::getMillisecondCounter();
+            for (;;)
+            {
+                { const ScopedLock sl(capture.lock); if (capture.received.size() >= 48) break; }
+                if ((int) (Time::getMillisecondCounter() - startTime) > 3000) break;
+                Thread::sleep(10);
+            }
+            const ScopedLock sl(capture.lock);
+            expectEquals(capture.received.size(), 48);
+            int perChannel[17][128] = {};
+            for (const auto& m : capture.received)
+            {
+                expect(m.isController());
+                expectEquals(m.getControllerValue(), 0);
+                perChannel[m.getChannel()][m.getControllerNumber()]++;
+            }
+            for (int channel = 1; channel <= 16; ++channel)
+            {
+                expectEquals(perChannel[channel][64], 1);
+                expectEquals(perChannel[channel][66], 1);
+                expectEquals(perChannel[channel][123], 1);
+            }
+        }
+
         beginTest("timer drops a vanished output and reconnects it when its port returns");
         {
             const String inName  = "RouteMIDI OutRecIn "  + Uuid().toString();
