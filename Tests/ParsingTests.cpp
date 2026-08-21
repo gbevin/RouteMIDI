@@ -630,6 +630,169 @@ public:
             expectEquals(state.getRoutes().size(), 256);
         }
 
+        beginTest("Every MCP tool result satisfies its declared outputSchema");
+        {
+            // a small JSON Schema validator covering the subset the output
+            // schemas use: type object/array/string/boolean/integer/number,
+            // properties, required and items; returns an empty string when the
+            // value conforms, or a description of the first violation
+            std::function<String(const var&, const var&)> conforms =
+                [&conforms](const var& value, const var& schema) -> String
+            {
+                const String type = schema.getProperty("type", var()).toString();
+                if (type == "object")
+                {
+                    auto* object = value.getDynamicObject();
+                    if (object == nullptr)
+                    {
+                        return "expected an object";
+                    }
+                    if (auto* required = schema.getProperty("required", var()).getArray())
+                    {
+                        for (const auto& name : *required)
+                        {
+                            if (!object->hasProperty(name.toString()))
+                            {
+                                return "missing required property " + name.toString();
+                            }
+                        }
+                    }
+                    if (auto* properties = schema.getProperty("properties", var()).getDynamicObject())
+                    {
+                        for (const auto& entry : properties->getProperties())
+                        {
+                            if (object->hasProperty(entry.name))
+                            {
+                                const String error = conforms(object->getProperty(entry.name), entry.value);
+                                if (error.isNotEmpty())
+                                {
+                                    return entry.name.toString() + ": " + error;
+                                }
+                            }
+                        }
+                    }
+                    return {};
+                }
+                if (type == "array")
+                {
+                    auto* array = value.getArray();
+                    if (array == nullptr)
+                    {
+                        return "expected an array";
+                    }
+                    const var items = schema.getProperty("items", var());
+                    for (const auto& element : *array)
+                    {
+                        const String error = conforms(element, items);
+                        if (error.isNotEmpty())
+                        {
+                            return "item: " + error;
+                        }
+                    }
+                    return {};
+                }
+                if (type == "string")  return value.isString() ? String() : "expected a string";
+                if (type == "boolean") return value.isBool()   ? String() : "expected a boolean";
+                if (type == "integer") return (value.isInt() || value.isInt64()) ? String() : "expected an integer";
+                if (type == "number")  return (value.isInt() || value.isInt64() || value.isDouble()) ? String() : "expected a number";
+                return "unknown schema type " + type;
+            };
+
+            // the validator itself must be able to fail, or every check below
+            // would be vacuous
+            {
+                auto wrongProps = new DynamicObject();
+                wrongProps->setProperty("x", var(JSON::parse(R"({"type":"integer"})")));
+                auto strict = new DynamicObject();
+                strict->setProperty("type", "object");
+                strict->setProperty("properties", var(wrongProps));
+                strict->setProperty("required", var(Array<var>{ var("x") }));
+                // hold the schema in one var: wrapping the same raw object in
+                // two temporaries would delete it between the two calls
+                const var strictSchema(strict);
+                auto sample = new DynamicObject();
+                sample->setProperty("x", "not a number");
+                expect(conforms(var(sample), strictSchema).isNotEmpty());
+                auto missing = new DynamicObject();
+                expect(conforms(var(missing), strictSchema).isNotEmpty());
+            }
+
+            ApplicationState state;
+            state.enableTrafficCapture(true);
+
+            // fetch the DECLARED schemas from tools/list, so any drift between
+            // declaration and reality fails here
+            const var listed = mcp(state, R"json({"jsonrpc":"2.0","id":1,"method":"tools/list"})json");
+            auto* tools = listed.getProperty("result", var()).getProperty("tools", var()).getArray();
+            expect(tools != nullptr);
+            std::map<String, var> declared;
+            for (const auto& tool : *tools)
+            {
+                const String name = tool.getProperty("name", var()).toString();
+                const var outputSchema = tool.getProperty("outputSchema", var());
+                expect(! outputSchema.isVoid(), name + " declares no outputSchema");
+                expect(outputSchema.getProperty("type", var()).toString() == "object");
+                declared[name] = outputSchema;
+            }
+            expectEquals((int) declared.size(), 11);
+
+            // drives one success call per tool and validates the structured
+            // result against the tool's own declaration
+            auto checked = [&](const String& toolName, const String& requestJson) -> var
+            {
+                const var response = mcp(state, requestJson, true);
+                const var result = response.getProperty("result", var());
+                expect(! (bool) result.getProperty("isError", var()), toolName + " unexpectedly failed");
+                const var structured = result.getProperty("structuredContent", var());
+                expect(! structured.isVoid(), toolName + " returned no structuredContent");
+                const String error = conforms(structured, declared[toolName]);
+                expect(error.isEmpty(), toolName + ": " + error);
+                return structured;
+            };
+
+            checked("get_schema", R"json({"jsonrpc":"2.0","id":2,"method":"tools/call",
+                "params":{"name":"get_schema","arguments":{}}})json");
+            checked("list_midi_ports", R"json({"jsonrpc":"2.0","id":3,"method":"tools/call",
+                "params":{"name":"list_midi_ports","arguments":{}}})json");
+
+            // a route exercising ports, a negated filter, transforms and MPE,
+            // so the shared route schema is validated against populated stages
+            checked("start_route", R"json({"jsonrpc":"2.0","id":4,"method":"tools/call",
+                "params":{"name":"start_route","arguments":{"commands":
+                    ["in","SchemaIn","not","cc","7","transp","12","mpexp","1","lower","out","SchemaOut"]}}})json");
+            checked("list_routes", R"json({"jsonrpc":"2.0","id":5,"method":"tools/call",
+                "params":{"name":"list_routes","arguments":{}}})json");
+            checked("add_commands", R"json({"jsonrpc":"2.0","id":6,"method":"tools/call",
+                "params":{"name":"add_commands","arguments":{"route":1,"commands":["scale","C","major"]}}})json");
+            checked("replace_command", R"json({"jsonrpc":"2.0","id":7,"method":"tools/call",
+                "params":{"name":"replace_command","arguments":{"route":1,
+                    "stage":"transforms","index":1,"commands":["scale","D","minor"]}}})json");
+            checked("remove_command", R"json({"jsonrpc":"2.0","id":8,"method":"tools/call",
+                "params":{"name":"remove_command","arguments":{"route":1,"stage":"transforms","index":1}}})json");
+
+            // inject through the route so the capture buffer has traffic, then
+            // read it back; both echo populated arrays through their schemas
+            const var injected = checked("inject_midi", R"json({"jsonrpc":"2.0","id":9,"method":"tools/call",
+                "params":{"name":"inject_midi","arguments":{"route":1,
+                    "messages":["channel 1 note-on 60 100"]}}})json");
+            expect(injected.getProperty("emitted", var()).getArray()->size() > 0);
+            const var readBack = checked("read_route", R"json({"jsonrpc":"2.0","id":10,"method":"tools/call",
+                "params":{"name":"read_route","arguments":{"route":1}}})json");
+            expect(readBack.getProperty("messages", var()).getArray()->size() > 0);
+
+            checked("panic_route", R"json({"jsonrpc":"2.0","id":11,"method":"tools/call",
+                "params":{"name":"panic_route","arguments":{"route":1}}})json");
+            checked("stop_route", R"json({"jsonrpc":"2.0","id":12,"method":"tools/call",
+                "params":{"name":"stop_route","arguments":{"route":1}}})json");
+
+            // an error result carries no structuredContent, so the declared
+            // outputSchema only ever describes success results
+            const var failed = mcp(state, R"json({"jsonrpc":"2.0","id":13,"method":"tools/call",
+                "params":{"name":"stop_route","arguments":{"route":999}}})json");
+            expect((bool) failed.getProperty("result", var()).getProperty("isError", var()));
+            expect(failed.getProperty("result", var()).getProperty("structuredContent", var()).isVoid());
+        }
+
         beginTest("MCP protocol conformance: ping, unknown tool, invalid request, notifications");
         {
             ApplicationState state;

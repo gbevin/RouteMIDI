@@ -226,9 +226,150 @@ static DynamicObject* newReadRouteSchema()
     return newObjectSchema(properties, { "route" });
 }
 
+// ---- output schemas: the declared shape of each tool's structuredContent ----
+
+static DynamicObject* newTypeSchema(const String& type)
+{
+    auto schema = newObject();
+    schema->setProperty("type", type);
+    return schema;
+}
+
+static DynamicObject* newArraySchema(DynamicObject* items)
+{
+    auto schema = newObject();
+    schema->setProperty("type", "array");
+    schema->setProperty("items", var(items));
+    return schema;
+}
+
+// a route port as routeToVar renders it
+static DynamicObject* newPortOutputSchema()
+{
+    auto props = newObject();
+    props->setProperty("name", var(newTypeSchema("string")));
+    props->setProperty("connected", var(newTypeSchema("boolean")));
+    return newObjectSchema(props, { "name", "connected" });
+}
+
+// a processing command as commandListToVar renders it (negated only when set)
+static DynamicObject* newCommandEntryOutputSchema()
+{
+    auto props = newObject();
+    props->setProperty("index", var(newTypeSchema("integer")));
+    props->setProperty("command", var(newTypeSchema("string")));
+    props->setProperty("args", var(newArraySchema(newTypeSchema("string"))));
+    props->setProperty("negated", var(newTypeSchema("boolean")));
+    return newObjectSchema(props, { "index", "command", "args" });
+}
+
+// a route as routeToVar renders it, shared by every route-returning tool
+static DynamicObject* newRouteOutputSchema()
+{
+    auto props = newObject();
+    props->setProperty("id", var(newTypeSchema("integer")));
+    props->setProperty("inputs", var(newArraySchema(newPortOutputSchema())));
+    props->setProperty("outputs", var(newArraySchema(newPortOutputSchema())));
+    props->setProperty("filters", var(newArraySchema(newCommandEntryOutputSchema())));
+    props->setProperty("transforms", var(newArraySchema(newCommandEntryOutputSchema())));
+    props->setProperty("mpe", var(newArraySchema(newCommandEntryOutputSchema())));
+    props->setProperty("conversions", var(newArraySchema(newCommandEntryOutputSchema())));
+    props->setProperty("split", var(newArraySchema(newCommandEntryOutputSchema())));
+    return newObjectSchema(props, { "id", "inputs", "outputs", "filters",
+                                    "transforms", "mpe", "conversions", "split" });
+}
+
+static DynamicObject* newGetSchemaOutputSchema()
+{
+    // the command schema document; the commands themselves are documented by
+    // the document, so they stay generic objects here
+    auto props = newObject();
+    props->setProperty("contractVersion", var(newTypeSchema("integer")));
+    props->setProperty("stable", var(newTypeSchema("boolean")));
+    props->setProperty("version", var(newTypeSchema("string")));
+    props->setProperty("numberBase", var(newTypeSchema("string")));
+    props->setProperty("octaveMiddleC", var(newTypeSchema("integer")));
+    props->setProperty("commands", var(newArraySchema(newTypeSchema("object"))));
+    props->setProperty("scaleNames", var(newArraySchema(newTypeSchema("string"))));
+    props->setProperty("processingOrder", var(newArraySchema(newTypeSchema("string"))));
+    return newObjectSchema(props, { "contractVersion", "stable", "version",
+                                    "numberBase", "octaveMiddleC", "commands" });
+}
+
+static DynamicObject* newListMidiPortsOutputSchema()
+{
+    auto props = newObject();
+    props->setProperty("inputs", var(newArraySchema(newTypeSchema("string"))));
+    props->setProperty("outputs", var(newArraySchema(newTypeSchema("string"))));
+    return newObjectSchema(props, { "inputs", "outputs" });
+}
+
+static DynamicObject* newStartRouteOutputSchema()
+{
+    auto props = newObject();
+    props->setProperty("routesBefore", var(newTypeSchema("integer")));
+    props->setProperty("routesAfter", var(newTypeSchema("integer")));
+    props->setProperty("routes", var(newArraySchema(newRouteOutputSchema())));
+    props->setProperty("connected", var(newTypeSchema("boolean")));
+    return newObjectSchema(props, { "routesBefore", "routesAfter", "routes", "connected" });
+}
+
+static DynamicObject* newListRoutesOutputSchema()
+{
+    auto props = newObject();
+    props->setProperty("routes", var(newArraySchema(newRouteOutputSchema())));
+    return newObjectSchema(props, { "routes" });
+}
+
+static DynamicObject* newInjectMidiOutputSchema()
+{
+    auto emittedProps = newObject();
+    emittedProps->setProperty("message", var(newTypeSchema("string")));
+    emittedProps->setProperty("outputs", var(newArraySchema(newTypeSchema("string"))));
+    auto props = newObject();
+    props->setProperty("route", var(newTypeSchema("integer")));
+    props->setProperty("input", var(newTypeSchema("integer")));
+    props->setProperty("injected", var(newTypeSchema("integer")));
+    props->setProperty("emitted", var(newArraySchema(
+        newObjectSchema(emittedProps, { "message", "outputs" }))));
+    props->setProperty("zoneReset", var(newTypeSchema("boolean")));
+    return newObjectSchema(props, { "route", "input", "injected", "emitted", "zoneReset" });
+}
+
+static DynamicObject* newReadRouteOutputSchema()
+{
+    auto messageProps = newObject();
+    messageProps->setProperty("seq", var(newTypeSchema("number")));
+    messageProps->setProperty("input", var(newTypeSchema("string")));
+    messageProps->setProperty("message", var(newTypeSchema("string")));
+    auto props = newObject();
+    props->setProperty("route", var(newTypeSchema("integer")));
+    props->setProperty("messages", var(newArraySchema(
+        newObjectSchema(messageProps, { "seq", "input", "message" }))));
+    props->setProperty("cursor", var(newTypeSchema("number")));
+    props->setProperty("dropped", var(newTypeSchema("number")));
+    return newObjectSchema(props, { "route", "messages", "cursor", "dropped" });
+}
+
+static DynamicObject* newStopRouteOutputSchema()
+{
+    auto props = newObject();
+    props->setProperty("stopped", var(newTypeSchema("integer")));
+    props->setProperty("routes", var(newArraySchema(newRouteOutputSchema())));
+    return newObjectSchema(props, { "stopped", "routes" });
+}
+
+static DynamicObject* newPanicRouteOutputSchema()
+{
+    auto props = newObject();
+    props->setProperty("panicked", var(newTypeSchema("integer")));
+    return newObjectSchema(props, { "panicked" });
+}
+
 static DynamicObject* newMcpTool(const String& name, const String& title,
                                  const String& description,
                                  DynamicObject* inputSchema,
+                                 DynamicObject* outputSchema,
                                  bool readOnly)
 {
     auto tool = newObject();
@@ -236,6 +377,7 @@ static DynamicObject* newMcpTool(const String& name, const String& title,
     tool->setProperty("title", title);
     tool->setProperty("description", description);
     tool->setProperty("inputSchema", var(inputSchema));
+    tool->setProperty("outputSchema", var(outputSchema));
 
     auto annotations = newObject();
     annotations->setProperty("readOnlyHint", readOnly);
@@ -250,16 +392,19 @@ static Array<var> mcpTools()
                              "Get RouteMIDI Command Schema",
                              "Return the machine-readable RouteMIDI command schema.",
                              newNoArgsSchema(),
+                             newGetSchemaOutputSchema(),
                              true)));
     tools.add(var(newMcpTool("list_midi_ports",
                              "List MIDI Ports",
                              "Return the currently available MIDI input and output ports.",
                              newNoArgsSchema(),
+                             newListMidiPortsOutputSchema(),
                              true)));
     tools.add(var(newMcpTool("start_route",
                              "Start RouteMIDI Route",
                              "Start live RouteMIDI routing from explicit command tokens.",
                              newRouteCommandsSchema(),
+                             newStartRouteOutputSchema(),
                              false)));
     tools.add(var(newMcpTool("list_routes",
                              "List Active Routes",
@@ -267,6 +412,7 @@ static Array<var> mcpTools()
                              "ports, and the commands in each processing stage (filters, "
                              "transforms, mpe, conversions, split) with their per-stage indexes.",
                              newNoArgsSchema(),
+                             newListRoutesOutputSchema(),
                              true)));
     tools.add(var(newMcpTool("inject_midi",
                              "Inject MIDI Into Route",
@@ -282,6 +428,7 @@ static Array<var> mcpTools()
                              "becomes an effective note-off), so include every operand and check "
                              "the echo.",
                              newInjectMidiSchema(),
+                             newInjectMidiOutputSchema(),
                              false)));
     tools.add(var(newMcpTool("read_route",
                              "Read Route Traffic",
@@ -296,12 +443,14 @@ static Array<var> mcpTools()
                              "missed when polling too slowly. Only messages that pass the route's "
                              "filters and processing are captured, exactly what its monitor shows.",
                              newReadRouteSchema(),
+                             newReadRouteOutputSchema(),
                              true)));
     tools.add(var(newMcpTool("stop_route",
                              "Stop Route",
                              "Stop and remove a route by id, sending all-notes-off to its "
                              "outputs first so nothing is left sounding.",
                              newRouteIdSchema(),
+                             newStopRouteOutputSchema(),
                              false)));
     tools.add(var(newMcpTool("panic_route",
                              "Panic Route",
@@ -310,6 +459,7 @@ static Array<var> mcpTools()
                              "commands (latch, mono, MPE operations) to release anything left "
                              "sounding.",
                              newRouteIdSchema(),
+                             newPanicRouteOutputSchema(),
                              false)));
     tools.add(var(newMcpTool("add_commands",
                              "Add Commands To Route",
@@ -317,6 +467,7 @@ static Array<var> mcpTools()
                              "conversions) to a running route. Ports cannot be changed; commands "
                              "are appended at the end of their stage.",
                              newAddCommandsSchema(),
+                             newRouteOutputSchema(),
                              false)));
     tools.add(var(newMcpTool("remove_command",
                              "Remove Command From Route",
@@ -324,6 +475,7 @@ static Array<var> mcpTools()
                              "(as reported by list_routes). Consider panic_route afterwards when "
                              "removing stateful commands.",
                              newStageIndexSchema(false),
+                             newRouteOutputSchema(),
                              false)));
     tools.add(var(newMcpTool("replace_command",
                              "Replace Command In Route",
@@ -331,6 +483,7 @@ static Array<var> mcpTools()
                              "position in the stage; the replacement must belong to the same "
                              "stage (for example swap 'scale C major' for 'scale D minor').",
                              newStageIndexSchema(true),
+                             newRouteOutputSchema(),
                              false)));
     return tools;
 }
