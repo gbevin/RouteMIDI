@@ -422,6 +422,90 @@ public:
             expectEquals(bend, 7000);
         }
 
+        beginTest("relocate keeps a new note's pre-note bend when channels fold");
+        {
+            // lower:15 -> lower:1: every member folds onto destination channel 2.
+            // note B's starting bend arrives before its note-on, while note A
+            // still owns the channel with a large bend
+            Array<MidiMessage> in;
+            in.add(MidiMessage::noteOn(2, 60, (uint8)100));            // note A
+            in.add(MidiMessage::pitchWheel(2, 12000));                 // A bends up
+            in.add(MidiMessage::pitchWheel(3, 8192));                  // B's starting bend
+            in.add(MidiMessage::noteOn(3, 64, (uint8)100));            // note B
+            auto out = runMpe(state, MPE_RELOCATE, {"lower:15", "lower:1"}, in);
+
+            // B's bend must reach the destination before B's note-on
+            int lastBendBeforeB = -1;
+            bool sawNoteB = false;
+            for (const auto& m : out)
+            {
+                if (!sawNoteB && m.isPitchWheel())
+                {
+                    lastBendBeforeB = m.getPitchWheelValue();
+                }
+                if (m.isNoteOn() && m.getNoteNumber() == 64)
+                {
+                    sawNoteB = true;
+                    expectEquals(m.getChannel(), 2);
+                }
+            }
+            expect(sawNoteB);
+            expectEquals(lastBendBeforeB, 8192);
+        }
+
+        beginTest("relocate re-asserts a note's pre-note expression after an interloper releases");
+        {
+            // note A declares its bend before its note-on and never repeats it;
+            // when the interloper releases, A's bend must be restored
+            Array<MidiMessage> in;
+            in.add(MidiMessage::pitchWheel(2, 12000));                 // A's starting bend
+            in.add(MidiMessage::noteOn(2, 60, (uint8)100));            // note A
+            in.add(MidiMessage::noteOn(4, 64, (uint8)100));            // interloper owns dst
+            in.add(MidiMessage::pitchWheel(4, 5000));                  // interloper bends
+            in.add(MidiMessage::noteOff(4, 64, (uint8)0));            // it releases
+            auto out = runMpe(state, MPE_RELOCATE, {"lower:4", "lower:2"}, in);
+
+            Array<int> bends;
+            for (const auto& m : out)
+            {
+                if (m.isPitchWheel())
+                {
+                    bends.add(m.getPitchWheelValue());
+                }
+            }
+            expectEquals(bends.size(), 3);
+            expectEquals(bends[0], 12000);   // A's own bend
+            expectEquals(bends[1], 5000);    // the interloper's
+            expectEquals(bends[2], 12000);   // A restored on release
+        }
+
+        beginTest("relocate does not replay a released note's expression on the next note");
+        {
+            // A bends and releases; an interloper moves the destination; a new
+            // note on A's old channel without a starting bend must not inherit
+            // A's stale bend
+            Array<MidiMessage> in;
+            in.add(MidiMessage::noteOn(2, 60, (uint8)100));            // note A
+            in.add(MidiMessage::pitchWheel(2, 12000));                 // A bends
+            in.add(MidiMessage::noteOff(2, 60, (uint8)0));            // A releases
+            in.add(MidiMessage::noteOn(4, 64, (uint8)100));            // interloper
+            in.add(MidiMessage::pitchWheel(4, 5000));                  // moves the dst bend
+            in.add(MidiMessage::noteOn(2, 62, (uint8)100));            // new note, no bend sent
+            auto out = runMpe(state, MPE_RELOCATE, {"lower:4", "lower:2"}, in);
+
+            Array<int> bends;
+            for (const auto& m : out)
+            {
+                if (m.isPitchWheel())
+                {
+                    bends.add(m.getPitchWheelValue());
+                }
+            }
+            expectEquals(bends.size(), 2);   // 12000 and 5000, no stale replay
+            expectEquals(bends[0], 12000);
+            expectEquals(bends[1], 5000);
+        }
+
         beginTest("relocate folds a colliding per-note CC to last-note-wins");
         {
             // like the pitch-bend collision, a generic per-note CC (here CC 6/38)

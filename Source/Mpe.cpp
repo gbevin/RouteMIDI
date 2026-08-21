@@ -434,11 +434,10 @@ void relocate(Relocator& rel, const Zone& src, const Zone& dst,
     {
         rel.active[ch] = true;
         rel.order[ch] = ++rel.counter;
-        // a fresh note starts with no known per-note expression, so stale
-        // values from a previous note on this channel are forgotten
-        rel.srcBend[ch] = -1;
-        rel.srcPressure[ch] = -1;
-        for (int cc = 0; cc < 128; ++cc) rel.channelCC[ch][cc] = -1;
+        // expression received since the channel's last release belongs to this
+        // note (a note's starting bend is sent ahead of its note-on), so it is
+        // re-asserted on the destination before the note starts
+        reassert(ch, dstChannel);
         MidiMessage out = msg;
         out.setChannel(dstChannel);
         output.add(out);
@@ -454,6 +453,11 @@ void relocate(Relocator& rel, const Zone& src, const Zone& dst,
         // re-asserting its held expression so it stops tracking the released
         // note instead of waiting for the next update to arrive
         reassert(activeForBucket(bucket), dstChannel);
+        // the released note's expression is stale from here on; anything that
+        // arrives next on this channel belongs to its next note
+        rel.srcBend[ch] = -1;
+        rel.srcPressure[ch] = -1;
+        for (int cc = 0; cc < 128; ++cc) rel.channelCC[ch][cc] = -1;
         return;
     }
 
