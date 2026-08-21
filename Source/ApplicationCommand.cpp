@@ -108,7 +108,9 @@ static uint16 scaleMask(const String& name)
         }
     }
 
-    // custom scale: a comma-separated list of semitone degrees (e.g. 0,2,4,7,9)
+    // custom scale: a comma-separated list of semitone degrees (e.g. 0,2,4,7,9);
+    // every part must be a plain number from 0 to 11, so a typo like "b3" is
+    // reported as an unknown scale instead of silently landing on degree 0
     if (name.containsChar(','))
     {
         uint16 m = 0;
@@ -117,10 +119,11 @@ static uint16 scaleMask(const String& name)
         for (const auto& p : parts)
         {
             const String t = p.trim();
-            if (t.isNotEmpty())
+            if (t.isEmpty() || !t.containsOnly("0123456789") || t.getIntValue() > 11)
             {
-                m |= (uint16)(1 << (((t.getIntValue() % 12) + 12) % 12));
+                return 0;
             }
+            m |= (uint16)(1 << t.getIntValue());
         }
         return m;
     }

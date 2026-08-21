@@ -245,6 +245,15 @@ public:
             parse(valid, "in A inscale C major scale C Harmonic-Minor dtransp C blues 2 out B");
             expectEquals(valid.getRoutes()[0]->filters.size(), 1);
             expectEquals(valid.getRoutes()[0]->transforms.size(), 2);
+
+            // custom degree lists must be plain numbers from 0 to 11: flat
+            // notation, out-of-range degrees and empty parts are rejected
+            ApplicationState custom;
+            parse(custom, "in A scale C 1,b3,5 scale C 0,12,7 scale C 0,,7 out B");
+            expect(custom.getRoutes()[0]->transforms.isEmpty());
+            parse(custom, "in A scale C 0,3,7 inscale C 0,2,4,7,9 out B");
+            expectEquals(custom.getRoutes()[1]->transforms.size(), 1);
+            expectEquals(custom.getRoutes()[1]->filters.size(), 1);
         }
 
         beginTest("Monitoring is suppressed while a route writes MIDI text to stdout");
