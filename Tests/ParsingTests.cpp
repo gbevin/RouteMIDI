@@ -552,6 +552,17 @@ public:
                 const auto& order = *root->getProperty("processingOrder").getArray();
                 expect(order.contains(var("split")));
                 expect(! order.contains(var("outputs")));
+
+                // the contract is marked stable and each command declares MCP
+                // availability truthfully (js/jsf and stdout commands are denied)
+                expect((bool) root->getProperty("stable"));
+                expect(! findCommand("js")->getProperty("mcpAvailable"));
+                expect(! findCommand("jsf")->getProperty("mcpAvailable"));
+                expect(! findCommand("mon")->getProperty("mcpAvailable"));
+                expect(! findCommand("syf")->getProperty("mcpAvailable"));
+                expect((bool) findCommand("transp")->getProperty("mcpAvailable"));
+                expect((bool) findCommand("cc")->getProperty("mcpAvailable"));
+                expect((bool) findCommand("convert")->getProperty("mcpAvailable"));
             }
         }
 

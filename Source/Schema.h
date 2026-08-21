@@ -32,4 +32,8 @@ namespace schema
 // number/note conventions
 String commandsJson(const Array<ApplicationCommand>& commands, int defaultOctaveMiddleC);
 
+// whether a command can be used through the MCP tools (start_route/add_commands);
+// the single source of truth shared by the schema and the MCP command validator
+bool availableViaMcp(const ApplicationCommand& command);
+
 } // namespace schema

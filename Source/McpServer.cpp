@@ -18,6 +18,8 @@
 
 #include "McpServer.h"
 
+#include "Schema.h"
+
 #include "ApplicationState.h"
 
 #if JUCE_WINDOWS
@@ -708,6 +710,10 @@ static bool readMcpMessage(String& body)
 // string for allowed commands.
 static String mcpCommandDenialReason(const ApplicationCommand& cmd)
 {
+    if (schema::availableViaMcp(cmd))
+    {
+        return {};
+    }
     switch (cmd.command_)
     {
         // routing and topology

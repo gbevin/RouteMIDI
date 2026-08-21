@@ -193,6 +193,28 @@ static bool isOptionalArg(const String& desc)
     return desc.startsWithChar('(');
 }
 
+bool availableViaMcp(const ApplicationCommand& command)
+{
+    switch (command.command_)
+    {
+        // these write to stdout, read local files, or run code, so a remote
+        // client cannot use them; everything else that forms a route can
+        case NONE:
+        case LIST:
+        case MONITOR:
+        case MONITOR_SOURCE:
+        case NOTE_NUMBERS:
+        case TIMESTAMP:
+        case TXTFILE:
+        case SYSEX_FILE:
+        case JAVASCRIPT:
+        case JAVASCRIPT_FILE:
+            return false;
+        default:
+            return true;
+    }
+}
+
 String commandsJson(const Array<ApplicationCommand>& commands, int defaultOctaveMiddleC)
 {
     auto root = new DynamicObject();
@@ -202,6 +224,9 @@ String commandsJson(const Array<ApplicationCommand>& commands, int defaultOctave
     // shape, independently of the release version, so a client can gate on it;
     // the release version is reported separately
     root->setProperty("contractVersion", 1);
+    // the contract is stable as of 1.0.0: a breaking change to this document's
+    // shape bumps contractVersion
+    root->setProperty("stable", true);
     root->setProperty("version", ProjectInfo::versionString);
     root->setProperty("defaultOctaveMiddleC", defaultOctaveMiddleC);
     root->setProperty("defaultNumberBase", "decimal");
@@ -250,6 +275,7 @@ String commandsJson(const Array<ApplicationCommand>& commands, int defaultOctave
         }
         command->setProperty("args", var(stringArrayToVarArray(cmd.optionsDescriptions_, true)));
         command->setProperty("description", cmd.commandDescriptions_.isEmpty() ? String() : cmd.commandDescriptions_[0]);
+        command->setProperty("mcpAvailable", availableViaMcp(cmd));
         commandArray.add(var(command));
     }
     root->setProperty("commands", var(commandArray));
@@ -272,7 +298,7 @@ String commandsJson(const Array<ApplicationCommand>& commands, int defaultOctave
     routeRules.add("Further in or vin commands add inputs to the current route until an out or vout is added.");
     routeRules.add("After outputs exist, the next in or vin starts a new route.");
     routeRules.add("Every input of a route is forwarded to every output of that route, unless mpesplit distributes voices across outputs.");
-    routeRules.add("Use - as an input or output name for text MIDI over stdin or stdout.");
+    routeRules.add("Use - as an input or output name for text MIDI over stdin or stdout; this is command-line only and not available over MCP.");
     root->setProperty("routeRules", var(routeRules));
 
     Array<var> stageOrder;
