@@ -566,6 +566,35 @@ public:
             }
         }
 
+        beginTest("MCP start_route rejects a route with no outputs and caps route count");
+        {
+            ApplicationState state;
+            // inputs but no outputs must be refused, not activated as running
+            const var noOut = mcp(state, R"json({"jsonrpc":"2.0","id":1,"method":"tools/call",
+                "params":{"name":"start_route","arguments":{"commands":["in","Bus 1"]}}})json", true);
+            expect(noOut.getProperty("result", var()).getProperty("isError", var()));
+            expect(state.getRoutes().isEmpty());
+
+            // starting routes past the cap is refused rather than growing without bound
+            int started = 0;
+            for (int i = 0; i < 300; ++i)
+            {
+                const var r = mcp(state, String("{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\","
+                    "\"params\":{\"name\":\"start_route\",\"arguments\":{\"commands\":[\"in\",\"In")
+                    + String(i) + "\",\"out\",\"Out" + String(i) + "\"]}}}", true);
+                if (! (bool) r.getProperty("result", var()).getProperty("isError", var()))
+                {
+                    ++started;
+                }
+                else
+                {
+                    break;
+                }
+            }
+            expectEquals(started, 256);
+            expectEquals(state.getRoutes().size(), 256);
+        }
+
         beginTest("MCP protocol conformance: ping, unknown tool, invalid request, notifications");
         {
             ApplicationState state;

@@ -27,6 +27,10 @@
 #include <io.h>
 #endif
 
+// an upper bound on live routes so a retry-looping client cannot grow routes,
+// virtual ports and capture buffers without limit
+static constexpr int maxMcpRoutes = 256;
+
 static Array<var> stringArrayToVarArray(const StringArray& strings, bool omitEmpty)
 {
     Array<var> result;
@@ -1070,6 +1074,23 @@ var McpServer::handleRequest(const var& message)
                 {
                     restoreSettings();
                     return var(newMcpResponse(id, newMcpToolResult("The commands did not create a route; start_route needs \"in ... out ...\" tokens",
+                                                                  var(),
+                                                                  true)));
+                }
+                for (auto* staged : staging)
+                {
+                    if (staged->outputs.isEmpty())
+                    {
+                        restoreSettings();
+                        return var(newMcpResponse(id, newMcpToolResult("A route has inputs but no outputs; start_route needs \"in ... out ...\" tokens",
+                                                                      var(),
+                                                                      true)));
+                    }
+                }
+                if (routesBefore + staging.size() > maxMcpRoutes)
+                {
+                    restoreSettings();
+                    return var(newMcpResponse(id, newMcpToolResult("Too many routes; stop some routes before starting more",
                                                                   var(),
                                                                   true)));
                 }
