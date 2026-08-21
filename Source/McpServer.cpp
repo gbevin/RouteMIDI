@@ -1363,9 +1363,14 @@ var McpServer::handleRequest(const var& message)
             }
             maxMessages = jlimit(1, Route::captureCapacity, maxMessages);
 
-            Array<var> messages;
+            // copy the matching entries out under the lock, then render the
+            // text and JSON without it: holding the callback lock across
+            // hundreds of allocations and string formats would stall the MIDI
+            // callback and drop incoming packets
+            std::vector<CapturedMidi> selected;
             int64 cursor = after;
             int64 dropped = 0;
+            bool anySelected = false;
             {
                 const ScopedLock sl(state_.midiCallbackLock_);
 
@@ -1382,13 +1387,10 @@ var McpServer::handleRequest(const var& message)
                 {
                     if (captured.seq > after)
                     {
-                        auto item = newObject();
-                        item->setProperty("seq", (double) captured.seq);
-                        item->setProperty("input", captured.input);
-                        item->setProperty("message", state_.messageToText(captured.message));
-                        messages.add(var(item));
+                        selected.push_back(captured);
                         cursor = captured.seq;
-                        if (messages.size() >= maxMessages)
+                        anySelected = true;
+                        if ((int) selected.size() >= maxMessages)
                         {
                             break;
                         }
@@ -1397,10 +1399,20 @@ var McpServer::handleRequest(const var& message)
 
                 // with nothing new to return, advance the cursor to the current end
                 // so the next poll continues forward instead of replaying history
-                if (messages.isEmpty())
+                if (!anySelected)
                 {
                     cursor = jmax(after, route->captureSeq - 1);
                 }
+            }
+
+            Array<var> messages;
+            for (const auto& captured : selected)
+            {
+                auto item = newObject();
+                item->setProperty("seq", (double) captured.seq);
+                item->setProperty("input", captured.input);
+                item->setProperty("message", state_.messageToText(captured.message));
+                messages.add(var(item));
             }
 
             auto result = newObject();
@@ -1458,10 +1470,13 @@ var McpServer::handleRequest(const var& message)
 
             if (name == "add_commands")
             {
-                const ScopedLock sl(state_.midiCallbackLock_);
-                for (const auto& entry : pending)
                 {
-                    state_.addProcessingCommand(*route, entry.command, entry.negate);
+                    // mutate under the lock, render the reply without it
+                    const ScopedLock sl(state_.midiCallbackLock_);
+                    for (const auto& entry : pending)
+                    {
+                        state_.addProcessingCommand(*route, entry.command, entry.negate);
+                    }
                 }
                 return structuredOk(routeToVar(*route));
             }
