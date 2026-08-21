@@ -194,13 +194,15 @@ private:
 
     bool pendingNegate_;
 
-    bool useHexadecimalsByDefault_;
-    bool noteNumbersOutput_;
+    // read by textFormat() on the MIDI callback thread while parse-time writes
+    // happen on the message thread, so these three are atomic
+    std::atomic<bool> useHexadecimalsByDefault_ { false };
+    std::atomic<bool> noteNumbersOutput_ { false };
+    std::atomic<int> octaveMiddleC_ { 3 };   // C3, the default middle C octave
     bool timestampOutput_;
     bool monitor_;
     bool captureTraffic_ { false };   // record routed traffic for the MCP read_route tool
     bool monitorShowSource_;
-    int octaveMiddleC_;
 
     JavascriptEngine scriptEngine_;
     ScriptMidiMessageClass* scriptMidiMessage_;

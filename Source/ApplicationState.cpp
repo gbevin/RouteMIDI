@@ -2025,7 +2025,7 @@ void ApplicationState::printVersion()
 
 String ApplicationState::schemaJson() const
 {
-    return schema::commandsJson(commands_, DEFAULT_OCTAVE_MIDDLE_C);
+    return schema::commandsJson(commands_, octaveMiddleC_, useHexadecimalsByDefault_);
 }
 
 void ApplicationState::printSchemaJson()

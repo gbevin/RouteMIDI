@@ -215,7 +215,7 @@ bool availableViaMcp(const ApplicationCommand& command)
     }
 }
 
-String commandsJson(const Array<ApplicationCommand>& commands, int defaultOctaveMiddleC)
+String commandsJson(const Array<ApplicationCommand>& commands, int octaveMiddleC, bool hexadecimal)
 {
     auto root = new DynamicObject();
     root->setProperty("schema", "https://github.com/gbevin/RouteMIDI/schema/commands-v1");
@@ -228,8 +228,10 @@ String commandsJson(const Array<ApplicationCommand>& commands, int defaultOctave
     // shape bumps contractVersion
     root->setProperty("stable", true);
     root->setProperty("version", ProjectInfo::versionString);
-    root->setProperty("defaultOctaveMiddleC", defaultOctaveMiddleC);
-    root->setProperty("defaultNumberBase", "decimal");
+    // these reflect the current session state (a route's "hex" or "omc"
+    // token persists), so a client sees how inject_midi values parse now
+    root->setProperty("octaveMiddleC", octaveMiddleC);
+    root->setProperty("numberBase", hexadecimal ? "hexadecimal" : "decimal");
 
     Array<var> commandArray;
     for (const auto& cmd : commands)

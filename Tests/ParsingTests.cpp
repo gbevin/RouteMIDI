@@ -463,7 +463,8 @@ public:
             if (root != nullptr)
             {
                 expect(root->getProperty("tool").toString() == ProjectInfo::projectName);
-                expectEquals((int)root->getProperty("defaultOctaveMiddleC"), 3);
+                expectEquals((int)root->getProperty("octaveMiddleC"), 3);
+                expect(root->getProperty("numberBase").toString() == "decimal");
 
                 const auto& commands = *root->getProperty("commands").getArray();
                 expect(commands.size() > 0);
@@ -564,6 +565,18 @@ public:
                 expect((bool) findCommand("cc")->getProperty("mcpAvailable"));
                 expect((bool) findCommand("convert")->getProperty("mcpAvailable"));
             }
+        }
+
+        beginTest("get_schema reflects the current session number base and octave");
+        {
+            ApplicationState state;
+            // a route carrying hex and omc changes the session state
+            mcp(state, R"json({"jsonrpc":"2.0","id":1,"method":"tools/call",
+                "params":{"name":"start_route","arguments":{
+                    "commands":["in","SIn","hex","omc","4","cc","10","out","SOut"]}}})json", true);
+            const var schema = JSON::parse(state.schemaJson());
+            expect(schema.getProperty("numberBase", var()).toString() == "hexadecimal");
+            expectEquals((int) schema.getProperty("octaveMiddleC", var()), 4);
         }
 
         beginTest("MCP start_route rejects a route with no outputs and caps route count");

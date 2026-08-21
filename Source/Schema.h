@@ -30,7 +30,7 @@ namespace schema
 // renders the command table as a JSON document: every command with its stage,
 // arity and argument names, plus the route rules, the processing order and the
 // number/note conventions
-String commandsJson(const Array<ApplicationCommand>& commands, int defaultOctaveMiddleC);
+String commandsJson(const Array<ApplicationCommand>& commands, int octaveMiddleC, bool hexadecimal);
 
 // whether a command can be used through the MCP tools (start_route/add_commands);
 // the single source of truth shared by the schema and the MCP command validator
