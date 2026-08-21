@@ -573,6 +573,19 @@ public:
             }
         }
 
+        beginTest("start_route reports connected=false while ports are still waiting");
+        {
+            ApplicationState state;
+            const var r = mcp(state, R"json({"jsonrpc":"2.0","id":1,"method":"tools/call",
+                "params":{"name":"start_route","arguments":{
+                    "commands":["in","NoSuchIn","out","NoSuchOut"]}}})json");
+            const var sc = r.getProperty("result", var()).getProperty("structuredContent", var());
+            // the route is active but its ports don't exist, so it is not connected
+            expect(sc.hasProperty("connected"));
+            expect(! (bool) sc.getProperty("connected", var(true)));
+            expect(! sc.hasProperty("running"));   // the uninformative constant is gone
+        }
+
         beginTest("get_schema reflects the current session number base and octave");
         {
             ApplicationState state;
@@ -782,7 +795,7 @@ public:
             auto structured = response.getProperty("result", var()).getProperty("structuredContent", var());
             expectEquals((int)structured.getProperty("routesBefore", var()), 0);
             expectEquals((int)structured.getProperty("routesAfter", var()), 1);
-            expect(structured.getProperty("running", var()));
+            expect(structured.hasProperty("connected"));   // active; connected reflects port state
             expectEquals(state.getRoutes().size(), 1);
             expectEquals(state.getRoutes()[0]->transforms.size(), 1);
             expect(state.getRoutes()[0]->transforms[0].command_ == TRANSPOSE);
@@ -845,7 +858,7 @@ public:
             // token-shape validation cannot catch everything: an invalid MPE zone
             // has the right arity but fails when the command is added. Such
             // failures must reject the whole call instead of splicing a partial
-            // route into the live set with "running": true
+            // route into the live set
             ApplicationState state;
             const var badZone = mcp(state, R"json({
                 "jsonrpc": "2.0", "id": 30, "method": "tools/call",

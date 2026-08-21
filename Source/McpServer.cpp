@@ -1113,11 +1113,30 @@ var McpServer::handleRequest(const var& message)
                 routeStatus.add(var(routeToVar(*state_.routes_[i])));
             }
 
+            // whether every port of every new route is connected; a false here
+            // means at least one route is waiting for a port to appear (the
+            // reconnect timer keeps retrying, and the per-port connected flags
+            // in "routes" say which). This replaces a constant that was always
+            // true and carried no information
+            bool connected = true;
+            for (int i = routesBefore; i < state_.routes_.size(); ++i)
+            {
+                auto* r = state_.routes_[i];
+                for (auto* in : r->inputs)
+                {
+                    if (in->midiIn == nullptr) connected = false;
+                }
+                for (auto* dest : r->outputs)
+                {
+                    if (!dest->isStdout && dest->out == nullptr && dest->syxFile == nullptr) connected = false;
+                }
+            }
+
             auto result = newObject();
             result->setProperty("routesBefore", routesBefore);
             result->setProperty("routesAfter", state_.routes_.size());
             result->setProperty("routes", var(routeStatus));
-            result->setProperty("running", true);
+            result->setProperty("connected", connected);
             const var structured(result);
             return var(newMcpResponse(id, newMcpToolResult(JSON::toString(structured, true),
                                                           structured,
