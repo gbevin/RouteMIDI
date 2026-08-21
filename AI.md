@@ -187,7 +187,7 @@ routemidi [settings] in|vin <port> [commands ...] out|vout <port> [out ...] [in 
 
 * A route is one or more `in`/`vin` inputs, the route's filter/transform/MPE/convert commands (their position among each other is free, see the fixed stage order under [Routes](README.md#routes)), and one or more `out`/`vout` outputs. The first `in` after an `out` starts a new, independent route. Every input of a route is forwarded to every output of that route.
 * Port names match case-insensitively by substring, so `in "Linn"` finds "LinnStrument MIDI". Ports that share the same name are listed with a number by `list` and `list_midi_ports`, like `KeyStep (2)`, and that numbered name selects that specific port. `-` as a port name is a text stream: `in -` reads text MIDI from standard input, `out -` writes it to standard output.
-* Settings (`dec`, `hex`, `omc`, `mon`, `ts`, `nn`, `src`, `panic`) can appear anywhere.
+* Settings (`dec`, `hex`, `omc`, `mon`, `ts`, `nn`, `src`) can appear anywhere. `panic` is per route: place it among a route's own commands (between its `in` and the next route), where it flags that route for the all-notes-off safety net.
 
 **Value conventions**
 

@@ -10,17 +10,19 @@
 
 Rules for generating correct RouteMIDI command lines.
 
-**Machine discovery** (experimental and fast-moving: the JSON shapes, MCP tool
-names and protocol version may change between RouteMIDI releases)
+**Machine discovery** (stable as of RouteMIDI 1.0.0: the JSON shapes and MCP
+tools are versioned by the `contractVersion` field, bumped only on a breaking
+change)
 
 - `routemidi --schema json` prints machine-readable command metadata and exits.
-  The document includes `"experimental": true`.
+  The document includes `"stable": true` and a `contractVersion` to gate on, and
+  each command carries an `mcpAvailable` flag.
 - `routemidi --mcp` runs a stdio MCP server. MCP clients must be configured to
   launch this command; normal live routing commands do not advertise or expose
   an MCP endpoint.
 - Once launched with `--mcp`, discover tools through MCP `initialize` and
   `tools/list`. The server exposes `get_schema`, `list_midi_ports`,
-  `start_route`, `list_routes`, `inject_midi`, `add_commands`,
+  `start_route`, `list_routes`, `inject_midi`, `read_route`, `add_commands`,
   `replace_command`, `remove_command`, `panic_route` and `stop_route`.
 - `start_route` and `add_commands` take the same command tokens as the command
   line, minus the executable name, as a JSON array (one token per element). A
@@ -129,7 +131,7 @@ channel  1   note-on           C4 100
 ## Docs
 
 - [README](https://raw.githubusercontent.com/gbevin/RouteMIDI/master/README.md): the full manual: every command, filter semantics, transforms, MPE routing, conversions and the text MIDI format
-- [AI.md](https://raw.githubusercontent.com/gbevin/RouteMIDI/master/AI.md): driving RouteMIDI from AI tools and scripts: the generation contract, the `--schema json` metadata, the `--mcp` MCP server and its security model (experimental and fast-moving)
+- [AI.md](https://raw.githubusercontent.com/gbevin/RouteMIDI/master/AI.md): driving RouteMIDI from AI tools and scripts: the generation contract, the `--schema json` metadata, the `--mcp` MCP server and its security model (stable as of 1.0.0, versioned by contractVersion)
 - [JAVASCRIPT.md](https://raw.githubusercontent.com/gbevin/RouteMIDI/master/JAVASCRIPT.md): the per-message JavaScript API (accessors, send functions, OSC, persistent state)
 
 ## Related
