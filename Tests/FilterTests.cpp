@@ -171,21 +171,19 @@ public:
             RouteInput pairing;   // fresh MSB memory for this test
             route.filters.add(makeCommand(CONTROL_CHANGE_14BIT_RANGE, {"7", "8000", "9000"}));
 
-            // an in-range pair: the MSB half is judged as MSB<<7, the LSB half
-            // with the exact assembled value
-            expect(  state.passesFilters(route, pairing, MidiMessage::controllerEvent(1, 7, 65)));   // 8320
-            expect(  state.passesFilters(route, pairing, MidiMessage::controllerEvent(1, 39, 64)));  // 8384
+            // an in-range pair: both halves are judged by the MSB's 128-value
+            // block, so they always travel together
+            expect(  state.passesFilters(route, pairing, MidiMessage::controllerEvent(1, 7, 65)));   // block 8320-8447
+            expect(  state.passesFilters(route, pairing, MidiMessage::controllerEvent(1, 39, 64)));
 
             // an out-of-range pair: both halves are blocked
-            expect(! state.passesFilters(route, pairing, MidiMessage::controllerEvent(1, 7, 20)));   // 2560
-            expect(! state.passesFilters(route, pairing, MidiMessage::controllerEvent(1, 39, 0)));   // 2560
+            expect(! state.passesFilters(route, pairing, MidiMessage::controllerEvent(1, 7, 20)));   // block 2560-2687
+            expect(! state.passesFilters(route, pairing, MidiMessage::controllerEvent(1, 39, 0)));
 
-            // the LSB decides with the remembered MSB: 65 << 7 | 127 = 8447 in
-            // range, while an LSB pushing past the bound is blocked
-            expect(  state.passesFilters(route, pairing, MidiMessage::controllerEvent(1, 7, 65)));
-            expect(  state.passesFilters(route, pairing, MidiMessage::controllerEvent(1, 39, 127))); // 8447
-            expect(  state.passesFilters(route, pairing, MidiMessage::controllerEvent(1, 7, 70)));   // 8960
-            expect(! state.passesFilters(route, pairing, MidiMessage::controllerEvent(1, 39, 41)));  // 9001
+            // at a window edge inside a block the whole pair still passes: the
+            // edge acts at MSB resolution rather than splitting the pair
+            expect(  state.passesFilters(route, pairing, MidiMessage::controllerEvent(1, 7, 70)));   // block 8960-9087
+            expect(  state.passesFilters(route, pairing, MidiMessage::controllerEvent(1, 39, 41)));  // follows its MSB
 
             // other controllers and non-CC messages don't match
             expect(! state.passesFilters(route, pairing, MidiMessage::controllerEvent(1, 8, 65)));
@@ -193,7 +191,15 @@ public:
             expect(! state.passesFilters(route, pairing, MidiMessage::noteOn(1, 60, (uint8)100)));
 
             // the MSB memory is per channel: channel 2 still assumes MSB 0
-            expect(! state.passesFilters(route, pairing, MidiMessage::controllerEvent(2, 39, 64)));  // 64
+            expect(! state.passesFilters(route, pairing, MidiMessage::controllerEvent(2, 39, 64)));  // block 0-127
+
+            // a window starting inside the first block never orphans the LSB:
+            // both halves of a low pair pass together
+            Route low;
+            RouteInput lowPairing;
+            low.filters.add(makeCommand(CONTROL_CHANGE_14BIT_RANGE, {"7", "100", "8191"}));
+            expect(  state.passesFilters(low, lowPairing, MidiMessage::controllerEvent(1, 7, 0)));
+            expect(  state.passesFilters(low, lowPairing, MidiMessage::controllerEvent(1, 39, 120)));
         }
 
         beginTest("inscale passes only notes that belong to the key");

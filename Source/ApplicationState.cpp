@@ -1578,23 +1578,26 @@ static bool matchesCc14Range(const ApplicationCommand& cmd, RouteInput& input,
 
     const int cc = msg.getControllerNumber();
     const int n = cmd.copts_[0].value7 & 0x1f;
-    int value;
+    int msb;
     if (cc == n)
     {
         input.cc14RangeMsb[msg.getChannel() - 1][n] = (uint8) msg.getControllerValue();
-        value = msg.getControllerValue() << 7;
+        msb = msg.getControllerValue();
     }
     else if (cc == n + 32)
     {
-        value = (input.cc14RangeMsb[msg.getChannel() - 1][n] << 7) | msg.getControllerValue();
+        msb = input.cc14RangeMsb[msg.getChannel() - 1][n];
     }
     else
     {
         return false;
     }
 
-    return value >= jlimit(0, 16383, cmd.copts_[1].intValue) &&
-           value <= jlimit(0, 16383, cmd.copts_[2].intValue);
+    // both halves get the same verdict so a pair is never split: the pair
+    // passes when the MSB's 128-value block overlaps the window, which is all
+    // that can be known when the MSB arrives ahead of its LSB
+    return (msb << 7) + 127 >= jlimit(0, 16383, cmd.copts_[1].intValue) &&
+           (msb << 7)       <= jlimit(0, 16383, cmd.copts_[2].intValue);
 }
 
 // the "nrpn N" / "rpn N" filters: pass only the traffic for parameter N. The
