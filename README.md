@@ -656,7 +656,7 @@ routemidi in "Linn" mpe lower:7 lower:7 mpe upper:7 upper:7 out "Synth"
 
 ## Monitoring
 
-RouteMIDI is quiet by default: it just routes. Add `mon` to print every message that a route forwards, in the same text format that ReceiveMIDI uses (and SendMIDI reads). `src` prefixes each monitored line with the input port name, which is handy when several inputs are merged. `ts` adds a timestamp, and `nn` prints notes as numbers instead of names.
+RouteMIDI is quiet by default: it just routes. Add `mon` to print every message that a route forwards, in the same text format that ReceiveMIDI uses (and SendMIDI reads). `src` prefixes each monitored line with the input port name, which is handy when several inputs are merged. `ts` adds a timestamp, and `nn` prints notes as numbers instead of names. While a route writes MIDI as text to standard output (`out -`), monitoring is suppressed so the stream stays clean for the next tool in the pipe.
 
 ```
 routemidi in "Keyboard" mon out "Synth"             # echo what is forwarded

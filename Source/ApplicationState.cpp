@@ -887,6 +887,10 @@ void ApplicationState::executeCommand(ApplicationCommand& cmd)
                     dest->name = "stdout";
                     dest->fullName = "stdout";
                     route->outputs.add(dest);
+                    if (monitor_)
+                    {
+                        std::cerr << "Monitoring is suppressed while MIDI is written to standard output" << std::endl;
+                    }
                 }
                 else
                 {
@@ -944,11 +948,16 @@ void ApplicationState::executeCommand(ApplicationCommand& cmd)
             timestampOutput_ = true;
             break;
         case MONITOR:
-            monitor_ = true;
-            break;
         case MONITOR_SOURCE:
             monitor_ = true;
-            monitorShowSource_ = true;
+            if (cmd.command_ == MONITOR_SOURCE)
+            {
+                monitorShowSource_ = true;
+            }
+            if (stdoutRouteExists())
+            {
+                std::cerr << "Monitoring is suppressed while MIDI is written to standard output" << std::endl;
+            }
             break;
         case SYSEX_FILE:
         {
@@ -1368,13 +1377,28 @@ void ApplicationState::routeMessage(Route& route, RouteInput& input, const MidiM
     processRouteMessage(route, input, msg, outMsgs, outPorts);
     sendRouted(route, outMsgs, outPorts);
 
-    if (monitor_)
+    if (monitor_ && !stdoutRouteExists())
     {
         for (auto& m : outMsgs)
         {
             printMonitor(input.fullInName, m);
         }
     }
+}
+
+bool ApplicationState::stdoutRouteExists() const
+{
+    for (auto* route : routes_)
+    {
+        for (auto* dest : route->outputs)
+        {
+            if (dest->isStdout)
+            {
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 bool ApplicationState::processRouteMessage(Route& route, RouteInput& input, const MidiMessage& msg,

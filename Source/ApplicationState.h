@@ -143,6 +143,9 @@ private:
     OutputDest* createVirtualOutput(const String& name);
 
     void routeMessage(Route& route, RouteInput& input, const MidiMessage& msg);
+    // monitoring shares stdout with "out -" text routes; while one exists the
+    // monitor stays quiet so the stream remains parseable downstream
+    bool stdoutRouteExists() const;
     void applyMpeOp(const ApplicationCommand& cmd, RouteInput& input, const MidiMessage& msg, Array<MidiMessage>& output);
     void sendToDest(OutputDest* dest, const MidiMessage& msg);
     // sends processRouteMessage results to the route's outputs, honoring the
@@ -231,6 +234,12 @@ public:
     // owns, so routed messages reach a connected output
     void startOutputSender() { state_.startOutputSender(); }
     void stopOutputSender()  { state_.stopOutputSender(); }
+
+    // route one message exactly as the MIDI callback would, monitor included
+    void routeMessage(Route& route, RouteInput& input, const MidiMessage& msg)
+    {
+        state_.routeMessage(route, input, msg);
+    }
 
 private:
     ApplicationState& state_;

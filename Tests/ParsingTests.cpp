@@ -206,6 +206,32 @@ public:
             expectEquals(route->filters.size(), 0);
         }
 
+        beginTest("Monitoring is suppressed while a route writes MIDI text to stdout");
+        {
+            // with an "out -" route, each message appears on stdout exactly once
+            ApplicationState state;
+            parse(state, "in A mon out -");
+            auto* route = state.getRoutes()[0];
+            std::ostringstream captured;
+            auto* previous = std::cout.rdbuf(captured.rdbuf());
+            ApplicationState::Control(state).routeMessage(*route, *route->inputs.getFirst(),
+                                                          MidiMessage::noteOn(1, 60, (uint8)100));
+            std::cout.rdbuf(previous);
+            expectEquals(StringArray::fromLines(String(captured.str()).trim()).size(), 1);
+
+            // without a stdout route the monitor still prints
+            ApplicationState other;
+            parse(other, "in A mon out B");
+            auto* route2 = other.getRoutes()[0];
+            std::ostringstream captured2;
+            previous = std::cout.rdbuf(captured2.rdbuf());
+            ApplicationState::Control(other).routeMessage(*route2, *route2->inputs.getFirst(),
+                                                          MidiMessage::noteOn(1, 60, (uint8)100));
+            std::cout.rdbuf(previous);
+            expectEquals(StringArray::fromLines(String(captured2.str()).trim()).size(), 1);
+            expect(String(captured2.str()).contains("note-on"));
+        }
+
         beginTest("A program file that includes itself is refused instead of recursing");
         {
             auto dir = File::getSpecialLocation(File::tempDirectory);
