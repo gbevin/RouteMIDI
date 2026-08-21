@@ -466,6 +466,12 @@ public:
                 expectEquals((int)root->getProperty("octaveMiddleC"), 3);
                 expect(root->getProperty("numberBase").toString() == "decimal");
 
+                // the scale vocabulary is discoverable in the schema
+                const auto* scaleNames = root->getProperty("scaleNames").getArray();
+                expect(scaleNames != nullptr && scaleNames->size() == 24);
+                expect(scaleNames != nullptr && scaleNames->contains(var("major")));
+                expect(scaleNames != nullptr && scaleNames->contains(var("harmonicminor")));
+
                 const auto& commands = *root->getProperty("commands").getArray();
                 expect(commands.size() > 0);
 

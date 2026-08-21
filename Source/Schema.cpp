@@ -321,7 +321,10 @@ String commandsJson(const Array<ApplicationCommand>& commands, int octaveMiddleC
     notes.add("Numbers are decimal by default; hex changes the default, and M/H suffixes force decimal or hexadecimal.");
     notes.add("Note names use C3 as middle C by default; omc changes the displayed and parsed octave.");
     notes.add("Selectors for ch, on, off, pp, cc, cc14 and pc may be single values or inclusive lo..hi ranges.");
+    notes.add("The scale argument of scale, inscale and dtransp is one of scaleNames, or a custom comma-separated list of semitone degrees such as 0,2,4,7,9.");
     root->setProperty("notes", var(notes));
+
+    root->setProperty("scaleNames", var(stringArrayToVarArray(ApplicationCommand::scaleNameList(), true)));
 
     Array<var> textMidiExamples;
     textMidiExamples.add("printf 'channel 1 note-on 60 100\\n' | routemidi in - transp 12 out -");

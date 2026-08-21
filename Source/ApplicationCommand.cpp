@@ -133,12 +133,21 @@ bool ApplicationCommand::isValidScaleName(const String& name)
     return scaleMask(name) != 0;
 }
 
+StringArray ApplicationCommand::scaleNameList()
+{
+    return { "chromatic", "major", "minor", "dorian", "phrygian", "lydian",
+             "mixolydian", "locrian", "harmonicminor", "melodicminor",
+             "majorpentatonic", "minorpentatonic", "majorblues", "minorblues",
+             "diminished", "wholetone", "spanish", "romani", "arabian",
+             "egyptian", "ryukyu", "augmented", "diminished7", "fifth" };
+}
+
 String ApplicationCommand::scaleNames()
 {
-    return "chromatic, major, minor, dorian, phrygian, lydian, mixolydian, locrian, "
-           "harmonicminor, melodicminor, majorpentatonic, minorpentatonic, majorblues, "
-           "minorblues, diminished, wholetone, spanish, romani, arabian, egyptian, "
-           "ryukyu, augmented, diminished7 or fifth";
+    auto names = scaleNameList();
+    const String last = names.strings.getLast();
+    names.strings.removeLast();
+    return names.joinIntoString(", ") + " or " + last;
 }
 
 

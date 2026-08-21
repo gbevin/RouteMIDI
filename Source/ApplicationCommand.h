@@ -222,6 +222,7 @@ struct ApplicationCommand
     // canonical names for their error message
     static bool isValidScaleName(const String& name);
     static String scaleNames();
+    static StringArray scaleNameList();
 
     static bool checkChannel(const MidiMessage& msg, int channelLow, int channelHigh);
 
