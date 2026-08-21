@@ -232,14 +232,13 @@ Options:
   -h  or  --help         Print Help (this message) and exit
   --version              Print version information and exit
   --schema json          Print machine-readable command JSON and exit
-                         [experimental]
-  --mcp                  Run a stdio MCP server [experimental]
+  --mcp                  Run a stdio MCP server
   --print-mcp-config     Print an MCP client configuration block and exit
   --install-mcp [client] Add RouteMIDI to an MCP client's configuration and exit
   --                     Read commands from standard input until it's closed
 ```
 
-Use `--schema json` for command metadata for scripts, MCP servers and AI agents. Use `--mcp` to let MCP clients control RouteMIDI over stdio. These two features are experimental and fast-moving: their JSON and the MCP tools may change between releases. See **[AI.md](AI.md)** for the generation contract, the schema and the MCP server with its tools and security model.
+Use `--schema json` for command metadata for scripts, MCP servers and AI agents. Use `--mcp` to let MCP clients control RouteMIDI over stdio. Their JSON shapes and MCP tools are stable and versioned by the schema's `contractVersion` field, bumped only on a breaking change. See **[AI.md](AI.md)** for the generation contract, the schema and the MCP server with its tools and security model.
 
 To connect RouteMIDI to a local AI assistant without hand-editing configuration, run `routemidi --install-mcp <client>`: for a JSON client (`claude-desktop`, `cursor`) it merges the entry into that client's configuration file, and for a client with its own command (`codex`, `claude-code`) it prints the one-liner to run, such as `codex mcp add routemidi -- routemidi --mcp`. Use `routemidi --print-mcp-config [client]` to print the entry in a client's format (JSON, or TOML for Codex) to paste elsewhere. See **[AI.md](AI.md)** for the per-client setup, including the double-click Claude Desktop extension.
 
@@ -331,7 +330,7 @@ The `noterange` and `velrange` filters pass notes within a note or velocity rang
 
 The `ccrange` filter is the same idea for a controller: it passes a Control Change only when its value falls within a `low high` window, so `ccrange 1 64 127` lets the modulation wheel through only in its upper half. As always, `not ccrange 1 64 127` inverts it (blocking that window and passing everything else). `cc14range` does the same for a 14-bit CC with a 0-16383 window: it remembers the controller's MSB per channel and passes a pair when the MSB's 128-value block overlaps the window, so both halves always travel (or stop) together. Since the MSB arrives before its LSB, the window edges act at MSB resolution (steps of 128).
 
-The `cc14`, `nrpn` and `rpn` filters match the constituent Control Change messages of a 14-bit CC, an NRPN or an RPN. `cc14` without a number passes every 14-bit-capable controller (MSB 0-31 together with its LSB 32-63), or with a number just that MSB controller and its LSB. `nrpn` passes the NRPN traffic (CC 98, 99 plus the data-entry CC 6, 38) and `rpn` the RPN traffic (CC 100, 101 plus CC 6, 38). Both also take an optional parameter number (0-16383) to pass only one parameter's traffic: RouteMIDI follows the parameter selection per channel, so the shared data-entry CC 6 and 38 are matched only while that parameter is the one selected (`nrpn 1000` isolates NRPN 1000, `rpn 0` the pitch-bend-sensitivity RPN). The deselecting (N)RPN null (select bytes of 127) always passes as framing and ends the selection, so a complete transmission keeps its closing null and nothing matches after it.
+The `cc14`, `nrpn` and `rpn` filters match the constituent Control Change messages of a 14-bit CC, an NRPN or an RPN. `cc14` without a number passes every 14-bit-capable controller (MSB 0-31 together with its LSB 32-63), or with a number just that MSB controller and its LSB. `nrpn` passes the NRPN traffic (CC 98, 99 plus the data-entry CC 6, 38 and data increment/decrement CC 96, 97) and `rpn` the RPN traffic (CC 100, 101 plus CC 6, 38, 96, 97). Both also take an optional parameter number (0-16383) to pass only one parameter's traffic: RouteMIDI follows the parameter selection per channel, so the shared data-entry CC 6 and 38 are matched only while that parameter is the one selected (`nrpn 1000` isolates NRPN 1000, `rpn 0` the pitch-bend-sensitivity RPN). The deselecting (N)RPN null (select bytes of 127) always passes as framing and ends the selection, so a complete transmission keeps its closing null and nothing matches after it.
 
 The `inscale` filter passes only the notes that belong to a key, taking a root and a scale name from the [same list as the `scale` transform](#transforms). It's the filtering counterpart of `scale`: where `scale` bends stray notes onto the nearest scale note, `inscale` simply drops them (and `not inscale` keeps only the out-of-key notes). It matches note-ons, note-offs and poly pressure together, so a note that passes is always released.
 

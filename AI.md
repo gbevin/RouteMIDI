@@ -1,12 +1,11 @@
 # Driving RouteMIDI from AI tools and scripts
 
-> **Experimental and fast-moving.** RouteMIDI's schema and MCP integration
-> target the Model Context Protocol, a young and rapidly changing specification.
-> The tool names, their arguments, the JSON shapes and the protocol version are
-> all likely to change between releases, and this surface is not covered by the
-> project's stability expectations the way the command-line interface is. If you
-> build on it, pin a RouteMIDI version and expect to revisit it. Feedback is
-> welcome.
+> **Stable and versioned as of RouteMIDI 1.0.0.** The schema document and the
+> MCP tools are a stable contract: their shapes are versioned by the schema's
+> `contractVersion` field (also asserted by `"stable": true`), which is bumped
+> only on a breaking change, so a client can gate on it. Each command in the
+> schema carries an `mcpAvailable` flag saying whether it can be used through
+> the MCP tools. Feedback is welcome.
 
 RouteMIDI can be driven programmatically in three ways, from lightest to deepest:
 
@@ -242,6 +241,7 @@ The same text also records and replays: redirect ReceiveMIDI's output (with `ts`
 * `start_route` and `add_commands` take the contract's command tokens as a JSON array, one token per element: `["in", "Keyboard", "transp", "12", "out", "Synth"]`. Quoting is not needed; a port name with spaces is simply one array element.
 * MCP mode allows the routing commands (`in`, `out`, `vin`, `vout`, `panic`), the number settings (`dec`, `hex`, `omc`) and every processing command; anything else is rejected with a reason. In particular `-` ports and the monitoring commands are refused because MCP owns standard output for the protocol (use the `list_midi_ports` tool instead of `list`), `syf` because it captures to the local file system and could not be rolled back when a call fails, and the scripting commands (`js`, `jsf`) because they can run code and reach the shell, the network and local files. The check is per command, so a port merely *named* like a command is fine.
 * A good workflow is to verify tokens first with a one-shot text pipe (previous section), start the identical tokens live with `start_route`, and then exercise the running route with `inject_midi`, checking the echoed result against the expectation. Tool calls are atomic: an invalid command (a bad MPE zone, a command before the first `in`) rejects the whole call, nothing is started, and session settings such as `hex` or `omc` that appeared in the rejected call are rolled back; an `inject_midi` call with a line that is not a text MIDI message injects nothing.
+* `start_route` also rejects a route that has inputs but no outputs, and refuses to start more than 256 routes in one session; stop routes you no longer need instead of accumulating them.
 * Routes have stable ids. `list_routes` reports each route's ports (with their connection state) and the commands of every stage with per-stage indexes; a route whose port is not connected yet keeps retrying until the port appears.
 * The `stage` field that `get_schema` reports for each command is the same `stage` argument the editing tools take: `filters`, `transforms`, `mpe`, `conversions` or `split`. Note two placements that differ from the help text's grouping: the 14-bit CC and RPN/NRPN value transforms (`cc14add`, `rpnadd`, `nrpnscale`, ...) edit in `conversions`, and `mpesplit` in `split`.
 * `replace_command` swaps a command in place and keeps its position, which is the right tool for musical live edits: replacing `scale C major` with `scale D minor`, or retuning a `velcurve` or `cccurve` between songs.

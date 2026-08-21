@@ -2227,8 +2227,8 @@ void ApplicationState::printUsage()
     std::cout << ansi::paint(ansi::label, "Options:") << std::endl;
     builtin("-h  or  --help", "Print Help (this message) and exit");
     builtin("--version", "Print version information and exit");
-    builtin("--schema json", "Print machine-readable command JSON and exit [experimental]");
-    builtin("--mcp", "Run a stdio MCP server [experimental]");
+    builtin("--schema json", "Print machine-readable command JSON and exit");
+    builtin("--mcp", "Run a stdio MCP server");
     builtin("--print-mcp-config", "Print an MCP client configuration block and exit");
     builtin("--install-mcp [client]", "Add RouteMIDI to an MCP client's configuration and exit");
     builtin("--", "Read commands from standard input until it's closed");
@@ -2284,8 +2284,8 @@ void ApplicationState::printUsage()
 
     std::cout << note("Use \"--schema json\" for command metadata for scripts, MCP servers and") << std::endl
               << note("AI agents. Use \"--mcp\" to let MCP clients control RouteMIDI over stdio.") << std::endl;
-    std::cout << "These two features are experimental and fast-moving: their JSON and the MCP" << std::endl
-              << "tools may change between releases. See AI.md for details." << std::endl;
+    std::cout << "Their JSON shapes and MCP tools are stable and versioned by the schema's" << std::endl
+              << "contractVersion field, bumped only on a breaking change. See AI.md for details." << std::endl;
     std::cout << note("Both take a client (e.g. \"cursor\", \"codex\"): \"--print-mcp-config\" prints the") << std::endl
               << note("block in that client's format, \"--install-mcp\" sets it up. See AI.md.") << std::endl;
     std::cout << std::endl;

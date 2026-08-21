@@ -1074,8 +1074,9 @@ var McpServer::handleRequest(const var& message)
                             "inject_midi sends test messages through a running "
                             "route echoing what it emitted, and read_route polls "
                             "the messages that have flowed through a route. This "
-                            "MCP interface is experimental and may change between "
-                            "RouteMIDI releases.");
+                            "MCP interface is stable as of RouteMIDI 1.0.0: its "
+                            "shapes are versioned by the contractVersion field "
+                            "of get_schema, bumped only on a breaking change.");
         return var(newMcpResponse(id, result));
     }
 
