@@ -59,6 +59,8 @@ stop() {
     if [ -n "$pid" ]; then
         kill "$pid" 2>/dev/null
         wait "$pid" 2>/dev/null
+        # the MIDI backend may refuse a port created right after one vanished
+        sleep 0.5
     fi
 }
 
