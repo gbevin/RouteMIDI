@@ -625,6 +625,31 @@ public:
             expectEquals(rpn.value, 16383);
         }
 
+        beginTest("rpnscale scales an RPN value");
+        {
+            auto out = runConverterCommand(state, RPN_SCALE, {"5", "0.5"}, rpnInput(1, 5, 8000, false, true));
+            expect(parseLastRpn(out, rpn));
+            expectEquals(rpn.value, 4000);
+        }
+
+        beginTest("rpncurve applies a gamma curve, preserving the endpoints");
+        {
+            // gamma 1.0 is the identity
+            auto identity = runConverterCommand(state, RPN_CURVE, {"5", "1.0"}, rpnInput(1, 5, 8000, false, true));
+            expect(parseLastRpn(identity, rpn));
+            expectEquals(rpn.value, 8000);
+
+            // the maximum stays at full scale for any gamma
+            auto top = runConverterCommand(state, RPN_CURVE, {"5", "2.0"}, rpnInput(1, 5, 16383, false, true));
+            expect(parseLastRpn(top, rpn));
+            expectEquals(rpn.value, 16383);
+
+            // a gamma above 1 bends the middle of the range down
+            auto bent = runConverterCommand(state, RPN_CURVE, {"5", "2.0"}, rpnInput(1, 5, 8000, false, true));
+            expect(parseLastRpn(bent, rpn));
+            expectEquals(rpn.value, 3906);
+        }
+
         beginTest("rpnadd offsets an RPN value and leaves other parameters alone");
         {
             auto out = runConverterCommand(state, RPN_ADD, {"5", "-1000"}, rpnInput(1, 5, 8000, false, true));
@@ -873,6 +898,45 @@ public:
                                                cc14Input(1, 7, 16000));
             expectEquals(lastCC(clamped, 7), 127);
             expectEquals(lastCC(clamped, 39), 127);
+        }
+
+        beginTest("cc14scale scales a 14-bit CC value");
+        {
+            Array<MidiMessage> in;
+            // the first pair teaches the converter the MSB/LSB pairing
+            in.addArray(cc14Input(1, 7, 16383));
+            in.addArray(cc14Input(1, 7, 8000));
+            auto out = runConverterCommand(state, CC14_SCALE, {"7", "0.5"}, in);
+            expectEquals(lastCC(out, 7), (4000 >> 7) & 0x7f);
+            expectEquals(lastCC(out, 39), 4000 & 0x7f);
+        }
+
+        beginTest("cc14curve applies a gamma curve to a 14-bit CC value");
+        {
+            Array<MidiMessage> in;
+            in.addArray(cc14Input(1, 7, 16383));
+            in.addArray(cc14Input(1, 7, 8000));
+
+            // gamma 1.0 is the identity
+            auto identity = runConverterCommand(state, CC14_CURVE, {"7", "1.0"}, in);
+            expectEquals(lastCC(identity, 7), (8000 >> 7) & 0x7f);
+            expectEquals(lastCC(identity, 39), 8000 & 0x7f);
+
+            // the maximum stays at full scale for any gamma
+            Array<MidiMessage> full;
+            full.addArray(cc14Input(1, 7, 16383));
+            full.addArray(cc14Input(1, 7, 16383));
+            auto top = runConverterCommand(state, CC14_CURVE, {"7", "2.0"}, full);
+            expectEquals(lastCC(top, 7), 127);
+            expectEquals(lastCC(top, 39), 127);
+
+            // a gamma above 1 bends the middle of the range down
+            Array<MidiMessage> mid;
+            mid.addArray(cc14Input(1, 7, 16383));
+            mid.addArray(cc14Input(1, 7, 8000));
+            auto bent = runConverterCommand(state, CC14_CURVE, {"7", "2.0"}, mid);
+            expectEquals(lastCC(bent, 7), (3906 >> 7) & 0x7f);
+            expectEquals(lastCC(bent, 39), 3906 & 0x7f);
         }
 
         beginTest("cc14invert mirrors a 14-bit CC value");
