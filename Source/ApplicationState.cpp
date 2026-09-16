@@ -28,6 +28,9 @@
 #include "ScriptUtilClass.h"
 #include "TerminalColor.h"
 
+#include <atomic>
+#include <csignal>
+
 static const int DEFAULT_OCTAVE_MIDDLE_C = 3;
 static const String DEFAULT_VIRTUAL_IN_NAME = "RouteMIDI In";
 static const String DEFAULT_VIRTUAL_OUT_NAME = "RouteMIDI Out";
@@ -294,6 +297,37 @@ void ApplicationState::enqueueSend(MidiOutput* out, const MidiMessage& msg)
     sendQueueCv_.notify_one();
 }
 
+// a terminating signal becomes a normal quit, so the exit panic and the port
+// teardown still run; the handler only raises a flag, which the reconnect timer
+// acts on, and a blocking read of standard input returns instead of restarting
+static std::atomic<bool> terminationRequested { false };
+
+static void onTerminationSignal(int)
+{
+    terminationRequested = true;
+}
+
+static void installTerminationHandlers()
+{
+#if JUCE_WINDOWS
+    std::signal(SIGINT, onTerminationSignal);
+#else
+    struct sigaction action {};
+    action.sa_handler = onTerminationSignal;
+    sigemptyset(&action.sa_mask);
+    for (int signal : { SIGINT, SIGTERM, SIGHUP })
+    {
+        // a signal the parent ignores, like SIGHUP under nohup, stays ignored
+        struct sigaction current {};
+        sigaction(signal, nullptr, &current);
+        if (current.sa_handler != SIG_IGN)
+        {
+            sigaction(signal, &action, nullptr);
+        }
+    }
+#endif
+}
+
 void ApplicationState::initialise(JUCEApplicationBase& app)
 {
     StringArray cmdLineParams(app.getCommandLineParameterArray());
@@ -350,6 +384,7 @@ void ApplicationState::initialise(JUCEApplicationBase& app)
         return;
     }
 
+    installTerminationHandlers();
     initialiseScripting();
 
     parseParameters(cmdLineParams);
@@ -467,7 +502,7 @@ bool ApplicationState::hasStdinInput() const
 
 void ApplicationState::readStdinMidi()
 {
-    while (std::cin)
+    while (std::cin && !terminationRequested)
     {
         std::string raw;
         getline(std::cin, raw);
@@ -540,6 +575,12 @@ void ApplicationState::reportParseError(const String& message)
 
 void ApplicationState::timerCallback()
 {
+    if (terminationRequested)
+    {
+        JUCEApplicationBase::getInstance()->systemRequestedQuit();
+        return;
+    }
+
     // Enumerate CoreMIDI devices WITHOUT holding midiCallbackLock_. These queries
     // can take milliseconds, and doing them under the lock stalls the real-time
     // MIDI input callback (which needs the same lock), risking dropped packets.
