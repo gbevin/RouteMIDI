@@ -36,6 +36,19 @@ class ConnectionTests : public UnitTest
 public:
     ConnectionTests() : UnitTest("Connections", "Connections") {}
 
+    // CI sets this on platforms that have virtual MIDI, so a missing backend
+    // fails the run there instead of quietly skipping the port tests
+    static bool virtualMidiRequired()
+    {
+        return SystemStats::getEnvironmentVariable("ROUTEMIDI_REQUIRE_VIRTUAL_MIDI", "").isNotEmpty();
+    }
+
+    void skip(const String& reason)
+    {
+        expect(!virtualMidiRequired(), "port test skipped: " + reason);
+        logMessage("  skipped: " + reason);
+    }
+
     // spins until a device with a name containing `needle` is present (or absent)
     // in the freshly enumerated list, or the timeout elapses; returns whether the
     // wanted state was actually reached
@@ -93,7 +106,7 @@ public:
         auto virtualSource = MidiOutput::createNewDevice(inName);
         if (virtualDest == nullptr || virtualSource == nullptr)
         {
-            logMessage("  skipped: virtual MIDI not available on this system");
+            skip("virtual MIDI not available on this system");
             return false;
         }
         virtualDest->start();
@@ -101,7 +114,7 @@ public:
         if (!waitForPort([] { return MidiInput::getAvailableDevices();  }, inName,  true, 3000) ||
             ! waitForPort([] { return MidiOutput::getAvailableDevices(); }, outName, true, 3000))
         {
-            logMessage("  skipped: virtual ports never appeared in the device lists");
+            skip("virtual ports never appeared in the device lists");
             return false;
         }
 
@@ -118,7 +131,7 @@ public:
         if (routes.isEmpty() || routes[0]->inputs.isEmpty() || routes[0]->outputs.isEmpty()
             || routes[0]->inputs[0]->midiIn == nullptr || routes[0]->outputs[0]->out == nullptr)
         {
-            logMessage("  skipped: could not open the virtual ports in this process");
+            skip("could not open the virtual ports in this process");
             return false;
         }
 
@@ -164,12 +177,12 @@ public:
             auto virtualSource = MidiOutput::createNewDevice(portName);
             if (virtualSource == nullptr)
             {
-                logMessage("  skipped: virtual MIDI not available on this system");
+                skip("virtual MIDI not available on this system");
                 return;
             }
             if (!waitForPort([] { return MidiInput::getAvailableDevices(); }, portName, true, 3000))
             {
-                logMessage("  skipped: virtual input never appeared in the device list");
+                skip("virtual input never appeared in the device list");
                 return;
             }
 
@@ -212,12 +225,12 @@ public:
             auto virtualDest = MidiInput::createNewDevice(portName, &nullCallback);
             if (virtualDest == nullptr)
             {
-                logMessage("  skipped: virtual MIDI not available on this system");
+                skip("virtual MIDI not available on this system");
                 return;
             }
             if (!waitForPort([] { return MidiOutput::getAvailableDevices(); }, portName, true, 3000))
             {
-                logMessage("  skipped: virtual output never appeared in the device list");
+                skip("virtual output never appeared in the device list");
                 return;
             }
 
@@ -233,12 +246,12 @@ public:
             auto virtualSource = MidiOutput::createNewDevice(inName);
             if (virtualSource == nullptr)
             {
-                logMessage("  skipped: virtual MIDI not available on this system");
+                skip("virtual MIDI not available on this system");
                 return;
             }
             if (!waitForPort([] { return MidiInput::getAvailableDevices(); }, inName, true, 3000))
             {
-                logMessage("  skipped: the virtual input never appeared");
+                skip("the virtual input never appeared");
                 return;
             }
 
@@ -255,7 +268,7 @@ public:
             auto& routes = state.getRoutes();
             if (routes.isEmpty() || routes[0]->inputs.isEmpty() || routes[0]->inputs[0]->midiIn == nullptr)
             {
-                logMessage("  skipped: could not open the virtual input in this process");
+                skip("could not open the virtual input in this process");
                 return;
             }
 
@@ -273,13 +286,13 @@ public:
             auto virtualDest = MidiInput::createNewDevice(outName, &capture);
             if (virtualDest == nullptr)
             {
-                logMessage("  skipped: virtual MIDI not available on this system");
+                skip("virtual MIDI not available on this system");
                 return;
             }
             virtualDest->start();
             if (!waitForPort([] { return MidiOutput::getAvailableDevices(); }, outName, true, 3000))
             {
-                logMessage("  skipped: the virtual port never appeared");
+                skip("the virtual port never appeared");
                 return;
             }
 
@@ -297,7 +310,7 @@ public:
             auto& routes = state.getRoutes();
             if (routes.isEmpty() || routes[0]->outputs.isEmpty() || routes[0]->outputs[0]->out == nullptr)
             {
-                logMessage("  skipped: could not open the virtual port in this process");
+                skip("could not open the virtual port in this process");
                 return;
             }
 
@@ -341,14 +354,14 @@ public:
             auto virtualSource = MidiOutput::createNewDevice(inName);
             if (virtualDest == nullptr || virtualSource == nullptr)
             {
-                logMessage("  skipped: virtual MIDI not available on this system");
+                skip("virtual MIDI not available on this system");
                 return;
             }
             virtualDest->start();
             if (!waitForPort([] { return MidiInput::getAvailableDevices();  }, inName,  true, 3000) ||
                 ! waitForPort([] { return MidiOutput::getAvailableDevices(); }, outName, true, 3000))
             {
-                logMessage("  skipped: virtual ports never appeared in the device lists");
+                skip("virtual ports never appeared in the device lists");
                 return;
             }
 
@@ -364,7 +377,7 @@ public:
             if (routes.isEmpty() || routes[0]->outputs.isEmpty() || routes[0]->outputs[0]->out == nullptr
                 || routes[0]->inputs.isEmpty() || routes[0]->inputs[0]->midiIn == nullptr)
             {
-                logMessage("  skipped: could not open the virtual ports in this process");
+                skip("could not open the virtual ports in this process");
                 return;
             }
 
@@ -372,7 +385,7 @@ public:
             virtualDest = nullptr;
             if (!waitForPort([] { return MidiOutput::getAvailableDevices(); }, outName, false, 3000))
             {
-                logMessage("  skipped: the virtual port never left the device list");
+                skip("the virtual port never left the device list");
                 return;
             }
             {
@@ -387,7 +400,7 @@ public:
             if (virtualDest == nullptr
                 || ! waitForPort([] { return MidiOutput::getAvailableDevices(); }, outName, true, 3000))
             {
-                logMessage("  skipped: the virtual port could not be recreated");
+                skip("the virtual port could not be recreated");
                 return;
             }
             virtualDest->start();
@@ -462,13 +475,13 @@ public:
             auto virtualDest = MidiInput::createNewDevice(outName, &capture);
             if (virtualDest == nullptr)
             {
-                logMessage("  skipped: virtual MIDI not available on this system");
+                skip("virtual MIDI not available on this system");
                 return;
             }
             virtualDest->start();
             if (!waitForPort([] { return MidiOutput::getAvailableDevices(); }, outName, true, 3000))
             {
-                logMessage("  skipped: virtual ports never appeared in the device lists");
+                skip("virtual ports never appeared in the device lists");
                 return;
             }
 
@@ -492,7 +505,7 @@ public:
             if (state.getRoutes().isEmpty() || state.getRoutes()[0]->outputs.isEmpty()
                 || state.getRoutes()[0]->outputs[0]->out == nullptr)
             {
-                logMessage("  skipped: could not open the virtual output in this process");
+                skip("could not open the virtual output in this process");
                 ApplicationState::Control(state).stopOutputSender();
                 return;
             }
@@ -535,14 +548,14 @@ public:
             auto virtualSource = MidiOutput::createNewDevice(inName);
             if (virtualDest == nullptr || virtualSource == nullptr)
             {
-                logMessage("  skipped: virtual MIDI not available on this system");
+                skip("virtual MIDI not available on this system");
                 return;
             }
             virtualDest->start();
             if (!waitForPort([] { return MidiInput::getAvailableDevices();  }, inName,  true, 3000) ||
                 ! waitForPort([] { return MidiOutput::getAvailableDevices(); }, outName, true, 3000))
             {
-                logMessage("  skipped: virtual ports never appeared in the device lists");
+                skip("virtual ports never appeared in the device lists");
                 return;
             }
 
@@ -561,7 +574,7 @@ public:
                 || state.getRoutes()[0]->outputs.isEmpty()
                 || state.getRoutes()[0]->outputs[0]->out == nullptr)
             {
-                logMessage("  skipped: could not open the virtual ports in this process");
+                skip("could not open the virtual ports in this process");
                 return;
             }
             // both ports resolved at start time, so the informative flag is true
@@ -587,14 +600,14 @@ public:
             auto virtualSource = MidiOutput::createNewDevice(inName);
             if (virtualDest == nullptr || virtualSource == nullptr)
             {
-                logMessage("  skipped: virtual MIDI not available on this system");
+                skip("virtual MIDI not available on this system");
                 return;
             }
             virtualDest->start();
             if (!waitForPort([] { return MidiInput::getAvailableDevices();  }, inName,  true, 3000) ||
                 ! waitForPort([] { return MidiOutput::getAvailableDevices(); }, outName, true, 3000))
             {
-                logMessage("  skipped: virtual ports never appeared in the device lists");
+                skip("virtual ports never appeared in the device lists");
                 return;
             }
 
@@ -714,7 +727,7 @@ public:
             auto goneSource   = MidiOutput::createNewDevice(goneName);
             if (virtualDest == nullptr || floodSource == nullptr || goneSource == nullptr)
             {
-                logMessage("  skipped: virtual MIDI not available on this system");
+                skip("virtual MIDI not available on this system");
                 return;
             }
             virtualDest->start();
@@ -722,7 +735,7 @@ public:
                 ! waitForPort([] { return MidiInput::getAvailableDevices();  }, floodName, true, 3000) ||
                 ! waitForPort([] { return MidiOutput::getAvailableDevices(); }, outName,   true, 3000))
             {
-                logMessage("  skipped: virtual ports never appeared in the device lists");
+                skip("virtual ports never appeared in the device lists");
                 return;
             }
 
@@ -741,7 +754,7 @@ public:
             if (routes.isEmpty() || routes[0]->inputs.size() < 2
                 || routes[0]->inputs[0]->midiIn == nullptr || routes[0]->inputs[1]->midiIn == nullptr)
             {
-                logMessage("  skipped: could not open the virtual ports in this process");
+                skip("could not open the virtual ports in this process");
                 delete state;
                 return;
             }
@@ -848,14 +861,14 @@ public:
             auto virtualSource = MidiOutput::createNewDevice(inName);
             if (virtualDest == nullptr || virtualSource == nullptr)
             {
-                logMessage("  skipped: virtual MIDI not available on this system");
+                skip("virtual MIDI not available on this system");
                 return;
             }
             virtualDest->start();
             if (!waitForPort([] { return MidiInput::getAvailableDevices();  }, inName,  true, 3000) ||
                 ! waitForPort([] { return MidiOutput::getAvailableDevices(); }, outName, true, 3000))
             {
-                logMessage("  skipped: virtual ports never appeared in the device lists");
+                skip("virtual ports never appeared in the device lists");
                 return;
             }
 
@@ -872,7 +885,7 @@ public:
             if (routes.isEmpty() || routes[0]->inputs.isEmpty() || routes[0]->outputs.isEmpty()
                 || routes[0]->inputs[0]->midiIn == nullptr || routes[0]->outputs[0]->out == nullptr)
             {
-                logMessage("  skipped: could not open the virtual ports in this process");
+                skip("could not open the virtual ports in this process");
                 return;
             }
             ApplicationState::Control(state).startOutputSender();

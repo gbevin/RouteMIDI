@@ -14,3 +14,4 @@ Tests/Builds/MacOSX/*.xcodeproj/project.xcworkspace/xcuserdata
 Tests/Builds/VisualStudio2022/.vs
 Tests/Builds/VisualStudio2022/x64
 Tests/Builds/VisualStudio2022/*.vcxproj.user
+/e2e/
