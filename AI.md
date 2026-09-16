@@ -95,7 +95,7 @@ inherit the shell `PATH`, so a bare name wouldn't resolve for them):
   to touch a file it can't parse; it reports the path so you can review it, then
   restart the client. For a client that ships its own command (`codex`,
   `claude-code`) it prints that command to run instead of editing an unfamiliar
-  file — `codex mcp add routemidi -- routemidi --mcp` and
+  file, `codex mcp add routemidi -- routemidi --mcp`, and
   `claude mcp add routemidi -- routemidi --mcp` respectively. RouteMIDI prints
   Codex's TOML but doesn't rewrite it, since its config lives as TOML at
   `~/.codex/config.toml`.

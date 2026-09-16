@@ -2,7 +2,7 @@
 
 This folder holds the [MCP Bundle](https://github.com/anthropics/mcpb) manifest
 that packages RouteMIDI as a Claude Desktop extension, so a user can install it
-by double-clicking a single `.mcpb` file — no configuration file to edit.
+by double-clicking a single `.mcpb` file, with no configuration file to edit.
 
 `manifest.json` describes RouteMIDI as a `binary` MCP server launched with
 `--mcp`. Its `version` is a `0.0.0` placeholder; the real version is stamped in
