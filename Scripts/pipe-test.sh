@@ -16,22 +16,7 @@ failures=0
 
 # run <name> <routemidi args...> ; the input is read from the INPUT variable
 # and the expected output from the EXPECTED variable
-run() {
-    local name="$1"
-    shift
-    local actual
-    actual="$(printf '%s\n' "$INPUT" | "$BIN" "$@" | tr -d '\r')"
-    if [ "$actual" = "$EXPECTED" ]; then
-        echo "ok   $name"
-    else
-        echo "FAIL $name"
-        echo "--- input ----------";    printf '%s\n' "$INPUT"
-        echo "--- expected -------";    printf '%s\n' "$EXPECTED"
-        echo "--- actual ---------";    printf '%s\n' "$actual"
-        echo "--------------------"
-        failures=$((failures+1))
-    fi
-}
+. "$(dirname "$0")/test-helpers.sh"
 
 # --- the text codec round-trips every message type unchanged ------------------
 INPUT='channel 1 note-on C3 100

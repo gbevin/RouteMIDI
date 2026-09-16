@@ -11,22 +11,7 @@ set -u
 BIN="$1"
 failures=0
 
-run() {
-    local name="$1"
-    shift
-    local actual
-    actual="$(printf '%s\n' "$INPUT" | "$BIN" "$@" | tr -d '\r')"
-    if [ "$actual" = "$EXPECTED" ]; then
-        echo "ok   $name"
-    else
-        echo "FAIL $name"
-        echo "--- input ----------";    printf '%s\n' "$INPUT"
-        echo "--- expected -------";    printf '%s\n' "$EXPECTED"
-        echo "--- actual ---------";    printf '%s\n' "$actual"
-        echo "--------------------"
-        failures=$((failures+1))
-    fi
-}
+. "$(dirname "$0")/test-helpers.sh"
 
 # Split one keyboard at middle C: bass notes to channel 2, lead notes to channel 3.
 INPUT='channel 1 note-on 59 90
