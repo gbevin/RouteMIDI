@@ -180,6 +180,24 @@ public:
             expect(r2.wasOk(), r2.getErrorMessage());
             expect((bool) engine.evaluate("ok"));
         }
+
+        beginTest("OSC.send types whole numbers as integers and fractions as floats");
+        {
+            // the script engine hands every number over as a double, so the
+            // sender has to restore the integer type a receiver expects
+            DatagramSocket socket;
+            expect(socket.bindToPort(0, "127.0.0.1"));
+            auto r = engine.execute("var typed = OSC.connect('127.0.0.1', " + String(socket.getBoundPort()) + ").send('/t', 60, 1.5, true, 'x');");
+            expect(r.wasOk(), r.getErrorMessage());
+            expect((bool) engine.evaluate("typed"));
+
+            char packet[64] = {};
+            expect(socket.waitUntilReady(true, 2000) == 1);
+            int received = socket.read(packet, sizeof(packet), false);
+            expect(received > 16);
+            expectEquals(String(packet + 4), String(",ifis"));
+            expectEquals(int((uint8)packet[12] << 24 | (uint8)packet[13] << 16 | (uint8)packet[14] << 8 | (uint8)packet[15]), 60);
+        }
     }
 };
 
