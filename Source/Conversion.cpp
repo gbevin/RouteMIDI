@@ -407,7 +407,7 @@ static void convertRpnSet(const Array<Rule>& rules, State& state,
     {
         for (const auto& r : rules)
         {
-            if (!r.isTransform && ((r.src == Rpn && ! isNRPN) || (r.src == Nrpn && isNRPN))
+            if (!r.isTransform && ((r.src == Rpn && !isNRPN) || (r.src == Nrpn && isNRPN))
                 && r.srcNum == param)
             {
                 return true;

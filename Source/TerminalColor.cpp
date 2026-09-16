@@ -54,7 +54,7 @@ bool terminalSupportsColor()
 
    #if JUCE_WINDOWS
     const bool tty = _isatty(_fileno(stdout)) != 0;
-    if (!forced && ! tty)
+    if (!forced && !tty)
     {
         // piped or redirected and not forced: plain text
         return false;
