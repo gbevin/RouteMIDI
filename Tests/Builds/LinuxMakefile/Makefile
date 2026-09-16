@@ -39,7 +39,7 @@ ifeq ($(CONFIG),Debug)
     TARGET_ARCH := 
   endif
 
-  JUCE_CPPFLAGS := $(DEPFLAGS) "-DLINUX=1" "-DDEBUG=1" "-D_DEBUG=1" "-DJUCER_LINUX_MAKE_6D53C8B4=1" "-DJUCE_APP_VERSION=0.9.10" "-DJUCE_APP_VERSION_HEX=0x90a" $(shell $(PKG_CONFIG) --cflags alsa) -pthread -I../../JuceLibraryCode -I../../../JuceLibraryCode/modules $(CPPFLAGS)
+  JUCE_CPPFLAGS := $(DEPFLAGS) "-DLINUX=1" "-DDEBUG=1" "-D_DEBUG=1" "-DJUCE_MODAL_LOOPS_PERMITTED=1" "-DJUCER_LINUX_MAKE_6D53C8B4=1" "-DJUCE_APP_VERSION=0.9.10" "-DJUCE_APP_VERSION_HEX=0x90a" $(shell $(PKG_CONFIG) --cflags alsa) -pthread -I../../JuceLibraryCode -I../../../JuceLibraryCode/modules $(CPPFLAGS)
   JUCE_CPPFLAGS_CONSOLEAPP :=  "-DJucePlugin_Build_VST=0" "-DJucePlugin_Build_VST3=0" "-DJucePlugin_Build_AU=0" "-DJucePlugin_Build_AUv3=0" "-DJucePlugin_Build_AAX=0" "-DJucePlugin_Build_Standalone=0" "-DJucePlugin_Build_Unity=0" "-DJucePlugin_Build_LV2=0"
   JUCE_TARGET_CONSOLEAPP := RouteMIDITests
 
@@ -60,7 +60,7 @@ ifeq ($(CONFIG),Release)
     TARGET_ARCH := 
   endif
 
-  JUCE_CPPFLAGS := $(DEPFLAGS) "-DLINUX=1" "-DNDEBUG=1" "-DJUCER_LINUX_MAKE_6D53C8B4=1" "-DJUCE_APP_VERSION=0.9.10" "-DJUCE_APP_VERSION_HEX=0x90a" $(shell $(PKG_CONFIG) --cflags alsa) -pthread -I../../JuceLibraryCode -I../../../JuceLibraryCode/modules $(CPPFLAGS)
+  JUCE_CPPFLAGS := $(DEPFLAGS) "-DLINUX=1" "-DNDEBUG=1" "-DJUCE_MODAL_LOOPS_PERMITTED=1" "-DJUCER_LINUX_MAKE_6D53C8B4=1" "-DJUCE_APP_VERSION=0.9.10" "-DJUCE_APP_VERSION_HEX=0x90a" $(shell $(PKG_CONFIG) --cflags alsa) -pthread -I../../JuceLibraryCode -I../../../JuceLibraryCode/modules $(CPPFLAGS)
   JUCE_CPPFLAGS_CONSOLEAPP :=  "-DJucePlugin_Build_VST=0" "-DJucePlugin_Build_VST3=0" "-DJucePlugin_Build_AU=0" "-DJucePlugin_Build_AUv3=0" "-DJucePlugin_Build_AAX=0" "-DJucePlugin_Build_Standalone=0" "-DJucePlugin_Build_Unity=0" "-DJucePlugin_Build_LV2=0"
   JUCE_TARGET_CONSOLEAPP := RouteMIDITests
 
@@ -106,8 +106,11 @@ OBJECTS_CONSOLEAPP := \
   $(JUCE_OBJDIR)/include_juce_audio_basics_8a4e984a.o \
   $(JUCE_OBJDIR)/include_juce_audio_devices_63111d02.o \
   $(JUCE_OBJDIR)/include_juce_core_f26d17db.o \
+  $(JUCE_OBJDIR)/include_juce_core_CompilationTime_9257742c.o \
+  $(JUCE_OBJDIR)/include_juce_core_zlib_ac61cd39.o \
   $(JUCE_OBJDIR)/include_juce_data_structures_7471b1e3.o \
   $(JUCE_OBJDIR)/include_juce_events_fd7d695.o \
+  $(JUCE_OBJDIR)/include_juce_javascript_84e88969.o \
   $(JUCE_OBJDIR)/include_juce_midi_ci_1fda4092.o \
   $(JUCE_OBJDIR)/include_juce_osc_f3df604d.o \
 
@@ -294,6 +297,16 @@ $(JUCE_OBJDIR)/include_juce_core_f26d17db.o: ../../JuceLibraryCode/include_juce_
 	@echo "Compiling include_juce_core.cpp"
 	$(V_AT)$(CXX) $(JUCE_CXXFLAGS) $(JUCE_CPPFLAGS_CONSOLEAPP) $(JUCE_CFLAGS_CONSOLEAPP) -o "$@" -c "$<"
 
+$(JUCE_OBJDIR)/include_juce_core_CompilationTime_9257742c.o: ../../JuceLibraryCode/include_juce_core_CompilationTime.cpp
+	-$(V_AT)mkdir -p $(@D)
+	@echo "Compiling include_juce_core_CompilationTime.cpp"
+	$(V_AT)$(CXX) $(JUCE_CXXFLAGS) $(JUCE_CPPFLAGS_CONSOLEAPP) $(JUCE_CFLAGS_CONSOLEAPP) -o "$@" -c "$<"
+
+$(JUCE_OBJDIR)/include_juce_core_zlib_ac61cd39.o: ../../JuceLibraryCode/include_juce_core_zlib.c
+	-$(V_AT)mkdir -p $(@D)
+	@echo "Compiling include_juce_core_zlib.c"
+	$(V_AT)$(CC) $(JUCE_CFLAGS) $(JUCE_CPPFLAGS_CONSOLEAPP) $(JUCE_CFLAGS_CONSOLEAPP) -o "$@" -c "$<"
+
 $(JUCE_OBJDIR)/include_juce_data_structures_7471b1e3.o: ../../JuceLibraryCode/include_juce_data_structures.cpp
 	-$(V_AT)mkdir -p $(@D)
 	@echo "Compiling include_juce_data_structures.cpp"
@@ -302,6 +315,11 @@ $(JUCE_OBJDIR)/include_juce_data_structures_7471b1e3.o: ../../JuceLibraryCode/in
 $(JUCE_OBJDIR)/include_juce_events_fd7d695.o: ../../JuceLibraryCode/include_juce_events.cpp
 	-$(V_AT)mkdir -p $(@D)
 	@echo "Compiling include_juce_events.cpp"
+	$(V_AT)$(CXX) $(JUCE_CXXFLAGS) $(JUCE_CPPFLAGS_CONSOLEAPP) $(JUCE_CFLAGS_CONSOLEAPP) -o "$@" -c "$<"
+
+$(JUCE_OBJDIR)/include_juce_javascript_84e88969.o: ../../JuceLibraryCode/include_juce_javascript.cpp
+	-$(V_AT)mkdir -p $(@D)
+	@echo "Compiling include_juce_javascript.cpp"
 	$(V_AT)$(CXX) $(JUCE_CXXFLAGS) $(JUCE_CPPFLAGS_CONSOLEAPP) $(JUCE_CFLAGS_CONSOLEAPP) -o "$@" -c "$<"
 
 $(JUCE_OBJDIR)/include_juce_midi_ci_1fda4092.o: ../../JuceLibraryCode/include_juce_midi_ci.cpp

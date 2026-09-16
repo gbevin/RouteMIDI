@@ -14,13 +14,13 @@ $Env:PATH_TO_JUCE = "$curDir\JUCE"
 Write-Output "Changing location to $curDir"
 Set-Location $curDir
 
-$buildLocation = "Builds\VisualStudio2017\x64"
+$buildLocation = "Builds\VisualStudio2022\x64"
 
 Write-Output "Deleting previous build from $buildLocation"
 Remove-Item -LiteralPath $buildLocation -Force -Recurse
 
 Write-Output "Building project"
-MSBuild.exe .\Builds\VisualStudio2017\routemidi.sln /p:Configuration=Release /p:PreferredToolArchitecture=x64 /p:Platform=x64 /clp:ErrorsOnly
+MSBuild.exe .\Builds\VisualStudio2022\routemidi.sln /p:Configuration=Release /p:PreferredToolArchitecture=x64 /p:Platform=x64 /clp:ErrorsOnly
 
 # Package the unsigned binary the way the release is distributed: a zip containing
 # a versioned folder with the executable, the readme and the license.

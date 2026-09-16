@@ -4,7 +4,7 @@
               bundleIdentifier="com.uwyn.routemiditests" includeBinaryInAppConfig="1"
               companyName="Uwyn" companyWebsite="http://www.uwyn.com" companyEmail="info@uwyn.com"
               displaySplashScreen="1" reportAppUsage="1" splashScreenColour="Dark"
-              jucerFormatVersion="1">
+              jucerFormatVersion="1" defines="JUCE_MODAL_LOOPS_PERMITTED=1">
   <MAINGROUP id="RmTstM" name="RouteMIDITests">
     <GROUP id="{A0000000-0000-0000-0000-000000000001}" name="Source">
       <FILE id="src001" name="ApplicationCommand.cpp" compile="1" resource="0"
@@ -83,6 +83,7 @@
       <MODULEPATHS>
         <MODULEPATH id="juce_core" path="../JuceLibraryCode/modules"/>
         <MODULEPATH id="juce_events" path="../JuceLibraryCode/modules"/>
+        <MODULEPATH id="juce_javascript" path="../JuceLibraryCode/modules"/>
         <MODULEPATH id="juce_data_structures" path="../JuceLibraryCode/modules"/>
         <MODULEPATH id="juce_audio_basics" path="../JuceLibraryCode/modules"/>
         <MODULEPATH id="juce_audio_devices" path="../JuceLibraryCode/modules"/>
@@ -99,6 +100,7 @@
       <MODULEPATHS>
         <MODULEPATH id="juce_core" path="../JuceLibraryCode/modules"/>
         <MODULEPATH id="juce_events" path="../JuceLibraryCode/modules"/>
+        <MODULEPATH id="juce_javascript" path="../JuceLibraryCode/modules"/>
         <MODULEPATH id="juce_data_structures" path="../JuceLibraryCode/modules"/>
         <MODULEPATH id="juce_audio_basics" path="../JuceLibraryCode/modules"/>
         <MODULEPATH id="juce_audio_devices" path="../JuceLibraryCode/modules"/>
@@ -106,7 +108,7 @@
         <MODULEPATH id="juce_midi_ci" path="../JuceLibraryCode/modules"/>
       </MODULEPATHS>
     </LINUX_MAKE>
-    <VS2017 targetFolder="Builds/VisualStudio2017">
+    <VS2022 targetFolder="Builds/VisualStudio2022">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug"/>
         <CONFIGURATION isDebug="0" name="Release" useRuntimeLibDLL="0"/>
@@ -117,10 +119,11 @@
         <MODULEPATH id="juce_core" path="../JuceLibraryCode/modules"/>
         <MODULEPATH id="juce_data_structures" path="../JuceLibraryCode/modules"/>
         <MODULEPATH id="juce_events" path="../JuceLibraryCode/modules"/>
+        <MODULEPATH id="juce_javascript" path="../JuceLibraryCode/modules"/>
         <MODULEPATH id="juce_osc" path="../JuceLibraryCode/modules"/>
         <MODULEPATH id="juce_midi_ci" path="../JuceLibraryCode/modules"/>
       </MODULEPATHS>
-    </VS2017>
+    </VS2022>
   </EXPORTFORMATS>
   <MODULES>
     <MODULE id="juce_audio_basics" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
@@ -128,6 +131,7 @@
     <MODULE id="juce_core" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="juce_data_structures" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="juce_events" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="juce_javascript" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="juce_midi_ci" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="juce_osc" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
   </MODULES>

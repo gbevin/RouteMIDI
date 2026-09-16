@@ -52,7 +52,9 @@ public:
             }
             if (present == wantPresent) return true;
             if ((int) (Time::getMillisecondCounter() - start) > timeoutMs) return false;
-            Thread::sleep(20);
+            // the device list refreshes from a run loop notification, so the
+            // wait has to pump the message loop instead of sleeping through it
+            MessageManager::getInstance()->runDispatchLoopUntil(20);
         }
     }
 
