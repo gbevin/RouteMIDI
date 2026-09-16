@@ -69,6 +69,39 @@ stop_all() {
     stop "$receiver_pid"; receiver_pid=""
 }
 
+# starts a tool in the background with its output in the given file; the MIDI
+# backend may refuse a virtual port created right after one vanished, so a
+# refused start is tried again
+start_background() {
+    local out="$1"
+    shift
+    local attempt
+    for attempt in 1 2 3; do
+        "$@" > "$out" 2>&1 &
+        started_pid=$!
+        sleep 1
+        if ! grep -q "Couldn't create virtual MIDI" "$out"; then
+            return 0
+        fi
+        stop "$started_pid"
+    done
+    return 1
+}
+
+start_router() {
+    local out="$1"
+    shift
+    start_background "$out" "$ROUTEMIDI" "$@"
+    router_pid=$started_pid
+}
+
+start_receiver() {
+    local out="$1"
+    shift
+    start_background "$out" "$RECEIVEMIDI" "$@"
+    receiver_pid=$started_pid
+}
+
 # sends the start marker into a port until it shows up in the given output file
 wait_for_marker() {
     local in="$1" out="$2"
@@ -116,11 +149,10 @@ route_to_text() {
     local in
     in="$(input_port)"
     if virtual_ports; then
-        "$ROUTEMIDI" vin "$in" "$@" out - > "$WORK/text.txt" 2>&1 &
+        start_router "$WORK/text.txt" vin "$in" "$@" out -
     else
-        "$ROUTEMIDI" in "$in" "$@" out - > "$WORK/text.txt" 2>&1 &
+        start_router "$WORK/text.txt" in "$in" "$@" out -
     fi
-    router_pid=$!
     if wait_for_marker "$in" "$WORK/text.txt"; then
         "$SENDMIDI" dev "$in" on 60 100 cc 74 64 pb 100 ch 2 on 61 50 off 61 0 cc 1 2 mc hex syx 7E 7F 09 01
         collect "$in" "$WORK/text.txt"
@@ -163,15 +195,20 @@ if virtual_ports; then
 else
     out="$PORT"
 fi
-"$RECEIVEMIDI" dev "$out" > "$WORK/received.txt" 2>&1 &
-receiver_pid=$!
-if virtual_ports; then
-    ( sleep 3; printf 'channel 1 control-change 119 1\nchannel 1 note-on C3 100\nchannel 1 control-change 1 2\nchannel 1 note-off C3 0\nchannel 1 control-change 119 2\n'; sleep 2 ) \
-        | "$ROUTEMIDI" in - vout "$out" transp 12 > "$WORK/router.txt" 2>&1
-else
-    ( sleep 3; printf 'channel 1 control-change 119 1\nchannel 1 note-on C3 100\nchannel 1 control-change 1 2\nchannel 1 note-off C3 0\nchannel 1 control-change 119 2\n'; sleep 2 ) \
-        | "$ROUTEMIDI" in - out "$out" transp 12 > "$WORK/router.txt" 2>&1
-fi
+start_receiver "$WORK/received.txt" dev "$out"
+for attempt in 1 2 3; do
+    if virtual_ports; then
+        ( sleep 3; printf 'channel 1 control-change 119 1\nchannel 1 note-on C3 100\nchannel 1 control-change 1 2\nchannel 1 note-off C3 0\nchannel 1 control-change 119 2\n'; sleep 2 ) \
+            | "$ROUTEMIDI" in - vout "$out" transp 12 > "$WORK/router.txt" 2>&1
+    else
+        ( sleep 3; printf 'channel 1 control-change 119 1\nchannel 1 note-on C3 100\nchannel 1 control-change 1 2\nchannel 1 note-off C3 0\nchannel 1 control-change 119 2\n'; sleep 2 ) \
+            | "$ROUTEMIDI" in - out "$out" transp 12 > "$WORK/router.txt" 2>&1
+    fi
+    if ! grep -q "Couldn't create virtual MIDI" "$WORK/router.txt"; then
+        break
+    fi
+    sleep 1
+done
 sleep 0.5
 stop "$receiver_pid"; receiver_pid=""
 received="$(tr -d '\r' < "$WORK/received.txt" | awk -v s="$MARK_START" -v e="$MARK_END" \
@@ -186,11 +223,8 @@ if virtual_ports; then
     in2="$(input_port)"
     out1="E2E routemidi out $$ $RANDOM"
     out2="E2E routemidi out $$ $RANDOM"
-    "$ROUTEMIDI" vin "$in1" transp 12 mon vout "$out1" vin "$in2" chmap 1 3 vout "$out2" > "$WORK/monitor.txt" 2>&1 &
-    router_pid=$!
-    sleep 1
-    "$RECEIVEMIDI" dev "$out1" > "$WORK/out1.txt" 2>&1 &
-    receiver_pid=$!
+    start_router "$WORK/monitor.txt" vin "$in1" transp 12 mon vout "$out1" vin "$in2" chmap 1 3 vout "$out2"
+    start_receiver "$WORK/out1.txt" dev "$out1"
     "$RECEIVEMIDI" dev "$out2" > "$WORK/out2.txt" 2>&1 &
     receiver2=$!
     if wait_for_marker "$in1" "$WORK/out1.txt" && wait_for_marker "$in2" "$WORK/out2.txt"; then
@@ -220,19 +254,15 @@ channel  3   note-off          C3   0' "$(tr -d '\r' < "$WORK/monitor.txt" | awk
     # --- an output that disappears is reconnected when its port returns ----
     in="$(input_port)"
     out="E2E routemidi out $$ $RANDOM"
-    "$ROUTEMIDI" vin "$in" out "$out" > "$WORK/reconnect.txt" 2>&1 &
-    router_pid=$!
-    sleep 1
-    "$RECEIVEMIDI" virt "$out" > "$WORK/first.txt" 2>&1 &
-    receiver_pid=$!
+    start_router "$WORK/reconnect.txt" vin "$in" out "$out"
+    start_receiver "$WORK/first.txt" virt "$out"
     if wait_for_marker "$in" "$WORK/first.txt"; then
         "$SENDMIDI" dev "$in" on 60 100
         collect "$in" "$WORK/first.txt"
         first="$received"
         stop "$receiver_pid"; receiver_pid=""
         sleep 1
-        "$RECEIVEMIDI" virt "$out" > "$WORK/second.txt" 2>&1 &
-        receiver_pid=$!
+        start_receiver "$WORK/second.txt" virt "$out"
         if wait_for_marker "$in" "$WORK/second.txt"; then
             "$SENDMIDI" dev "$in" on 62 100
             collect "$in" "$WORK/second.txt"
@@ -250,11 +280,8 @@ channel  3   note-off          C3   0' "$(tr -d '\r' < "$WORK/monitor.txt" | awk
     # --- a terminating signal still runs the exit panic ---------------------
     in="$(input_port)"
     out="E2E routemidi out $$ $RANDOM"
-    "$ROUTEMIDI" vin "$in" vout "$out" panic > "$WORK/signal.txt" 2>&1 &
-    router_pid=$!
-    sleep 1
-    "$RECEIVEMIDI" dev "$out" > "$WORK/panic.txt" 2>&1 &
-    receiver_pid=$!
+    start_router "$WORK/signal.txt" vin "$in" vout "$out" panic
+    start_receiver "$WORK/panic.txt" dev "$out"
     if wait_for_marker "$in" "$WORK/panic.txt"; then
         "$SENDMIDI" dev "$in" on 60 100
         kill -TERM "$router_pid"
@@ -291,8 +318,7 @@ if virtual_ports; then
 else
     printf 'in "%s"\ntransp 12\nout -\n' "$in" > "$WORK/program.txt"
 fi
-"$ROUTEMIDI" file "$WORK/program.txt" > "$WORK/program-out.txt" 2>&1 &
-router_pid=$!
+start_router "$WORK/program-out.txt" file "$WORK/program.txt"
 if wait_for_marker "$in" "$WORK/program-out.txt"; then
     "$SENDMIDI" dev "$in" on 60 100
     collect "$in" "$WORK/program-out.txt"
