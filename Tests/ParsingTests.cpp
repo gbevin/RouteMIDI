@@ -22,6 +22,8 @@
 #include "../Source/McpServer.h"
 #include "../Source/Schema.h"
 
+#include <sstream>
+
 namespace
 {
     // feeds a command line into the parser; ports won't resolve to real devices,
@@ -448,6 +450,38 @@ public:
             ApplicationState state;
             parse(state, "transp 12 out B cc");
             expectEquals(state.getRoutes().size(), 0);
+        }
+
+        beginTest("An empty token is not the list command");
+        {
+            // an empty argument used to run list, the first command
+            // without an alias
+            ApplicationState state;
+            StringArray params { "", "in", "A", "out", "B" };
+
+            std::ostringstream captured;
+            auto* previousOut = std::cout.rdbuf(captured.rdbuf());
+            auto* previousErr = std::cerr.rdbuf(nullptr);
+            state.parseParameters(params);
+            std::cerr.rdbuf(previousErr);
+            std::cout.rdbuf(previousOut);
+
+            expect(captured.str().empty());
+            expectEquals(state.getRoutes().size(), 1);
+
+            // the MCP tools reject it as the unknown command it is, rather than
+            // refusing the whole call with the list denial
+            ApplicationState edited;
+            parse(edited, "in A out B");
+            const var added = mcp(edited, R"({"jsonrpc":"2.0","id":1,"method":"tools/call","params":)"
+                                         R"({"name":"add_commands","arguments":{"route":1,"commands":["transp","12",""]}}})");
+            expectEquals(mcpText(added), String("Unknown command: "));
+
+            // start_route treats it like any other token it cannot resolve
+            ApplicationState started;
+            const var route = mcp(started, R"({"jsonrpc":"2.0","id":1,"method":"tools/call","params":)"
+                                          R"({"name":"start_route","arguments":{"commands":["vin","A","","vout","B"]}}})", true);
+            expect(!mcpText(route).startsWith("Use the list_midi_ports"));
         }
 
         beginTest("Decimal and hexadecimal number parsing");

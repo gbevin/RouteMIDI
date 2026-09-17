@@ -651,7 +651,7 @@ static String collectProcessingCommands(const Array<ApplicationCommand>& table,
     {
         for (const auto& cmd : table)
         {
-            if (cmd.param_.equalsIgnoreCase(token) || cmd.altParam_.equalsIgnoreCase(token))
+            if (cmd.matchesName(token))
             {
                 return &cmd;
             }
@@ -914,7 +914,7 @@ static String validateMcpCommandTokens(const Array<ApplicationCommand>& commands
     {
         for (const auto& cmd : commands)
         {
-            if (cmd.param_.equalsIgnoreCase(token) || cmd.altParam_.equalsIgnoreCase(token))
+            if (cmd.matchesName(token))
             {
                 return &cmd;
             }
