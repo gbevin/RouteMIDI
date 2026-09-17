@@ -330,19 +330,6 @@ String commandsJson(const Array<ApplicationCommand>& commands, int octaveMiddleC
     }
     root->setProperty("commands", var(commandArray));
 
-    Array<var> longAliases;
-    for (const auto& cmd : commands)
-    {
-        if (cmd.altParam_.isNotEmpty())
-        {
-            auto alias = new DynamicObject();
-            alias->setProperty("alias", cmd.altParam_);
-            alias->setProperty("name", cmd.param_);
-            longAliases.add(var(alias));
-        }
-    }
-    root->setProperty("aliases", var(longAliases));
-
     Array<var> routeRules;
     routeRules.add("A route starts with in or vin.");
     routeRules.add("Further in or vin commands add inputs to the current route until an out or vout is added.");
@@ -369,10 +356,23 @@ String commandsJson(const Array<ApplicationCommand>& commands, int octaveMiddleC
     notes.add("Numbers are decimal by default; hex changes the default, and M/H suffixes force decimal or hexadecimal.");
     notes.add("Note names use C3 as middle C by default; omc changes the displayed and parsed octave.");
     notes.add("Selectors for ch, on, off, pp, cc, cc14 and pc may be single values or inclusive lo..hi ranges.");
-    notes.add("The scale argument of scale, inscale and dtransp is one of scaleNames, or a custom comma-separated list of semitone degrees from 0 to 11, such as 0,2,4,7,9.");
+    notes.add("The scale argument of scale, inscale and dtransp is the name or any alias of an entry in scales, matched ignoring case, spaces, hyphens and underscores, or a custom comma-separated list of semitone degrees from 0 to 11, such as 0,2,4,7,9.");
     root->setProperty("notes", var(notes));
 
-    root->setProperty("scaleNames", var(stringArrayToVarArray(ApplicationCommand::scaleNameList(), true)));
+    Array<var> scaleArray;
+    for (const auto& spellings : ApplicationCommand::scaleSpellings())
+    {
+        auto scale = new DynamicObject();
+        scale->setProperty("name", spellings[0]);
+        if (spellings.size() > 1)
+        {
+            StringArray aliases(spellings);
+            aliases.remove(0);
+            scale->setProperty("aliases", var(stringArrayToVarArray(aliases, true)));
+        }
+        scaleArray.add(var(scale));
+    }
+    root->setProperty("scales", var(scaleArray));
 
     Array<var> textMidiExamples;
     textMidiExamples.add("printf 'channel 1 note-on 60 100\\n' | routemidi in - transp 12 out -");

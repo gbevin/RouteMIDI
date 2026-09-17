@@ -530,11 +530,49 @@ public:
                 expectEquals((int)root->getProperty("octaveMiddleC"), 3);
                 expect(root->getProperty("numberBase").toString() == "decimal");
 
-                // the scale vocabulary is discoverable in the schema
-                const auto* scaleNames = root->getProperty("scaleNames").getArray();
-                expect(scaleNames != nullptr && scaleNames->size() == 24);
-                expect(scaleNames != nullptr && scaleNames->contains(var("major")));
-                expect(scaleNames != nullptr && scaleNames->contains(var("harmonicminor")));
+                // the scale vocabulary is discoverable in the schema, aliases included
+                const auto* scales = root->getProperty("scales").getArray();
+                expect(scales != nullptr);
+                if (scales != nullptr)
+                {
+                    expectEquals(scales->size(), ApplicationCommand::scaleNameList().size());
+
+                    StringArray published;
+                    for (const auto& entry : *scales)
+                    {
+                        auto* scale = entry.getDynamicObject();
+                        expect(scale != nullptr);
+                        if (scale == nullptr)
+                        {
+                            continue;
+                        }
+
+                        published.add(scale->getProperty("name").toString());
+                        if (const auto* aliases = scale->getProperty("aliases").getArray())
+                        {
+                            for (const auto& alias : *aliases)
+                            {
+                                published.add(alias.toString());
+                            }
+                        }
+                    }
+
+                    // a published spelling the parser rejects would mislead a client
+                    for (const auto& spelling : published)
+                    {
+                        expect(ApplicationCommand::isValidScaleName(spelling), spelling);
+                    }
+
+                    expect(published.contains("major"));
+                    expect(published.contains("harmonicminor"));
+                    // the aliases the schema used to keep to itself
+                    expect(published.contains("ionian"));
+                    expect(published.contains("blues"));
+                    expect(published.contains("naturalminor"));
+                }
+
+                // the command aliases live on the commands; the flat duplicate is gone
+                expect(!root->hasProperty("aliases"));
 
                 const auto& commands = *root->getProperty("commands").getArray();
                 expect(commands.size() > 0);

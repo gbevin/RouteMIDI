@@ -61,41 +61,43 @@ static int parsePitchClass(const ApplicationState& state, const String& value)
     return ((state.asDecOrHexIntValue(value) % 12) + 12) % 12;
 }
 
+// each scale lists the semitone degrees it contains, counting from the root;
+// the first spelling is canonical and the rest are accepted aliases. The schema
+// and the error messages derive from this table, so a new scale needs no edit
+// anywhere else
+static const struct { StringArray names; Array<int> degrees; } scales[] =
+{
+    { {"chromatic"}, {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11} },
+    { {"major", "ionian"}, {0, 2, 4, 5, 7, 9, 11} },
+    { {"minor", "aeolian", "naturalminor"}, {0, 2, 3, 5, 7, 8, 10} },
+    { {"dorian"}, {0, 2, 3, 5, 7, 9, 10} },
+    { {"phrygian"}, {0, 1, 3, 5, 7, 8, 10} },
+    { {"lydian"}, {0, 2, 4, 6, 7, 9, 11} },
+    { {"mixolydian"}, {0, 2, 4, 5, 7, 9, 10} },
+    { {"locrian"}, {0, 1, 3, 5, 6, 8, 10} },
+    { {"harmonicminor"}, {0, 2, 3, 5, 7, 8, 11} },
+    { {"melodicminor"}, {0, 2, 3, 5, 7, 9, 11} },
+    { {"majorpentatonic", "majpent", "pentatonic"}, {0, 2, 4, 7, 9} },
+    { {"minorpentatonic", "minpent"}, {0, 3, 5, 7, 10} },
+    { {"majorblues", "majblues"}, {0, 2, 3, 4, 7, 9} },
+    { {"minorblues", "minblues", "blues"}, {0, 3, 5, 6, 7, 10} },
+    { {"diminished", "dim"}, {0, 2, 3, 5, 6, 8, 9, 11} },
+    { {"wholetone"}, {0, 2, 4, 6, 8, 10} },
+    { {"spanish", "phrygiandominant"}, {0, 1, 4, 5, 7, 8, 10} },
+    { {"romani", "gypsy", "hungarianminor"}, {0, 2, 3, 6, 7, 8, 11} },
+    { {"arabian"}, {0, 2, 4, 5, 6, 8, 10} },
+    { {"egyptian"}, {0, 2, 5, 7, 10} },
+    { {"ryukyu"}, {0, 4, 5, 7, 11} },
+    { {"augmented", "maj3rd"}, {0, 4, 8} },
+    { {"diminished7", "dim7", "min3rd"}, {0, 3, 6, 9} },
+    { {"fifth", "power", "5th"}, {0, 7} },
+};
+
 // builds a 12-bit mask of the pitch classes (relative to the root) that make up
 // a named scale, or a custom comma-separated list of semitone degrees; returns
 // 0 for an unrecognised name
 static uint16 scaleMask(const String& name)
 {
-    // each scale lists the semitone degrees it contains, counting from the root;
-    // the first spelling is canonical and the rest are accepted aliases
-    static const struct { StringArray names; Array<int> degrees; } scales[] =
-    {
-        { {"chromatic"}, {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11} },
-        { {"major", "ionian"}, {0, 2, 4, 5, 7, 9, 11} },
-        { {"minor", "aeolian", "naturalminor"}, {0, 2, 3, 5, 7, 8, 10} },
-        { {"dorian"}, {0, 2, 3, 5, 7, 9, 10} },
-        { {"phrygian"}, {0, 1, 3, 5, 7, 8, 10} },
-        { {"lydian"}, {0, 2, 4, 6, 7, 9, 11} },
-        { {"mixolydian"}, {0, 2, 4, 5, 7, 9, 10} },
-        { {"locrian"}, {0, 1, 3, 5, 6, 8, 10} },
-        { {"harmonicminor"}, {0, 2, 3, 5, 7, 8, 11} },
-        { {"melodicminor"}, {0, 2, 3, 5, 7, 9, 11} },
-        { {"majorpentatonic", "majpent", "pentatonic"}, {0, 2, 4, 7, 9} },
-        { {"minorpentatonic", "minpent"}, {0, 3, 5, 7, 10} },
-        { {"majorblues", "majblues"}, {0, 2, 3, 4, 7, 9} },
-        { {"minorblues", "minblues", "blues"}, {0, 3, 5, 6, 7, 10} },
-        { {"diminished", "dim"}, {0, 2, 3, 5, 6, 8, 9, 11} },
-        { {"wholetone"}, {0, 2, 4, 6, 8, 10} },
-        { {"spanish", "phrygiandominant"}, {0, 1, 4, 5, 7, 8, 10} },
-        { {"romani", "gypsy", "hungarianminor"}, {0, 2, 3, 6, 7, 8, 11} },
-        { {"arabian"}, {0, 2, 4, 5, 6, 8, 10} },
-        { {"egyptian"}, {0, 2, 5, 7, 10} },
-        { {"ryukyu"}, {0, 4, 5, 7, 11} },
-        { {"augmented", "maj3rd"}, {0, 4, 8} },
-        { {"diminished7", "dim7", "min3rd"}, {0, 3, 6, 9} },
-        { {"fifth", "power", "5th"}, {0, 7} },
-    };
-
     const String n = name.toLowerCase().removeCharacters("-_ ");
 
     for (const auto& scale : scales)
@@ -136,13 +138,24 @@ bool ApplicationCommand::isValidScaleName(const String& name)
     return scaleMask(name) != 0;
 }
 
+Array<StringArray> ApplicationCommand::scaleSpellings()
+{
+    Array<StringArray> result;
+    for (const auto& scale : scales)
+    {
+        result.add(scale.names);
+    }
+    return result;
+}
+
 StringArray ApplicationCommand::scaleNameList()
 {
-    return { "chromatic", "major", "minor", "dorian", "phrygian", "lydian",
-             "mixolydian", "locrian", "harmonicminor", "melodicminor",
-             "majorpentatonic", "minorpentatonic", "majorblues", "minorblues",
-             "diminished", "wholetone", "spanish", "romani", "arabian",
-             "egyptian", "ryukyu", "augmented", "diminished7", "fifth" };
+    StringArray result;
+    for (const auto& scale : scales)
+    {
+        result.add(scale.names[0]);
+    }
+    return result;
 }
 
 String ApplicationCommand::scaleNames()

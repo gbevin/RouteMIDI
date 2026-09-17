@@ -290,7 +290,7 @@ static DynamicObject* newGetSchemaOutputSchema()
     props->setProperty("numberBase", var(newTypeSchema("string")));
     props->setProperty("octaveMiddleC", var(newTypeSchema("integer")));
     props->setProperty("commands", var(newArraySchema(newTypeSchema("object"))));
-    props->setProperty("scaleNames", var(newArraySchema(newTypeSchema("string"))));
+    props->setProperty("scales", var(newArraySchema(newTypeSchema("object"))));
     props->setProperty("processingOrder", var(newArraySchema(newTypeSchema("string"))));
     return newObjectSchema(props, { "contractVersion", "stable", "version",
                                     "numberBase", "octaveMiddleC", "commands" });

@@ -234,6 +234,8 @@ struct ApplicationCommand
     static bool isValidScaleName(const String& name);
     static String scaleNames();
     static StringArray scaleNameList();
+    // every accepted spelling of each scale, canonical name first
+    static Array<StringArray> scaleSpellings();
 
     static bool checkChannel(const MidiMessage& msg, int channelLow, int channelHigh);
 
