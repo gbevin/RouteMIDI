@@ -348,7 +348,7 @@ String commandsJson(const Array<ApplicationCommand>& commands, int octaveMiddleC
 
     Array<var> notes;
     notes.add("The stage of a processing command matches the stage argument of the MCP route-editing tools: filters, transforms, mpe, conversions or split.");
-    notes.add("Filters whitelist matching messages when one or more positive filters are present.");
+    notes.add("Filters whitelist matching messages when one or more positive filters are present, so a route that filters notes also needs pb, cp and cc filters to keep pitch bend, pressure and timbre.");
     notes.add("The not command negates the following filter.");
     notes.add("Transforms run in the written order within the transform stage.");
     notes.add("MPE operations run in the written order within the MPE stage.");

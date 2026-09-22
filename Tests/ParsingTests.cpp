@@ -263,6 +263,30 @@ public:
             parse(chords, "in A chord out B in A chord 7 out B");
             expect(chords.getRoutes()[0]->transforms.isEmpty());
             expectEquals(chords.getRoutes()[1]->transforms.size(), 1);
+
+            // scale takes a comma-separated degree list, so the same spelling
+            // is accepted here and expands to separate intervals
+            ApplicationState commas;
+            parse(commas, "in A chord 0,4,7 out B in A chord 0,4 7 out B");
+            expectEquals(commas.getRoutes()[0]->transforms.size(), 1);
+            expectEquals(commas.getRoutes()[0]->transforms[0].opts_.size(), 3);
+            expect(commas.getRoutes()[0]->transforms[0].opts_[2] == "7");
+            expectEquals(commas.getRoutes()[1]->transforms[0].opts_.size(), 3);
+
+            // an interval that isn't a number reads as 0 and stacks a duplicate
+            // of the played note, in either spelling
+            ApplicationState intervals;
+            parse(intervals, "in A chord 4 bogus out B in A chord bogus out B in A chord 0,,7 out B");
+            expect(intervals.getRoutes()[0]->transforms.isEmpty());
+            expect(intervals.getRoutes()[1]->transforms.isEmpty());
+            expect(intervals.getRoutes()[2]->transforms.isEmpty());
+
+            // the forms that do parse still register, negatives and hex included
+            ApplicationState good;
+            parse(good, "in A chord 4 7 out B in A chord -5 4 out B in A hex chord 0C out B");
+            expectEquals(good.getRoutes()[0]->transforms.size(), 1);
+            expectEquals(good.getRoutes()[1]->transforms.size(), 1);
+            expectEquals(good.getRoutes()[2]->transforms.size(), 1);
         }
 
         beginTest("Monitoring is suppressed while a route writes MIDI text to stdout");
@@ -418,6 +442,34 @@ public:
                 expect(route->filters[0].opts_.isEmpty());
                 expect(route->filters[1].command_ == PROGRAM_CHANGE);
                 expect(route->filters[1].opts_[0] == "5");
+            }
+        }
+
+        beginTest("A range filter refuses the selector's lo..hi spelling");
+        {
+            // each case gets its own state because a refused filter still
+            // consumes two tokens, swallowing the "out" that follows it
+            for (const auto* line : { "in A noterange 0..59 out B",
+                                      "in A velrange 0..80 out B",
+                                      "in A ccrange 1 0..80 out B",
+                                      "in A cc14range 1 0..80 out B",
+                                      // a missing argument swallows "out"
+                                      "in A noterange 0 out B" })
+            {
+                ApplicationState state;
+                parse(state, line);
+                expect(state.getRoutes()[0]->filters.isEmpty(), line);
+            }
+
+            // the real form still registers, note names included
+            for (const auto* line : { "in A noterange 0 59 out B",
+                                      "in A noterange C-2 B2 out B",
+                                      "in A velrange 0 80 out B",
+                                      "in A ccrange 1 0 80 out B" })
+            {
+                ApplicationState state;
+                parse(state, line);
+                expectEquals(state.getRoutes()[0]->filters.size(), 1, line);
             }
         }
 

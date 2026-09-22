@@ -46,6 +46,14 @@ uint8  asNoteNumber(const String& value, const Format& format);
 uint8  asDecOrHex7BitValue(const String& value, const Format& format);
 uint16 asDecOrHex14BitValue(const String& value, const Format& format);
 int    asDecOrHexIntValue(const String& value, const Format& format);
+// asDecOrHexIntValue yields 0 for a value it can't read, so this reports
+// whether it read the whole thing
+bool   isDecOrHexIntValue(const String& value, const Format& format);
+// whether asNoteNumber reads the value as a note name or a number
+bool   isNoteNumber(const String& value, const Format& format);
+// whether the value is one value or an inclusive "lo..hi" range, the form the
+// ch, on, off, pp, cc, cc14 and pc filters accept
+bool   isSelector(const String& value, const Format& format, bool notes);
 
 // --- value formatting ---------------------------------------------------------
 String output7BitAsHex(int value);

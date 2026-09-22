@@ -907,9 +907,15 @@ static String mcpCommandDenialReason(const ApplicationCommand& cmd)
     return "\"" + cmd.param_ + "\" is not available in MCP mode.";
 }
 
-static String validateMcpCommandTokens(const Array<ApplicationCommand>& commands,
+static String validateMcpCommandTokens(const ApplicationState& state,
+                                       const Array<ApplicationCommand>& commands,
                                        const StringArray& tokens)
 {
+    StringArray collected;
+    auto shapeError = [&state, &collected](const ApplicationCommand* cmd) -> String
+    {
+        return cmd == nullptr ? String() : state.argumentShapeError(*cmd, collected);
+    };
     auto findCommand = [&commands](const String& token) -> const ApplicationCommand*
     {
         for (const auto& cmd : commands)
@@ -946,9 +952,15 @@ static String validateMcpCommandTokens(const Array<ApplicationCommand>& commands
             {
                 return "MCP mode does not support stdin/stdout '-' routes.";
             }
+            collected.add(token);
             remainingFixedArgs -= 1;
             if (remainingFixedArgs == 0)
             {
+                const String error = shapeError(current);
+                if (error.isNotEmpty())
+                {
+                    return error;
+                }
                 current = nullptr;
             }
             continue;
@@ -962,6 +974,12 @@ static String validateMcpCommandTokens(const Array<ApplicationCommand>& commands
             {
                 return denial;
             }
+            const String pending = shapeError(current);
+            if (pending.isNotEmpty())
+            {
+                return pending;
+            }
+            collected.clearQuick();
             current = cmd;
             convertOpts.clearQuick();
             remainingFixedArgs = jmax(0, cmd->expectedOptions_);
@@ -977,14 +995,14 @@ static String validateMcpCommandTokens(const Array<ApplicationCommand>& commands
         {
             return "Unknown command: " + token;
         }
-        // a non-command token feeding a variable-argument command: consumed
+        collected.add(token);
     }
 
     if (current != nullptr && (remainingFixedArgs > 0 || current->command_ == CONVERT))
     {
         return "Incomplete command: " + current->param_ + " is missing arguments";
     }
-    return {};
+    return shapeError(current);
 }
 
 
@@ -1137,7 +1155,7 @@ var McpServer::handleRequest(const var& message)
             // reject incomplete or unknown commands before anything is applied,
             // so a tool call is atomic and cannot leave the parser waiting for
             // arguments that would swallow the next call's tokens
-            const String validationError = validateMcpCommandTokens(state_.commands_, commands);
+            const String validationError = validateMcpCommandTokens(state_, state_.commands_, commands);
             if (validationError.isNotEmpty())
             {
                 return var(newMcpResponse(id, newMcpToolResult(validationError, var(), true)));
@@ -1585,7 +1603,7 @@ var McpServer::handleRequest(const var& message)
                 commands.add(token.toString());
             }
 
-            error = validateMcpCommandTokens(state_.commands_, commands);
+            error = validateMcpCommandTokens(state_, state_.commands_, commands);
             if (error.isNotEmpty())
             {
                 return toolError(error);

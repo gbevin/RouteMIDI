@@ -67,6 +67,10 @@ public:
 
     // the parser and the per-message processing stages, exposed so a route can
     // be built and driven a message at a time without real MIDI hardware
+    // checks a command's arguments are written the way it expects, shared with
+    // the MCP token validator so a bad argument is reported instead of whatever
+    // token gets swallowed after it
+    String argumentShapeError(const ApplicationCommand& cmd, const StringArray& opts) const;
     void parseParameters(StringArray& parameters);
     // like parseParameters, but newly created routes land in the given staging
     // list instead of routes_ (see the MCP start_route tool)
@@ -136,6 +140,9 @@ private:
     // adds a processing command (filter, transform, MPE operation, conversion or
     // split) to the route, with the same normalization and validation as the
     // command-line parser; returns an error message, or an empty string on success
+    // scale takes its degrees as one comma-separated argument, so chord accepts
+    // that spelling too instead of reading the list as a single interval
+    static StringArray chordIntervals(const StringArray& opts);
     String addProcessingCommand(Route& route, ApplicationCommand cmd, bool negate);
     void openInput(RouteInput& input);
     bool tryToConnectInput(RouteInput& input);

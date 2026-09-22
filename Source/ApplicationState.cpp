@@ -92,8 +92,8 @@ ApplicationState::ApplicationState()
 {
     commands_.add({"in",           "input",                            INPUT,                       1, {"name"},                   {"Add a MIDI input (- for stdin text); a new route starts after outputs"}, "Routing and ports"});
     commands_.add({"out",          "output",                           OUTPUT,                      1, {"name"},                   {"Add a MIDI output to the route (- for stdout text)"}});
-    commands_.add({"vin",          "virtual-in",                       VIRTUAL_IN,                 -1, {"(name)"},                 {"Add a virtual MIDI input to the route (Linux/macOS)"}});
-    commands_.add({"vout",         "virtual-out",                      VIRTUAL_OUT,                -1, {"(name)"},                 {"Add a virtual MIDI output to the route (Linux/macOS)"}});
+    commands_.add({"vin",          "virtual-in",                       VIRTUAL_IN,                 -1, {"(name)"},                 {"Create a virtual MIDI input and add it to the route (Linux/macOS)"}});
+    commands_.add({"vout",         "virtual-out",                      VIRTUAL_OUT,                -1, {"(name)"},                 {"Create a virtual MIDI output and add it to the route (Linux/macOS)"}});
     commands_.add({"list",         "",                                 LIST,                        0, {""},                       {"List the available MIDI input and output ports"}});
     commands_.add({"panic",        "",                                 PANIC,                       0, {""},                       {"Send all-notes-off on disconnect, exit and zone change"}});
     commands_.add({"file",         "",                                 TXTFILE,                     1, {"path"},                   {"Load commands from the specified program file"}, "Configuration"});
@@ -1107,6 +1107,92 @@ void ApplicationState::executeCommand(ApplicationCommand& cmd)
     pendingNegate_ = false;
 }
 
+StringArray ApplicationState::chordIntervals(const StringArray& opts)
+{
+    StringArray intervals;
+    for (const auto& opt : opts)
+    {
+        intervals.addTokens(opt, ",", "");
+    }
+    intervals.trim();
+    return intervals;
+}
+
+String ApplicationState::argumentShapeError(const ApplicationCommand& cmd, const StringArray& opts) const
+{
+    const auto format = textFormat();
+    switch (cmd.command_)
+    {
+        case CHANNEL:
+        case NOTE_ON:
+        case NOTE_OFF:
+        case POLY_PRESSURE:
+        case CONTROL_CHANGE:
+        case CONTROL_CHANGE_14BIT:
+        case PROGRAM_CHANGE:
+        {
+            // a selector is one value or an inclusive "lo..hi" range; "1-4"
+            // reads as just its first number and "1...4" as a low of 0, which
+            // for ch means any channel, so both quietly change what matches
+            const bool notes = cmd.command_ == NOTE_ON
+                            || cmd.command_ == NOTE_OFF
+                            || cmd.command_ == POLY_PRESSURE;
+            for (const auto& opt : opts)
+            {
+                if (!textmidi::isSelector(opt, format, notes))
+                {
+                    return cmd.param_ + " selector \"" + opt + "\" is not a value"
+                           " or a \"lo..hi\" range";
+                }
+            }
+            return {};
+        }
+        case NOTE_RANGE:
+        case VELOCITY_RANGE:
+        case CONTROL_CHANGE_RANGE:
+        case CONTROL_CHANGE_14BIT_RANGE:
+        {
+            // these take low and high as separate arguments, unlike the
+            // selectors above, and the wrong spelling reads as 0 so the filter
+            // quietly passes nothing
+            for (const auto& opt : opts)
+            {
+                if (opt.contains(".."))
+                {
+                    return cmd.param_ + " takes low and high as separate arguments,"
+                           " not a \"" + opt + "\" range";
+                }
+                const bool ok = cmd.command_ == NOTE_RANGE
+                              ? textmidi::isNoteNumber(opt, format)
+                              : textmidi::isDecOrHexIntValue(opt, format);
+                if (!ok)
+                {
+                    return cmd.param_ + " value \"" + opt + "\" is not a "
+                           + (cmd.command_ == NOTE_RANGE ? "note" : "number");
+                }
+            }
+            return {};
+        }
+        case CHORD:
+        {
+            for (const auto& interval : chordIntervals(opts))
+            {
+                if (interval.isEmpty())
+                {
+                    return "chord has an empty interval; check for a stray comma";
+                }
+                if (!textmidi::isDecOrHexIntValue(interval, format))
+                {
+                    return "chord interval \"" + interval + "\" is not a number";
+                }
+            }
+            return {};
+        }
+        default:
+            return {};
+    }
+}
+
 String ApplicationState::addProcessingCommand(Route& route, ApplicationCommand cmd, bool negate)
 {
     switch (cmd.command_)
@@ -1195,14 +1281,22 @@ String ApplicationState::addProcessingCommand(Route& route, ApplicationCommand c
             route.convertRules.clearQuick();
             return {};
         case CHORD:
+        {
             // the schema promises at least one interval; a bare chord would be
             // a silent no-op
             if (cmd.opts_.isEmpty())
             {
                 return "chord needs at least one semitone interval";
             }
+            const String error = argumentShapeError(cmd, cmd.opts_);
+            if (error.isNotEmpty())
+            {
+                return error;
+            }
+            cmd.opts_ = chordIntervals(cmd.opts_);
             route.transforms.add(cmd);
             return {};
+        }
         case IN_SCALE:
         case SCALE:
         case DIATONIC_TRANSPOSE:
@@ -1236,6 +1330,27 @@ String ApplicationState::addProcessingCommand(Route& route, ApplicationCommand c
             // adding replaces the split configuration, so the voice allocation
             // state of the previous one must not survive into the new zone
             route.mpeSplit = mpe::Splitter();
+            return {};
+        }
+        case CHANNEL:
+        case NOTE_ON:
+        case NOTE_OFF:
+        case POLY_PRESSURE:
+        case CONTROL_CHANGE:
+        case CONTROL_CHANGE_14BIT:
+        case PROGRAM_CHANGE:
+        case NOTE_RANGE:
+        case VELOCITY_RANGE:
+        case CONTROL_CHANGE_RANGE:
+        case CONTROL_CHANGE_14BIT_RANGE:
+        {
+            const String error = argumentShapeError(cmd, cmd.opts_);
+            if (error.isNotEmpty())
+            {
+                return error;
+            }
+            cmd.negate_ = negate;
+            route.filters.add(cmd);
             return {};
         }
         default:

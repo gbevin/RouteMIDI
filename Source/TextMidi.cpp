@@ -31,43 +31,71 @@ uint16 limit14Bit(int value)
     return (uint16)jlimit(0, 0x3fff, value);
 }
 
+// a note name is a letter, an optional flat or sharp, and an octave number
+static bool looksLikeNoteName(const String& value)
+{
+    if (value.length() < 2)
+    {
+        return false;
+    }
+    const String v = value.toUpperCase();
+    return v.substring(0, 1).containsOnly("CDEFGABH")
+        && v.substring(v.length() - 1).containsOnly("1234567890");
+}
+
 uint8 asNoteNumber(const String& value, const Format& format)
 {
-    if (value.length() >= 2)
+    if (looksLikeNoteName(value))
     {
         const String v = value.toUpperCase();
-        String first = v.substring(0, 1);
-        if (first.containsOnly("CDEFGABH") && v.substring(v.length() - 1).containsOnly("1234567890"))
+        int note = 0;
+        switch (v[0])
         {
-            int note = 0;
-            switch (first[0])
-            {
-                case 'C': note = 0; break;
-                case 'D': note = 2; break;
-                case 'E': note = 4; break;
-                case 'F': note = 5; break;
-                case 'G': note = 7; break;
-                case 'A': note = 9; break;
-                case 'B': note = 11; break;
-                case 'H': note = 11; break;
-            }
-
-            if (v[1] == 'B')
-            {
-                note -= 1;
-            }
-            else if (v[1] == '#')
-            {
-                note += 1;
-            }
-
-            note += (v.getTrailingIntValue() + 5 - format.octaveMiddleC) * 12;
-
-            return limit7Bit(note);
+            case 'C': note = 0; break;
+            case 'D': note = 2; break;
+            case 'E': note = 4; break;
+            case 'F': note = 5; break;
+            case 'G': note = 7; break;
+            case 'A': note = 9; break;
+            case 'B': note = 11; break;
+            case 'H': note = 11; break;
         }
+
+        if (v[1] == 'B')
+        {
+            note -= 1;
+        }
+        else if (v[1] == '#')
+        {
+            note += 1;
+        }
+
+        note += (v.getTrailingIntValue() + 5 - format.octaveMiddleC) * 12;
+
+        return limit7Bit(note);
     }
 
     return limit7Bit(asDecOrHexIntValue(value, format));
+}
+
+bool isNoteNumber(const String& value, const Format& format)
+{
+    return looksLikeNoteName(value) || isDecOrHexIntValue(value, format);
+}
+
+bool isSelector(const String& value, const Format& format, bool notes)
+{
+    auto valid = [&](const String& part)
+    {
+        return notes ? isNoteNumber(part, format) : isDecOrHexIntValue(part, format);
+    };
+
+    const int separator = value.indexOf("..");
+    if (separator < 0)
+    {
+        return valid(value);
+    }
+    return valid(value.substring(0, separator)) && valid(value.substring(separator + 2));
 }
 
 uint8 asDecOrHex7BitValue(const String& value, const Format& format)
@@ -98,6 +126,26 @@ int asDecOrHexIntValue(const String& value, const Format& format)
     {
         return value.getIntValue();
     }
+}
+
+bool isDecOrHexIntValue(const String& value, const Format& format)
+{
+    String digits = value;
+    bool hexadecimal = format.hexadecimal;
+    if (digits.endsWithIgnoreCase("H"))
+    {
+        digits = digits.dropLastCharacters(1);
+        hexadecimal = true;
+    }
+    else if (digits.endsWithIgnoreCase("M"))
+    {
+        digits = digits.dropLastCharacters(1);
+        hexadecimal = false;
+    }
+    digits = digits.startsWithChar('-') ? digits.substring(1) : digits;
+
+    return digits.isNotEmpty()
+        && digits.containsOnly(hexadecimal ? "0123456789abcdefABCDEF" : "0123456789");
 }
 
 String output7BitAsHex(int value)
